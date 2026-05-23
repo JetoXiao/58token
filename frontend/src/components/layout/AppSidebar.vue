@@ -7,7 +7,13 @@
     ]"
   >
     <!-- Logo/Brand -->
-    <div class="sidebar-header" :class="{ 'sidebar-header-collapsed': sidebarCollapsed }">
+    <router-link
+      to="/home"
+      class="sidebar-header sidebar-brand-link"
+      :class="{ 'sidebar-header-collapsed': sidebarCollapsed }"
+      :aria-label="`${siteName} ${siteSubtitle}`"
+      title="返回首页"
+    >
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
           {{ siteName }}
@@ -16,7 +22,7 @@
           {{ siteSubtitle }}
         </span>
       </div>
-    </div>
+    </router-link>
 
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
@@ -891,6 +897,20 @@ onMounted(() => {
   gap: 0;
   padding-left: 1.125rem;
   padding-right: 1.125rem;
+}
+
+.sidebar-brand-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sidebar-brand-link:hover {
+  background-color: rgba(59, 130, 246, 0.04);
+}
+
+.dark .sidebar-brand-link:hover {
+  background-color: rgba(255, 255, 255, 0.04);
 }
 
 .sidebar-brand {
