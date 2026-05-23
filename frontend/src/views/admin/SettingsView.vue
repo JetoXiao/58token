@@ -6861,7 +6861,7 @@ const form = reactive<SettingsForm>({
   default_user_rpm_limit: 0,
   site_name: "UseAiForMe",
   site_logo: "",
-  site_subtitle: "Subscription to API Conversion Platform",
+  site_subtitle: "让AI为我所用",
   api_base_url: "",
   contact_info: "",
   doc_url: "",
