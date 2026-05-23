@@ -87,6 +87,80 @@
           </p>
         </div>
 
+        <!-- Email Verification Code -->
+        <div v-if="emailVerifyEnabled">
+          <label for="verify_code" class="input-label">
+            {{ t('auth.verificationCode') }}
+          </label>
+          <div class="flex gap-2">
+            <div class="relative min-w-0 flex-1">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                <Icon name="shield" size="md" class="text-gray-400 dark:text-dark-500" />
+              </div>
+              <input
+                id="verify_code"
+                v-model="formData.verify_code"
+                type="text"
+                required
+                autocomplete="one-time-code"
+                inputmode="numeric"
+                maxlength="6"
+                :disabled="registrationActionDisabled"
+                class="input pl-11"
+                :class="{ 'input-error': errors.verify_code }"
+                placeholder="000000"
+              />
+            </div>
+            <button
+              type="button"
+              @click="sendRegistrationVerifyCode"
+              :disabled="sendCodeDisabled"
+              class="btn btn-secondary shrink-0 px-4"
+            >
+              <svg
+                v-if="isSendingCode"
+                class="h-4 w-4 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span v-else-if="countdown > 0">
+                {{ t('auth.resendCountdown', { countdown }) }}
+              </span>
+              <span v-else>
+                {{ isSendingCode ? t('auth.sendingCode') : t('auth.sendCode') }}
+              </span>
+            </button>
+          </div>
+          <p class="input-hint">
+            {{ t('auth.verificationCodeHint') }}
+          </p>
+          <transition name="fade">
+            <div
+              v-if="codeSent"
+              class="mt-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20"
+            >
+              <Icon name="checkCircle" size="sm" class="text-green-600 dark:text-green-400" />
+              <span class="text-sm text-green-700 dark:text-green-400">
+                {{ t('auth.codeSentSuccess') }}
+              </span>
+            </div>
+          </transition>
+        </div>
+
         <!-- Invitation Code Input (Required when enabled) -->
         <div v-if="invitationCodeEnabled">
           <label for="invitation_code" class="input-label">
@@ -208,7 +282,11 @@
         <!-- Submit Button -->
         <button
           type="submit"
-          :disabled="registrationActionDisabled || (turnstileEnabled && !turnstileToken)"
+          :disabled="
+            registrationActionDisabled ||
+            (turnstileEnabled && !emailVerifyEnabled && !turnstileToken) ||
+            (emailVerifyEnabled && !formData.verify_code.trim())
+          "
           class="btn btn-primary w-full"
         >
           <svg
@@ -236,7 +314,7 @@
             isLoading
               ? t('auth.processing')
               : emailVerifyEnabled
-                ? t('auth.continue')
+                ? t('auth.verifyAndCreate')
                 : t('auth.createAccount')
           }}
         </button>
@@ -313,6 +391,7 @@ import { useAuthStore, useAppStore } from '@/stores'
 import {
   getPublicSettings,
   isWeChatWebOAuthEnabled,
+  sendVerifyCode,
   validatePromoCode,
   validateInvitationCode
 } from '@/api/auth'
@@ -342,9 +421,13 @@ const appStore = useAppStore()
 // ==================== State ====================
 
 const isLoading = ref<boolean>(false)
+const isSendingCode = ref<boolean>(false)
 const settingsLoaded = ref<boolean>(false)
 const errorMessage = ref<string>('')
 const showPassword = ref<boolean>(false)
+const codeSent = ref<boolean>(false)
+const countdown = ref<number>(0)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 // Public settings
 const registrationEnabled = ref<boolean>(true)
@@ -353,7 +436,7 @@ const promoCodeEnabled = ref<boolean>(true)
 const invitationCodeEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
-const siteName = ref<string>('Sub2API')
+const siteName = ref<string>('UseAiForMe')
 const linuxdoOAuthEnabled = ref<boolean>(false)
 const wechatOAuthEnabled = ref<boolean>(false)
 const oidcOAuthEnabled = ref<boolean>(false)
@@ -395,6 +478,7 @@ let invitationValidateTimeout: ReturnType<typeof setTimeout> | null = null
 const formData = reactive({
   email: '',
   password: '',
+  verify_code: '',
   promo_code: '',
   invitation_code: '',
   aff_code: ''
@@ -403,6 +487,7 @@ const formData = reactive({
 const errors = reactive({
   email: '',
   password: '',
+  verify_code: '',
   turnstile: '',
   invitation_code: ''
 })
@@ -410,6 +495,7 @@ const errors = reactive({
 const validationToastMessage = computed(() =>
   errors.email ||
   errors.password ||
+  errors.verify_code ||
   (invitationValidation.invalid ? invitationValidation.message : '') ||
   errors.invitation_code ||
   (promoValidation.invalid ? promoValidation.message : '') ||
@@ -434,11 +520,36 @@ const registrationActionDisabled = computed(
   () => isLoading.value || !settingsLoaded.value || agreementGateActive.value
 )
 
+const sendCodeDisabled = computed(
+  () =>
+    registrationActionDisabled.value ||
+    isSendingCode.value ||
+    countdown.value > 0 ||
+    !formData.email.trim() ||
+    !validateEmail(formData.email) ||
+    !isRegistrationEmailSuffixAllowed(formData.email, registrationEmailSuffixWhitelist.value) ||
+    (turnstileEnabled.value && !turnstileToken.value)
+)
+
 watch(validationToastMessage, (value, previousValue) => {
   if (value && value !== previousValue) {
     appStore.showError(value)
   }
 })
+
+watch(
+  () => formData.email,
+  () => {
+    formData.verify_code = ''
+    errors.verify_code = ''
+    codeSent.value = false
+    countdown.value = 0
+    if (countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }
+)
 
 function syncAffiliateReferralCode(): string {
   const code = resolveAffiliateReferralCode(route.query.aff, route.query.aff_code)
@@ -461,7 +572,7 @@ onMounted(async () => {
     invitationCodeEnabled.value = settings.invitation_code_enabled
     turnstileEnabled.value = settings.turnstile_enabled
     turnstileSiteKey.value = settings.turnstile_site_key || ''
-    siteName.value = settings.site_name || 'Sub2API'
+    siteName.value = settings.site_name || 'UseAiForMe'
     linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
     wechatOAuthEnabled.value = isWeChatWebOAuthEnabled(settings)
     oidcOAuthEnabled.value = settings.oidc_oauth_enabled
@@ -505,6 +616,10 @@ onUnmounted(() => {
   }
   if (invitationValidateTimeout) {
     clearTimeout(invitationValidateTimeout)
+  }
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
   }
 })
 
@@ -645,6 +760,71 @@ function getPromoErrorMessage(errorCode?: string): string {
 
 // ==================== Invitation Code Validation ====================
 
+function startCountdown(seconds: number): void {
+  countdown.value = seconds
+
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+  }
+
+  countdownTimer = setInterval(() => {
+    if (countdown.value > 0) {
+      countdown.value--
+      return
+    }
+    if (countdownTimer) {
+      clearInterval(countdownTimer)
+      countdownTimer = null
+    }
+  }, 1000)
+}
+
+async function sendRegistrationVerifyCode(): Promise<void> {
+  errors.email = ''
+  errors.turnstile = ''
+  errors.verify_code = ''
+
+  if (!formData.email.trim()) {
+    errors.email = t('auth.emailRequired')
+    return
+  }
+  if (!validateEmail(formData.email)) {
+    errors.email = t('auth.invalidEmail')
+    return
+  }
+  if (!isRegistrationEmailSuffixAllowed(formData.email, registrationEmailSuffixWhitelist.value)) {
+    errors.email = buildEmailSuffixNotAllowedMessage()
+    return
+  }
+  if (turnstileEnabled.value && !turnstileToken.value) {
+    errors.turnstile = t('auth.completeVerification')
+    return
+  }
+
+  isSendingCode.value = true
+  errorMessage.value = ''
+
+  try {
+    const response = await sendVerifyCode({
+      email: formData.email.trim(),
+      turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined
+    })
+    codeSent.value = true
+    startCountdown(response.countdown)
+    if (turnstileRef.value) {
+      turnstileRef.value.reset()
+      turnstileToken.value = ''
+    }
+  } catch (error: unknown) {
+    errorMessage.value = buildAuthErrorMessage(error, {
+      fallback: t('auth.sendCodeFailed')
+    })
+    appStore.showError(errorMessage.value)
+  } finally {
+    isSendingCode.value = false
+  }
+}
+
 function handleInvitationCodeInput(): void {
   const code = formData.invitation_code.trim()
 
@@ -751,6 +931,7 @@ function validateForm(): boolean {
   // Reset errors
   errors.email = ''
   errors.password = ''
+  errors.verify_code = ''
   errors.turnstile = ''
   errors.invitation_code = ''
 
@@ -787,6 +968,16 @@ function validateForm(): boolean {
     isValid = false
   }
 
+  if (emailVerifyEnabled.value) {
+    if (!formData.verify_code.trim()) {
+      errors.verify_code = t('auth.codeRequired')
+      isValid = false
+    } else if (!/^\d{6}$/.test(formData.verify_code.trim())) {
+      errors.verify_code = t('auth.invalidCode')
+      isValid = false
+    }
+  }
+
   // Invitation code validation (required when enabled)
   if (invitationCodeEnabled.value) {
     if (!formData.invitation_code.trim()) {
@@ -796,7 +987,7 @@ function validateForm(): boolean {
   }
 
   // Turnstile validation
-  if (turnstileEnabled.value && !turnstileToken.value) {
+  if (turnstileEnabled.value && !emailVerifyEnabled.value && !turnstileToken.value) {
     errors.turnstile = t('auth.completeVerification')
     isValid = false
   }
@@ -861,31 +1052,12 @@ async function handleRegister(): Promise<void> {
       formData.aff_code = affCode
     }
 
-    // If email verification is enabled, redirect to verification page
-    if (emailVerifyEnabled.value) {
-      // Store registration data in sessionStorage
-      sessionStorage.setItem(
-        'register_data',
-        JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          turnstile_token: turnstileToken.value,
-          promo_code: formData.promo_code || undefined,
-          invitation_code: formData.invitation_code || undefined,
-          ...(affCode ? { aff_code: affCode } : {})
-        })
-      )
-
-      // Navigate to email verification page
-      await router.push('/email-verify')
-      return
-    }
-
-    // Otherwise, directly register
     await authStore.register({
       email: formData.email,
       password: formData.password,
-      turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined,
+      verify_code: emailVerifyEnabled.value ? formData.verify_code.trim() : undefined,
+      turnstile_token:
+        turnstileEnabled.value && !emailVerifyEnabled.value ? turnstileToken.value : undefined,
       promo_code: formData.promo_code || undefined,
       invitation_code: formData.invitation_code || undefined,
       ...(affCode ? { aff_code: affCode } : {})
