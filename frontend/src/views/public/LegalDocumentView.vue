@@ -90,7 +90,6 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Icon from '@/components/icons/Icon.vue'
 import { getPublicSettings } from '@/api/auth'
-import { sanitizeUrl } from '@/utils/url'
 import type { LoginAgreementDocument, PublicSettings } from '@/types'
 
 type LegalDocumentIcon = 'document' | 'shield' | 'globe' | 'cog'
@@ -108,10 +107,7 @@ marked.setOptions({
 const documentId = computed(() => String(route.params.documentId || ''))
 const documents = computed(() => settings.value?.login_agreement_documents ?? [])
 const siteName = computed(() => settings.value?.site_name || 'UseAiForMe')
-const siteLogo = computed(() => sanitizeUrl(settings.value?.site_logo || '', {
-  allowRelative: true,
-  allowDataUrl: true,
-}))
+const siteLogo = computed(() => '/logo.png')
 const updatedAt = computed(() => settings.value?.login_agreement_updated_at || '')
 
 const currentDocument = computed<LoginAgreementDocument | null>(() => {

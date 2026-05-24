@@ -13,6 +13,67 @@ export default {
     // 新增：面向用户的价值主张
     heroSubtitle: '一个密钥，畅用多个 AI 模型',
     heroDescription: '无需管理多个订阅账号，一站式接入 Claude、GPT、Gemini 等主流 AI 服务',
+    marketing: {
+      eyebrow: '面向团队的 AI 网关操作系统',
+      heroCopy: '统一接入账号、路由请求、计量用量，并在一个自适应控制台里运营你的 AI 服务。',
+      liveRouting: '实时路由',
+      requests: '请求',
+      latency: '延迟',
+      weeklyGrowth: '本周 +18.2%',
+      p95Stable: 'P95 稳定',
+      routingRequest: '正在路由请求...',
+      platformEyebrow: '平台能力',
+      platformTitle: '一个控制台管理 AI 运营',
+      platformDescription: '以现代 Bento 工作区呈现路由、计费、权限控制与可观测能力。',
+      pricingEyebrow: '计费',
+      pricingTitle: '为按量 AI 产品而设计',
+      pricingDescription: '保留现有计费逻辑，用更精致的 SaaS 界面呈现套餐、订阅与用量。',
+      rechargeEyebrow: '充值说明',
+      rechargeTitle: '人民币充值，美元余额到账',
+      rechargeDescription: '平台采用 1:1（RMB:USD）充值换算，充值 1 RMB，账户实际到账 1 USD 余额。',
+      rechargeRateLabel: '到账比例',
+      rechargeRate: '1 RMB = 1 USD',
+      rechargeExample: '充值 1 RMB，到账 1 USD',
+      docsCta: '查看文档',
+      bento: {
+        unifiedGateway: {
+          title: '统一网关',
+          description: '提供 OpenAI 风格 API 入口，按供应商智能路由，并支持优雅降级。'
+        },
+        accountPool: {
+          title: '账号池',
+          description: '管理供应商账号、会话保持、配额和分组分配。'
+        },
+        realtimeBilling: {
+          title: '实时计费',
+          description: '跟踪实际成本、标准成本、请求、Token 与余额变化。'
+        },
+        accessControl: {
+          title: '访问控制',
+          description: '管理 API Key 策略、注册规则、风控和安全默认项。'
+        },
+        opsDashboard: {
+          title: '运营看板',
+          description: '图表和近期用量贴近日常运维工作流，便于快速判断状态。'
+        }
+      },
+      plans: {
+        developer: {
+          name: '开发者',
+          badge: '起步',
+          price: '按量计费',
+          copy: '适合验证 API 路由和账号池的个人开发者。',
+          features: ['API Key 控制台', '用量记录', '余额和配额展示']
+        },
+        team: {
+          name: '团队',
+          badge: '即将推出',
+          price: '订阅套餐',
+          copy: '适合需要治理、计费和运营可视化的团队。',
+          features: ['分组策略', '供应商监控', '管理员设置控制台']
+        }
+      }
+    },
     tags: {
       subscriptionToApi: '订阅转 API',
       stickySession: '会话保持',
@@ -613,6 +674,7 @@ export default {
   dashboard: {
     title: '仪表盘',
     welcomeMessage: '欢迎回来！这是您账户的概览。',
+    platformEyebrow: 'OpenAI Platform 风格控制台',
     balance: '余额',
     apiKeys: 'API 密钥',
     todayRequests: '今日请求',
@@ -5361,6 +5423,8 @@ export default {
     settings: {
       title: '系统设置',
       description: '管理注册、邮箱验证、默认值和 SMTP 设置',
+      controlPlaneEyebrow: '控制平面',
+      controlPlaneDescription: '配置访问、计费、网关行为与平台默认值，不改变运行中的业务逻辑。',
       tabs: {
         general: '通用设置',
         agreement: '登录条款',

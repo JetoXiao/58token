@@ -1,6 +1,16 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-6xl space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <section class="relative overflow-hidden rounded-[1.75rem] border border-gray-200/70 bg-white/75 p-6 text-gray-950 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:shadow-[0_24px_90px_rgba(0,0,0,0.32)]">
+        <div class="absolute right-0 top-0 h-40 w-40 rounded-full bg-violet-300/25 blur-3xl dark:bg-violet-400/20"></div>
+        <div class="relative">
+          <p class="text-sm font-medium text-violet-600 dark:text-violet-300">{{ t('admin.settings.controlPlaneEyebrow') }}</p>
+          <h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{{ t('admin.settings.title') }}</h1>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-600 dark:text-slate-400">
+            {{ t('admin.settings.controlPlaneDescription') }}
+          </p>
+        </div>
+      </section>
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
         <div
@@ -9482,7 +9492,7 @@ watch(
 
 /* ============ 系统设置 Tab 导航 ============ */
 .settings-tabs-shell {
-  @apply sticky z-20 -mx-1 rounded-2xl border border-white/80 bg-white/90 p-1.5 backdrop-blur-xl;
+  @apply sticky z-20 -mx-1 rounded-[1.5rem] border border-white/80 bg-white/80 p-1.5 backdrop-blur-2xl;
   top: 4.75rem;
   box-shadow:
     0 12px 28px rgb(15 23 42 / 0.07),
@@ -9504,7 +9514,7 @@ watch(
 }
 
 .settings-tab {
-  @apply relative isolate flex h-10 min-w-[6.75rem] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-transparent px-3 text-sm font-medium text-gray-600 outline-none transition-colors duration-200 ease-out dark:text-gray-300;
+  @apply relative isolate flex h-10 min-w-[6.75rem] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-2xl border border-transparent px-3 text-sm font-medium text-gray-600 outline-none transition-all duration-200 ease-out dark:text-gray-300;
 }
 
 @media (min-width: 768px) {
@@ -9522,7 +9532,7 @@ watch(
 }
 
 .settings-tab::before {
-  @apply absolute inset-0 -z-10 rounded-xl opacity-0 transition-opacity duration-200;
+  @apply absolute inset-0 -z-10 rounded-2xl opacity-0 transition-opacity duration-200;
   content: "";
   background: linear-gradient(135deg, rgb(248 250 252 / 0.95), rgb(241 245 249 / 0.8));
 }
@@ -9537,7 +9547,7 @@ watch(
 }
 
 .settings-tab-active {
-  @apply border-primary-200/80 bg-white text-primary-700 shadow-sm dark:border-primary-400/30 dark:bg-dark-700/95 dark:text-primary-200;
+  @apply border-primary-200/80 bg-white text-primary-700 shadow-sm dark:border-cyan-300/20 dark:bg-white/[0.08] dark:text-cyan-100;
   box-shadow:
     0 8px 18px rgb(15 23 42 / 0.08),
     0 1px 0 rgb(255 255 255 / 0.92) inset;
@@ -9581,8 +9591,8 @@ watch(
    because Vue's scoped-CSS compiler was dropping the `:global(.dark) ...`
    rules in the production build, leaving inactive tabs unreadable on dark. */
 .dark .settings-tabs-shell {
-  border-color: rgb(51 65 85 / 0.65);
-  background: rgb(15 23 42 / 0.86);
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.045);
   box-shadow:
     0 16px 36px rgb(0 0 0 / 0.28),
     0 1px 0 rgb(255 255 255 / 0.06) inset;

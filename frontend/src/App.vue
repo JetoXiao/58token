@@ -27,7 +27,7 @@ function updateFavicon(logoUrl: string) {
     link.rel = 'icon'
     document.head.appendChild(link)
   }
-  link.type = logoUrl.endsWith('.svg') ? 'image/svg+xml' : 'image/x-icon'
+  link.type = logoUrl.endsWith('.svg') ? 'image/svg+xml' : 'image/png'
   link.href = logoUrl
 }
 
@@ -35,9 +35,7 @@ function updateFavicon(logoUrl: string) {
 watch(
   () => appStore.siteLogo,
   (newLogo) => {
-    if (newLogo) {
-      updateFavicon(newLogo)
-    }
+    updateFavicon(newLogo || '/logo.png')
   },
   { immediate: true }
 )

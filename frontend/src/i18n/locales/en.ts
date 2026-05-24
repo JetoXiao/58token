@@ -13,6 +13,67 @@ export default {
     // User-focused value proposition
     heroSubtitle: 'One Key, All AI Models',
     heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
+    marketing: {
+      eyebrow: 'AI gateway OS for teams',
+      heroCopy: 'Connect accounts, route traffic, meter usage, and operate your AI stack from a single adaptive control plane.',
+      liveRouting: 'Live routing',
+      requests: 'Requests',
+      latency: 'Latency',
+      weeklyGrowth: '+18.2% this week',
+      p95Stable: 'P95 stable',
+      routingRequest: 'routing request...',
+      platformEyebrow: 'Platform',
+      platformTitle: 'One console for AI operations',
+      platformDescription: 'A modern bento workspace for routing, billing, access control, and observability.',
+      pricingEyebrow: 'Pricing',
+      pricingTitle: 'Built for metered AI products',
+      pricingDescription: 'Keep your current billing logic. Present plans, subscriptions, and usage in a polished SaaS surface.',
+      rechargeEyebrow: 'Top-up pricing',
+      rechargeTitle: 'RMB top-ups credit your account in USD',
+      rechargeDescription: 'Top-ups use a 1:1 (RMB:USD) conversion. When you top up 1 RMB, your account receives 1 USD in usable balance.',
+      rechargeRateLabel: 'Credit ratio',
+      rechargeRate: '1 RMB = 1 USD',
+      rechargeExample: 'Top up 1 RMB, receive 1 USD',
+      docsCta: 'View docs',
+      bento: {
+        unifiedGateway: {
+          title: 'Unified gateway',
+          description: 'OpenAI-style API entrypoints with provider-aware routing and graceful fallbacks.'
+        },
+        accountPool: {
+          title: 'Account pool',
+          description: 'Manage provider accounts, session affinity, quotas, and group assignment.'
+        },
+        realtimeBilling: {
+          title: 'Realtime billing',
+          description: 'Track actual cost, standard cost, requests, tokens, and balance updates.'
+        },
+        accessControl: {
+          title: 'Access control',
+          description: 'API key policies, registration rules, risk controls, and secure defaults.'
+        },
+        opsDashboard: {
+          title: 'Ops dashboard',
+          description: 'Charts and recent usage stay close to the workflows your operators use daily.'
+        }
+      },
+      plans: {
+        developer: {
+          name: 'Developer',
+          badge: 'Start',
+          price: 'Usage based',
+          copy: 'For individuals validating API routing and account pools.',
+          features: ['API key dashboard', 'Usage records', 'Balance and quota display']
+        },
+        team: {
+          name: 'Team',
+          badge: 'Soon',
+          price: 'Subscription',
+          copy: 'For teams that need governance, billing, and operational visibility.',
+          features: ['Group policies', 'Provider monitoring', 'Admin settings console']
+        }
+      }
+    },
     tags: {
       subscriptionToApi: 'Subscription to API',
       stickySession: 'Session Persistence',
@@ -614,6 +675,7 @@ export default {
   dashboard: {
     title: 'Dashboard',
     welcomeMessage: "Welcome back! Here's an overview of your account.",
+    platformEyebrow: 'OpenAI Platform style dashboard',
     balance: 'Balance',
     apiKeys: 'API Keys',
     todayRequests: 'Today Requests',
@@ -5198,6 +5260,8 @@ export default {
     settings: {
       title: 'System Settings',
       description: 'Manage registration, email verification, default values, and SMTP settings',
+      controlPlaneEyebrow: 'Control plane',
+      controlPlaneDescription: 'Configure access, billing, gateway behavior, and platform defaults without changing runtime business logic.',
       tabs: {
         general: 'General',
         agreement: 'Agreement',

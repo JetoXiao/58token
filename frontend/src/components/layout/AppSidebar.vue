@@ -14,6 +14,9 @@
       :aria-label="`${siteName} ${siteSubtitle}`"
       title="返回首页"
     >
+      <span class="sidebar-logo" aria-hidden="true">
+        <img src="/logo.png" alt="" class="h-full w-full object-cover" />
+      </span>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
           {{ siteName }}
@@ -903,6 +906,21 @@ onMounted(() => {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
+}
+
+.sidebar-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 2.25rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: rgb(15 23 42 / 0.06);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.12);
+}
+
+.dark .sidebar-logo {
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: 0 0 24px rgb(34 211 238 / 0.14);
 }
 
 .sidebar-brand-link:hover {

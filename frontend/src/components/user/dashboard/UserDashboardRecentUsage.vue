@@ -1,7 +1,7 @@
 <template>
-  <div class="card">
-    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('dashboard.recentUsage') }}</h2>
+  <div class="card overflow-hidden">
+    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-white/10">
+      <h2 class="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">{{ t('dashboard.recentUsage') }}</h2>
       <span class="badge badge-gray">{{ t('dashboard.last7Days') }}</span>
     </div>
     <div class="p-6">
@@ -12,9 +12,9 @@
         <EmptyState :title="t('dashboard.noUsageRecords')" :description="t('dashboard.startUsingApi')" />
       </div>
       <div v-else class="space-y-3">
-        <div v-for="log in data" :key="log.id" class="flex items-center justify-between rounded-xl bg-gray-50 p-4 transition-colors hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800">
+        <div v-for="log in data" :key="log.id" class="flex items-center justify-between rounded-2xl border border-gray-100 bg-gray-50/70 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:bg-gray-100 dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.07]">
           <div class="flex items-center gap-4">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-900/30">
+            <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-100 dark:bg-primary-400/10">
               <Icon name="beaker" size="md" class="text-primary-600 dark:text-primary-400" />
             </div>
             <div>

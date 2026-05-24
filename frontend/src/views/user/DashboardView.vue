@@ -1,6 +1,19 @@
 <template>
   <AppLayout>
-    <div class="space-y-6">
+    <div class="mx-auto max-w-7xl space-y-6">
+      <section class="relative overflow-hidden rounded-[1.75rem] border border-gray-200/70 bg-white/75 p-6 text-gray-950 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:shadow-[0_24px_90px_rgba(0,0,0,0.32)]">
+        <div class="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/25 blur-3xl dark:bg-cyan-400/20"></div>
+        <div class="relative flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div>
+            <p class="text-sm font-medium text-cyan-600 dark:text-cyan-300">{{ $t('dashboard.platformEyebrow') }}</p>
+            <h2 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{{ $t('dashboard.title') }}</h2>
+            <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-600 dark:text-slate-400">{{ $t('dashboard.welcomeMessage') }}</p>
+          </div>
+          <button class="btn btn-secondary" @click="refreshAll">
+            {{ $t('common.refresh') }}
+          </button>
+        </div>
+      </section>
       <div v-if="loading" class="flex items-center justify-center py-12"><LoadingSpinner /></div>
       <template v-else-if="stats">
         <UserDashboardStats :stats="stats" :balance="user?.balance || 0" :is-simple="authStore.isSimpleMode" />
