@@ -36,13 +36,14 @@ export const PROVIDER_SUPPORTED_TYPES: Record<string, string[]> = {
   wxpay: ['wxpay'],
   stripe: ['card', 'alipay', 'wxpay', 'link'],
   airwallex: ['airwallex'],
+  infini: ['usdt'],
 }
 
 /** Available payment modes for EasyPay providers. */
 export const EASYPAY_PAYMENT_MODES = ['qrcode', 'popup'] as const
 
 /** Fixed display order for user-facing payment methods */
-export const METHOD_ORDER = ['alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'stripe', 'airwallex'] as const
+export const METHOD_ORDER = ['usdt', 'alipay', 'alipay_direct', 'wxpay', 'wxpay_direct', 'stripe', 'airwallex'] as const
 
 /** Payment mode constants */
 export const PAYMENT_MODE_QRCODE = 'qrcode'
@@ -55,6 +56,7 @@ export const PAYMENT_MODE_REDIRECT = 'redirect'
 
 export const PAYMENT_CURRENCY_OPTIONS: TypeOption[] = [
   { value: 'CNY', label: 'CNY' },
+  { value: 'USDT', label: 'USDT' },
   { value: 'HKD', label: 'HKD' },
   { value: 'USD', label: 'USD' },
   { value: 'EUR', label: 'EUR' },
@@ -96,6 +98,7 @@ export const WEBHOOK_PATHS: Record<string, string> = {
   wxpay: '/api/v1/payment/webhook/wxpay',
   stripe: '/api/v1/payment/webhook/stripe',
   airwallex: '/api/v1/payment/webhook/airwallex',
+  infini: '/api/v1/payment/webhook/infini',
 }
 
 export const RETURN_PATH = '/payment/result'
@@ -146,6 +149,15 @@ export const PROVIDER_CONFIG_FIELDS: Record<string, ConfigFieldDef[]> = {
     { key: 'countryCode', label: '', sensitive: false, defaultValue: 'CN' },
     { key: 'currency', label: '', sensitive: false, defaultValue: 'CNY', hintKey: 'admin.settings.payment.field_paymentCurrencyHint', options: PAYMENT_CURRENCY_OPTIONS },
     { key: 'accountId', label: '', sensitive: false, optional: true, clearable: true, hintKey: 'admin.settings.payment.field_accountIdHint' },
+  ],
+  infini: [
+    { key: 'keyId', label: 'Key ID', sensitive: false },
+    { key: 'secretKey', label: 'Secret Key', sensitive: true },
+    { key: 'webhookSecret', label: 'Webhook Secret', sensitive: true },
+    { key: 'apiBase', label: 'API Base', sensitive: false, defaultValue: 'https://openapi.infini.money' },
+    { key: 'currency', label: '', sensitive: false, defaultValue: 'USDT', hintKey: 'admin.settings.payment.field_paymentCurrencyHint', options: PAYMENT_CURRENCY_OPTIONS },
+    { key: 'fiatCurrency', label: 'Fiat Currency', sensitive: false, defaultValue: 'USD' },
+    { key: 'merchantAlias', label: 'Merchant Alias', sensitive: false, optional: true, clearable: true },
   ],
 }
 

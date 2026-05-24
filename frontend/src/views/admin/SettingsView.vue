@@ -5730,6 +5730,31 @@
                   </div>
                   <div>
                     <label class="input-label">{{
+                      t("admin.settings.payment.usdtCnyExchangeRate")
+                    }}</label>
+                    <input
+                      :value="form.payment_usdt_cny_exchange_rate || ''"
+                      @input="
+                        form.payment_usdt_cny_exchange_rate =
+                          parseFloat(
+                            ($event.target as HTMLInputElement).value,
+                          ) || 7.2
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      class="input"
+                    />
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{
+                        t(
+                          "admin.settings.payment.usdtCnyExchangeRateHint",
+                        )
+                      }}
+                    </p>
+                  </div>
+                  <div>
+                    <label class="input-label">{{
                       t("admin.settings.payment.rechargeFeeRate")
                     }}</label>
                     <div class="relative">
@@ -6583,6 +6608,7 @@ import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiErro
 import { useAppStore } from "@/stores";
 import { useAdminSettingsStore } from "@/stores/adminSettings";
 import { normalizeVisibleMethod } from "@/components/payment/paymentFlow";
+import { PROVIDER_SUPPORTED_TYPES } from "@/components/payment/providerConfig";
 import {
   isRegistrationEmailSuffixDomainValid,
   normalizeRegistrationEmailSuffixDomain,
@@ -6888,6 +6914,7 @@ const form = reactive<SettingsForm>({
   payment_balance_disabled: false,
   payment_balance_recharge_multiplier: 1,
   payment_recharge_fee_rate: 0,
+  payment_usdt_cny_exchange_rate: 7.2,
   payment_enabled_types: [],
   payment_help_image_url: "",
   payment_help_text: "",
@@ -8156,6 +8183,8 @@ async function saveSettings() {
       payment_balance_recharge_multiplier:
         Number(form.payment_balance_recharge_multiplier) || 1,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
+      payment_usdt_cny_exchange_rate:
+        Number(form.payment_usdt_cny_exchange_rate) || 7.2,
       payment_enabled_types: form.payment_enabled_types,
       payment_load_balance_strategy: form.payment_load_balance_strategy,
       payment_product_name_prefix: form.payment_product_name_prefix,
@@ -8759,6 +8788,7 @@ const allPaymentTypes = computed(() => [
   { value: "wxpay", label: t("payment.methods.wxpay") },
   { value: "stripe", label: t("payment.methods.stripe") },
   { value: "airwallex", label: t("payment.methods.airwallex") },
+  { value: "usdt", label: t("payment.methods.usdt") },
 ]);
 
 function isPaymentTypeEnabled(type: string): boolean {
@@ -8783,7 +8813,7 @@ function togglePaymentType(type: string) {
 
 async function disableProvidersByType(type: string) {
   const matching = providers.value.filter(
-    (p) => p.provider_key === type && p.enabled,
+    (p) => providerExposesPaymentType(p, type) && p.enabled,
   );
   for (const p of matching) {
     try {
@@ -8793,6 +8823,28 @@ async function disableProvidersByType(type: string) {
       slog("disable provider failed", p.id, err);
     }
   }
+}
+
+function providerKeyMatchesEnabledTypes(
+  providerKey: string,
+  enabledTypes: string[],
+): boolean {
+  if (enabledTypes.includes(providerKey)) return true;
+  const supportedTypes = PROVIDER_SUPPORTED_TYPES[providerKey] || [];
+  return supportedTypes.some((type) => enabledTypes.includes(type));
+}
+
+function providerExposesPaymentType(
+  provider: Pick<ProviderInstance, "provider_key" | "supported_types">,
+  type: string,
+): boolean {
+  if (provider.provider_key === type) return true;
+  const selectedTypes = Array.isArray(provider.supported_types)
+    ? provider.supported_types
+    : [];
+  if (selectedTypes.includes(type)) return true;
+  const defaultTypes = PROVIDER_SUPPORTED_TYPES[provider.provider_key] || [];
+  return defaultTypes.includes(type);
 }
 
 function slog(...args: unknown[]) {
@@ -8816,11 +8868,14 @@ const providerKeyOptions = computed(() => [
   { value: "wxpay", label: t("admin.settings.payment.providerWxpay") },
   { value: "stripe", label: t("admin.settings.payment.providerStripe") },
   { value: "airwallex", label: t("admin.settings.payment.providerAirwallex") },
+  { value: "infini", label: t("admin.settings.payment.providerInfini") },
 ]);
 
 const enabledProviderKeyOptions = computed(() => {
   const enabled = form.payment_enabled_types;
-  return providerKeyOptions.value.filter((opt) => enabled.includes(opt.value));
+  return providerKeyOptions.value.filter((opt) =>
+    providerKeyMatchesEnabledTypes(opt.value, enabled),
+  );
 });
 
 const loadBalanceOptions = computed(() => [

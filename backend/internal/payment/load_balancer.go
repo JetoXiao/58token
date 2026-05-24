@@ -144,6 +144,10 @@ func (lb *DefaultLoadBalancer) queryEnabledInstances(
 			if inst.ProviderKey == TypeStripe {
 				matched = append(matched, inst)
 			}
+		} else if paymentType == TypeUSDT {
+			if inst.ProviderKey == TypeInfini || InstanceSupportsType(inst.SupportedTypes, paymentType) {
+				matched = append(matched, inst)
+			}
 		} else if InstanceSupportsType(inst.SupportedTypes, paymentType) {
 			if expectedWxpayJSAPIAppID != "" && normalizeVisibleMethodSupportType(paymentType) == TypeWxpay && inst.ProviderKey == TypeWxpay {
 				config, cfgErr := lb.decryptConfig(inst.Config)
@@ -258,6 +262,9 @@ func getInstanceChannelLimits(inst *dbent.PaymentProviderInstance, paymentType P
 	lookupKey := paymentType
 	if inst.ProviderKey == "stripe" {
 		lookupKey = "stripe"
+	}
+	if inst.ProviderKey == TypeInfini {
+		lookupKey = TypeUSDT
 	}
 	if cl, ok := limits[lookupKey]; ok {
 		return cl

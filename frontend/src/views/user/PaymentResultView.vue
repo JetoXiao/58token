@@ -107,6 +107,7 @@ import {
   readPaymentRecoverySnapshot,
 } from '@/components/payment/paymentFlow'
 import { usePaymentStore } from '@/stores/payment'
+import { useAuthStore } from '@/stores/auth'
 import { paymentAPI } from '@/api/payment'
 import type { PaymentOrder } from '@/types/payment'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
@@ -117,10 +118,12 @@ const { t } = i18n
 const route = useRoute()
 const router = useRouter()
 const paymentStore = usePaymentStore()
+const authStore = useAuthStore()
 
 const order = ref<PaymentOrder | null>(null)
 const loading = ref(true)
 const currency = ref('CNY')
+const refreshedTerminalOrderIds = new Set<number>()
 
 interface ReturnInfo {
   outTradeNo: string
@@ -193,6 +196,10 @@ function setResolvedOrder(nextOrder: PaymentOrder | null): void {
   order.value = nextOrder
   if (nextOrder?.currency) {
     currency.value = normalizePaymentCurrency(nextOrder.currency)
+  }
+  if (nextOrder && isSuccessStatus(nextOrder.status) && !refreshedTerminalOrderIds.has(nextOrder.id)) {
+    refreshedTerminalOrderIds.add(nextOrder.id)
+    authStore.refreshUser().catch(() => undefined)
   }
 }
 

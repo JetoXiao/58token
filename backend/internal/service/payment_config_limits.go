@@ -185,6 +185,10 @@ func pcGroupByPaymentType(instances []*dbent.PaymentProviderInstance) map[string
 			add(payment.TypeStripe, inst)
 			continue
 		}
+		if inst.ProviderKey == payment.TypeInfini {
+			add(payment.TypeUSDT, inst)
+			continue
+		}
 		for _, t := range splitTypes(inst.SupportedTypes) {
 			add(t, inst)
 		}

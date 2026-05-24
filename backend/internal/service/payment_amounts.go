@@ -7,13 +7,23 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-const defaultBalanceRechargeMultiplier = 1.0
+const (
+	defaultBalanceRechargeMultiplier = 1.0
+	defaultUsdtCnyExchangeRate       = 7.2
+)
 
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
 	if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
 		return defaultBalanceRechargeMultiplier
 	}
 	return multiplier
+}
+
+func normalizeUsdtCnyExchangeRate(rate float64) float64 {
+	if math.IsNaN(rate) || math.IsInf(rate, 0) || rate <= 0 {
+		return defaultUsdtCnyExchangeRate
+	}
+	return rate
 }
 
 func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {

@@ -114,7 +114,13 @@ func (s *PaymentResumeService) ensureSigningKey() error {
 }
 
 func NormalizeVisibleMethod(method string) string {
-	return payment.GetBasePaymentType(strings.TrimSpace(method))
+	normalized := payment.GetBasePaymentType(strings.TrimSpace(method))
+	switch normalized {
+	case payment.TypeEasyPay, payment.TypeAlipay, payment.TypeWxpay, payment.TypeStripe, payment.TypeAirwallex, payment.TypeUSDT:
+		return normalized
+	default:
+		return ""
+	}
 }
 
 func NormalizeVisibleMethods(methods []string) []string {

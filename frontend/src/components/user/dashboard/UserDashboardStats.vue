@@ -59,7 +59,7 @@
           </p>
           <p class="text-xs">
             <span class="text-gray-500 dark:text-gray-400">{{ t('common.total') }}: </span>
-            <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')">${{ formatCost(stats?.total_actual_cost || 0) }}</span>
+            <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.accountingCost')">${{ formatCost(totalAccountingCost) }}</span>
             <span class="text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')"> / ${{ formatCost(stats?.total_cost || 0) }}</span>
           </p>
         </div>
@@ -207,6 +207,11 @@ const platformLabel = (p: string) => PLATFORM_LABELS[p] ?? p
 const sortedPlatforms = computed(() => {
   const list = props.stats?.by_platform ?? []
   return [...list].sort((a, b) => b.total_actual_cost - a.total_actual_cost)
+})
+
+const totalAccountingCost = computed(() => {
+  if (props.stats?.total_recharged == null) return props.stats?.total_actual_cost ?? 0
+  return Math.max(0, props.stats.total_recharged - (props.balance ?? 0))
 })
 
 // 处理"各平台之和 < 总值"的差值：后端按平台聚合时过滤了无法归属平台的行

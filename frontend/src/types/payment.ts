@@ -18,7 +18,7 @@ export type OrderStatus =
   | 'REFUNDED'
   | 'REFUND_FAILED'
 
-export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'airwallex'
+export type PaymentType = 'alipay' | 'wxpay' | 'alipay_direct' | 'wxpay_direct' | 'stripe' | 'easypay' | 'airwallex' | 'usdt' | 'infini'
 
 export type OrderType = 'balance' | 'subscription'
 
@@ -33,6 +33,7 @@ export interface PaymentConfig {
   order_timeout_minutes: number
   balance_disabled: boolean
   balance_recharge_multiplier: number
+  usdt_cny_exchange_rate: number
   enabled_payment_types: PaymentType[]
   help_image_url: string
   help_text: string
@@ -66,6 +67,7 @@ export interface CheckoutInfoResponse {
   balance_disabled: boolean
   balance_recharge_multiplier: number
   recharge_fee_rate: number
+  usdt_cny_exchange_rate: number
   help_text: string
   help_image_url: string
   stripe_publishable_key: string
@@ -155,6 +157,7 @@ export interface ProviderInstance {
 
 export interface CreateOrderRequest {
   amount: number
+  payment_amount?: number
   payment_type: string
   order_type: string
   plan_id?: number

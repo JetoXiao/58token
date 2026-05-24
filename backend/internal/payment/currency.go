@@ -18,6 +18,7 @@ var (
 	zeroDecimalAmountUnit  = paymentCurrencyAmountUnit{apiMinorUnit: 0, maxFractionDigits: 0}
 	twoDecimalAmountUnit   = paymentCurrencyAmountUnit{apiMinorUnit: 2, maxFractionDigits: 2}
 	threeDecimalAmountUnit = paymentCurrencyAmountUnit{apiMinorUnit: 3, maxFractionDigits: 3}
+	fourDecimalAmountUnit  = paymentCurrencyAmountUnit{apiMinorUnit: 4, maxFractionDigits: 4}
 	stripeLegacyZeroAmount = paymentCurrencyAmountUnit{apiMinorUnit: 2, maxFractionDigits: 0}
 )
 
@@ -46,12 +47,16 @@ var paymentCurrencyAmountUnits = map[string]paymentCurrencyAmountUnit{
 	"LYD": threeDecimalAmountUnit,
 	"OMR": threeDecimalAmountUnit,
 	"TND": threeDecimalAmountUnit,
+	"USDT": fourDecimalAmountUnit,
 }
 
 func NormalizePaymentCurrency(raw string) (string, error) {
 	currency := strings.ToUpper(strings.TrimSpace(raw))
 	if currency == "" {
 		return DefaultPaymentCurrency, nil
+	}
+	if currency == "USDT" {
+		return currency, nil
 	}
 	if len(currency) != 3 {
 		return "", fmt.Errorf("payment currency must be a 3-letter ISO currency code")

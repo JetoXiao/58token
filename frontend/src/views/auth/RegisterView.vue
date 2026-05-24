@@ -50,6 +50,9 @@
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="allowedEmailSuffixHint" class="input-hint">
+            {{ allowedEmailSuffixHint }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -515,6 +518,22 @@ const showOAuthLogin = computed(
 const agreementGateActive = computed(
   () => loginAgreementEnabled.value && !agreementAccepted.value
 )
+
+const allowedEmailSuffixHint = computed(() => {
+  const normalizedWhitelist = normalizeRegistrationEmailSuffixWhitelist(
+    registrationEmailSuffixWhitelist.value
+  )
+  if (normalizedWhitelist.length === 0) {
+    return ''
+  }
+  const separator = String(locale.value || '').toLowerCase().startsWith('zh') ? '、' : ', '
+  return t('auth.emailSuffixAllowedHint', {
+    suffixes: formatRegistrationEmailSuffixWhitelistForMessage(normalizedWhitelist, {
+      separator,
+      more: (count) => t('auth.emailSuffixAllowedMore', { count })
+    })
+  })
+})
 
 const registrationActionDisabled = computed(
   () => isLoading.value || !settingsLoaded.value || agreementGateActive.value

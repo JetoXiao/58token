@@ -16,9 +16,10 @@ const VISIBLE_METHOD_ALIASES = {
   wxpay_direct: 'wxpay',
   stripe: 'stripe',
   airwallex: 'airwallex',
+  usdt: 'usdt',
 } as const
 
-export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe' | 'airwallex'
+export type VisiblePaymentMethod = 'alipay' | 'wxpay' | 'stripe' | 'airwallex' | 'usdt'
 export type StripeVisibleMethod = 'alipay' | 'wechat_pay'
 export type PaymentLaunchKind =
   | 'qr_waiting'
@@ -74,6 +75,7 @@ export interface PaymentLaunchDecision {
 
 export interface BuildCreateOrderPayloadInput {
   amount: number
+  paymentAmount?: number
   paymentType: string
   orderType: OrderType
   planId?: number
@@ -91,7 +93,7 @@ type CreateOrderFlowResult = CreateOrderResult & {
 type StorageWriter = Pick<Storage, 'removeItem' | 'setItem'>
 
 export function normalizeVisibleMethod(method: string): VisiblePaymentMethod | '' {
-  const normalized = VISIBLE_METHOD_ALIASES[method.trim() as keyof typeof VISIBLE_METHOD_ALIASES]
+  const normalized = VISIBLE_METHOD_ALIASES[method.trim().toLowerCase() as keyof typeof VISIBLE_METHOD_ALIASES]
   return normalized ?? ''
 }
 
@@ -122,6 +124,7 @@ export function buildCreateOrderPayload(input: BuildCreateOrderPayloadInput): Cr
     : input.isMobile
   const payload: CreateOrderRequest = {
     amount: input.amount,
+    payment_amount: input.paymentAmount,
     payment_type: visibleMethod,
     order_type: input.orderType,
     is_mobile: effectiveMobile,

@@ -226,6 +226,7 @@ type UserDashboardStats struct {
 	TotalTokens              int64   `json:"total_tokens"`
 	TotalCost                float64 `json:"total_cost"`        // 累计标准计费
 	TotalActualCost          float64 `json:"total_actual_cost"` // 累计实际扣除
+	TotalRecharged           float64 `json:"total_recharged"`   // 累计充值
 
 	// 今日 Token 使用统计
 	TodayRequests            int64   `json:"today_requests"`
