@@ -7,6 +7,7 @@ import { resolveDocumentTitle } from '@/router/title'
 import AnnouncementPopup from '@/components/common/AnnouncementPopup.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore, useAnnouncementStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
+import { BRAND_LOGO_URL } from '@/constants/brand'
 
 const router = useRouter()
 const route = useRoute()
@@ -35,7 +36,7 @@ function updateFavicon(logoUrl: string) {
 watch(
   () => appStore.siteLogo,
   (newLogo) => {
-    updateFavicon(newLogo || '/logo.png')
+    updateFavicon(newLogo || BRAND_LOGO_URL)
   },
   { immediate: true }
 )

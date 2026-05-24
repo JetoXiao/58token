@@ -215,6 +215,7 @@ import MarketingNavbar from '@/components/marketing/MarketingNavbar.vue'
 import MarketingHero from '@/components/marketing/MarketingHero.vue'
 import BentoFeatureGrid from '@/components/marketing/BentoFeatureGrid.vue'
 import PricingBento from '@/components/marketing/PricingBento.vue'
+import { BRAND_LOGO_URL } from '@/constants/brand'
 
 const { t } = useI18n()
 
@@ -223,7 +224,7 @@ const appStore = useAppStore()
 
 // Site settings - directly from appStore (already initialized from injected config)
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => '/logo.png')
+const siteLogo = computed(() => BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')

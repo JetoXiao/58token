@@ -5,7 +5,7 @@
     >
       <router-link to="/home" class="flex min-w-0 items-center gap-3">
         <span class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-gray-200/80 bg-white/80 dark:border-white/10 dark:bg-white/10">
-          <img :src="logo || '/logo.png'" alt="" class="h-full w-full object-contain" />
+          <img :src="logo || BRAND_LOGO_URL" alt="" class="h-full w-full object-contain" />
         </span>
         <span class="hidden min-w-0 sm:block">
           <span class="block truncate text-sm font-semibold tracking-tight text-gray-950 dark:text-white">{{ siteName }}</span>
@@ -36,6 +36,8 @@
 </template>
 
 <script setup lang="ts">
+import { BRAND_LOGO_URL } from '@/constants/brand'
+
 defineProps<{
   siteName: string
   subtitle: string

@@ -15,7 +15,7 @@
       title="返回首页"
     >
       <span class="sidebar-logo" aria-hidden="true">
-        <img src="/logo.png" alt="" class="h-full w-full object-cover" />
+        <img :src="BRAND_LOGO_URL" alt="" class="h-full w-full object-cover" />
       </span>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
@@ -192,6 +192,7 @@ import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { BRAND_LOGO_URL } from '@/constants/brand'
 
 interface NavItem {
   path: string
