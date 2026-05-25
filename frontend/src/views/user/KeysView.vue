@@ -319,6 +319,15 @@
                 <Icon name="terminal" size="sm" />
                 <span class="text-xs">{{ t('keys.useKey') }}</span>
               </button>
+              <!-- Test Connection Button -->
+              <button
+                @click="openTestModal(row)"
+                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-400"
+                :title="t('keys.testConnection')"
+              >
+                <Icon name="play" size="sm" />
+                <span class="text-xs">{{ t('keys.testConnection') }}</span>
+              </button>
               <!-- Import to CC Switch Button -->
               <button
                 v-if="!publicSettings?.hide_ccs_import_button"
@@ -930,6 +939,13 @@
       @close="closeUseKeyModal"
     />
 
+    <!-- Test Connection Modal -->
+    <KeyTestModal
+      :show="showTestModal"
+      :api-key="selectedKey"
+      @close="closeTestModal"
+    />
+
     <!-- CCS Client Selection Dialog for Antigravity -->
     <BaseDialog
       :show="showCcsClientSelect"
@@ -1065,6 +1081,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+	import KeyTestModal from '@/components/keys/KeyTestModal.vue'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1143,6 +1160,7 @@ const showDeleteDialog = ref(false)
 const showResetQuotaDialog = ref(false)
 const showResetRateLimitDialog = ref(false)
 const showUseKeyModal = ref(false)
+const showTestModal = ref(false)
 const showCcsClientSelect = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
@@ -1366,6 +1384,16 @@ const openUseKeyModal = (key: ApiKey) => {
 
 const closeUseKeyModal = () => {
   showUseKeyModal.value = false
+  selectedKey.value = null
+}
+
+const openTestModal = (key: ApiKey) => {
+  selectedKey.value = key
+  showTestModal.value = true
+}
+
+const closeTestModal = () => {
+  showTestModal.value = false
   selectedKey.value = null
 }
 
