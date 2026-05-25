@@ -103,6 +103,7 @@ const loading = ref(false)
 const actionLoading = ref(false)
 const orders = ref<PaymentOrder[]>([])
 const refundEligibleProviders = ref<Set<string>>(new Set())
+const locallyCancelledOrderIds = ref<Set<number>>(new Set())
 const currentFilter = ref('')
 const cancelTargetId = ref<number | null>(null)
 const refundTarget = ref<PaymentOrder | null>(null)
@@ -125,7 +126,7 @@ async function fetchOrders() {
       page_size: pagination.page_size,
       status: currentFilter.value || undefined,
     })
-    orders.value = res.data.items || []
+    orders.value = reconcileOrders(res.data.items || [])
     pagination.total = res.data.total || 0
   } catch (err: unknown) {
     appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
@@ -140,11 +141,17 @@ function handlePageSizeChange(size: number) { pagination.page_size = size; pagin
 function handleCancel(orderId: number) { cancelTargetId.value = orderId }
 
 async function confirmCancel() {
-  if (!cancelTargetId.value) return
+  const orderId = cancelTargetId.value
+  if (!orderId) return
   actionLoading.value = true
   try {
-    await paymentAPI.cancelOrder(cancelTargetId.value)
-    appStore.showSuccess(t('common.success'))
+    const res = await paymentAPI.cancelOrder(orderId)
+    if (res.data.message === 'cancelled') {
+      markOrderCancelled(orderId)
+      appStore.showSuccess(t('common.success'))
+    } else if (res.data.message === 'already_paid') {
+      appStore.showInfo(t('payment.status.paid'))
+    }
     cancelTargetId.value = null
     await fetchOrders()
   } catch (err: unknown) {
@@ -152,6 +159,25 @@ async function confirmCancel() {
   } finally {
     actionLoading.value = false
   }
+}
+
+function reconcileOrders(items: PaymentOrder[]): PaymentOrder[] {
+  return items.map((order) => {
+    if (locallyCancelledOrderIds.value.has(order.id) && order.status === 'PENDING') {
+      return { ...order, status: 'CANCELLED' }
+    }
+    if (order.status !== 'PENDING') {
+      locallyCancelledOrderIds.value.delete(order.id)
+    }
+    return order
+  })
+}
+
+function markOrderCancelled(orderId: number) {
+  locallyCancelledOrderIds.value.add(orderId)
+  orders.value = orders.value.map((order) => (
+    order.id === orderId ? { ...order, status: 'CANCELLED' } : order
+  ))
 }
 
 function openRefundDialog(order: PaymentOrder) { refundTarget.value = order; refundReason.value = '' }

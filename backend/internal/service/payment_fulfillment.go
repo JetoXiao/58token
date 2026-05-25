@@ -101,11 +101,66 @@ func (s *PaymentService) confirmPayment(ctx context.Context, oid int64, tradeNo 
 		})
 		return fmt.Errorf("invalid paid amount from provider: %v", paid)
 	}
-	if math.Abs(paid-o.PayAmount) > paymentAmountToleranceForCurrency(PaymentOrderCurrency(o)) {
+	if !isProviderPaidAmountAcceptable(o, paid, pk) {
 		s.writeAuditLog(ctx, o.ID, "PAYMENT_AMOUNT_MISMATCH", pk, map[string]any{"expected": o.PayAmount, "paid": paid, "tradeNo": tradeNo})
 		return fmt.Errorf("amount mismatch: expected %s, got %s", strconv.FormatFloat(o.PayAmount, 'f', -1, 64), strconv.FormatFloat(paid, 'f', -1, 64))
 	}
 	return s.toPaid(ctx, o, tradeNo, paid, pk)
+}
+
+func isProviderPaidAmountAcceptable(order *dbent.PaymentOrder, paid float64, providerKey string) bool {
+	if order == nil {
+		return false
+	}
+	expected := order.PayAmount
+	tolerance := paymentAmountToleranceForCurrency(PaymentOrderCurrency(order))
+	if math.Abs(paid-expected) <= tolerance {
+		return true
+	}
+	if !isStablecoinPaymentOrder(order, providerKey) {
+		return false
+	}
+	// Stablecoin processors may report the chain payment amount including
+	// network/provider rounding. Accept small over-payments, but never
+	// under-payments, so a short payment cannot unlock balance.
+	if paid+stablecoinUnderpayTolerance() < expected {
+		return false
+	}
+	return paid-expected <= stablecoinOverpayTolerance(expected)
+}
+
+func isStablecoinPaymentOrder(order *dbent.PaymentOrder, providerKey string) bool {
+	if strings.EqualFold(strings.TrimSpace(providerKey), payment.TypeInfini) {
+		return true
+	}
+	if order == nil {
+		return false
+	}
+	if strings.EqualFold(PaymentOrderCurrency(order), payment.TypeUSDT) {
+		return true
+	}
+	if strings.EqualFold(payment.GetBasePaymentType(order.PaymentType), payment.TypeUSDT) {
+		return true
+	}
+	if order.ProviderKey != nil && strings.EqualFold(payment.GetBasePaymentType(*order.ProviderKey), payment.TypeInfini) {
+		return true
+	}
+	return false
+}
+
+func stablecoinUnderpayTolerance() float64 {
+	return paymentAmountToleranceForCurrency(payment.TypeUSDT)
+}
+
+func stablecoinOverpayTolerance(expected float64) float64 {
+	byPercent := math.Abs(expected) * 0.05
+	if byPercent < 0.01 {
+		return 0.01
+	}
+	if byPercent > 1 {
+		return 1
+	}
+	return byPercent
 }
 
 func paymentAmountToleranceForCurrency(currency string) float64 {

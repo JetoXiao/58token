@@ -418,3 +418,46 @@ func TestPaymentAmountToleranceForThreeDecimalCurrency(t *testing.T) {
 	assert.Equal(t, amountToleranceCNY, paymentAmountToleranceForCurrency("JPY"))
 	assert.InDelta(t, 0.0005, paymentAmountToleranceForCurrency("KWD"), 1e-12)
 }
+
+func TestStablecoinPaidAmountAcceptsSmallOverpayment(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		PaymentType: payment.TypeUSDT,
+		PayAmount:   0.14,
+		ProviderSnapshot: map[string]any{
+			"schema_version": 2,
+			"provider_key":   payment.TypeInfini,
+			"currency":       payment.TypeUSDT,
+		},
+	}
+
+	assert.True(t, isProviderPaidAmountAcceptable(order, 0.1429, payment.TypeInfini))
+}
+
+func TestStablecoinPaidAmountRejectsUnderpayment(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		PaymentType: payment.TypeUSDT,
+		PayAmount:   0.14,
+		ProviderSnapshot: map[string]any{
+			"schema_version": 2,
+			"provider_key":   payment.TypeInfini,
+			"currency":       payment.TypeUSDT,
+		},
+	}
+
+	assert.False(t, isProviderPaidAmountAcceptable(order, 0.13, payment.TypeInfini))
+}
+
+func TestFiatPaidAmountRejectsOverpaymentOutsideTolerance(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		PaymentType: payment.TypeAlipay,
+		PayAmount:   0.14,
+	}
+
+	assert.False(t, isProviderPaidAmountAcceptable(order, 0.16, payment.TypeAlipay))
+}
