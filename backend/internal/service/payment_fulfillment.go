@@ -124,9 +124,16 @@ func isProviderPaidAmountAcceptable(order *dbent.PaymentOrder, paid float64, pro
 	// network/provider rounding. Accept small over-payments, but never
 	// under-payments, so a short payment cannot unlock balance.
 	if paid+stablecoinUnderpayTolerance() < expected {
+		if matchesLegacyRoundedStablecoinAmount(expected, paid) {
+			return true
+		}
 		return false
 	}
 	return paid-expected <= stablecoinOverpayTolerance(expected)
+}
+
+func matchesLegacyRoundedStablecoinAmount(expected, paid float64) bool {
+	return math.Abs(math.Round(paid*100)/100-expected) <= 1e-9
 }
 
 func isStablecoinPaymentOrder(order *dbent.PaymentOrder, providerKey string) bool {

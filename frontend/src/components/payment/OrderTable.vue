@@ -45,7 +45,7 @@ import type { PaymentOrder } from '@/types/payment'
 import type { Column } from '@/components/common/types'
 import DataTable from '@/components/common/DataTable.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
-import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
+import { formatOrderPayAmount, formatOrderCreditedAmount } from '@/components/payment/orderUtils'
 
 const { t } = useI18n()
 
@@ -56,31 +56,6 @@ const props = defineProps<{
 }>()
 
 function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString() }
-
-function isUsdtOrder(row: PaymentOrder): boolean {
-  return row.payment_type === 'usdt' || row.payment_type === 'infini' || normalizePaymentCurrency(row.currency) === 'USDT'
-}
-
-function orderPayCurrency(row: PaymentOrder): string {
-  if (isUsdtOrder(row)) {
-    return 'USD'
-  }
-  const currency = normalizePaymentCurrency(row.currency)
-  if (currency !== 'CNY') {
-    return currency
-  }
-  return currency
-}
-
-function formatOrderPayAmount(row: PaymentOrder, value: number): string {
-  return formatPaymentAmount(Number(value) || 0, orderPayCurrency(row))
-}
-
-function formatOrderCreditedAmount(row: PaymentOrder): string {
-  return row.order_type === 'balance'
-    ? formatPaymentAmount(row.amount, 'USD')
-    : formatPaymentAmount(row.amount, orderPayCurrency(row))
-}
 
 const columns = computed((): Column[] => {
   const cols: Column[] = [

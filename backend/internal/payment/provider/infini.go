@@ -8,8 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,6 +29,7 @@ const (
 	infiniMaxResponseSize  = 1 << 20
 	infiniMaxErrorSummary  = 512
 	infiniWebhookTolerance = 5 * time.Minute
+	infiniDNSFallbackDelay = 3 * time.Second
 
 	infiniOrderCreatePath = "/v1/acquiring/order"
 	infiniCryptoPayMethod = 1
@@ -74,8 +77,87 @@ func NewInfini(instanceID string, config map[string]string) (*Infini, error) {
 	return &Infini{
 		instanceID: instanceID,
 		config:     cfg,
-		httpClient: &http.Client{Timeout: infiniHTTPTimeout},
+		httpClient: newInfiniHTTPClient(),
 	}, nil
+}
+
+func newInfiniHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = infiniDialContext
+	return &http.Client{
+		Timeout:   infiniHTTPTimeout,
+		Transport: transport,
+	}
+}
+
+func infiniDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: infiniHTTPTimeout}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err == nil || !isInfiniDNSLookupError(err) {
+		return conn, err
+	}
+
+	host, port, splitErr := net.SplitHostPort(address)
+	if splitErr != nil || !isInfiniAPIHost(host) {
+		return nil, err
+	}
+
+	ips, resolveErr := lookupInfiniHostWithFallbackDNS(ctx, host)
+	if resolveErr != nil || len(ips) == 0 {
+		return nil, err
+	}
+
+	lastErr := err
+	for _, ip := range ips {
+		conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		if dialErr == nil {
+			return conn, nil
+		}
+		lastErr = dialErr
+	}
+	return nil, lastErr
+}
+
+func isInfiniDNSLookupError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such host") || strings.Contains(msg, "lookup")
+}
+
+func isInfiniAPIHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "openapi.infini.money" || host == "openapi-sandbox.infini.money"
+}
+
+func lookupInfiniHostWithFallbackDNS(ctx context.Context, host string) ([]net.IPAddr, error) {
+	var lastErr error
+	for _, server := range []string{
+		"223.5.5.5:53",
+		"119.29.29.29:53",
+		"1.1.1.1:53",
+		"8.8.8.8:53",
+	} {
+		server := server
+		resolver := &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{Timeout: infiniDNSFallbackDelay}
+				return d.DialContext(ctx, network, server)
+			},
+		}
+		ips, err := resolver.LookupIPAddr(ctx, host)
+		if err == nil && len(ips) > 0 {
+			return ips, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 func normalizeInfiniAPIBase(raw string) (string, error) {
@@ -165,10 +247,7 @@ func (i *Infini) QueryOrder(ctx context.Context, tradeNo string) (*payment.Query
 	if err := i.doJSON(ctx, http.MethodGet, path, nil, &order); err != nil {
 		return nil, fmt.Errorf("infini query order: %w", err)
 	}
-	amount := infiniAmount(order.Amount)
-	if confirmed := infiniAmount(order.AmountConfirmed); confirmed > amount {
-		amount = confirmed
-	}
+	amount := infiniSettledAmount(order.Amount, order.AmountConfirmed)
 	status := infiniProviderStatus(order.PayStatus, order.ExceptionTags)
 	if strings.TrimSpace(order.PayStatus) == "" {
 		status = infiniProviderStatus(order.Status, order.ExceptionTags)
@@ -219,10 +298,7 @@ func (i *Infini) VerifyNotification(_ context.Context, rawBody string, headers m
 		return nil, nil
 	}
 
-	amount := infiniAmount(event.Amount)
-	if confirmed := infiniAmount(event.AmountConfirmed); confirmed > amount {
-		amount = confirmed
-	}
+	amount := infiniSettledAmount(event.Amount, event.AmountConfirmed)
 	return &payment.PaymentNotification{
 		TradeNo:  event.OrderID,
 		OrderID:  event.ClientReference,
@@ -416,7 +492,7 @@ func parseInfiniWebhookTimestamp(raw string) (time.Time, error) {
 
 func infiniProviderStatus(status string, tags []string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case infiniStatusPaid, "success", "succeeded", "completed", "confirmed":
+	case infiniStatusPaid, "success", "succeeded", "completed", "confirmed", "overpaid", "fully_paid":
 		return payment.ProviderStatusPaid
 	case infiniStatusProcessing, infiniStatusPending, "created", "waiting", "unpaid", "confirming":
 		return payment.ProviderStatusPending
@@ -464,6 +540,13 @@ func infiniAmount(raw any) float64 {
 	default:
 		return 0
 	}
+}
+
+func infiniSettledAmount(orderAmount any, amountConfirmed any) float64 {
+	if confirmed := infiniAmount(amountConfirmed); confirmed > 0 {
+		return confirmed
+	}
+	return infiniAmount(orderAmount)
 }
 
 func infiniOrderMetadata(orderID, currency, clientReference, eventID string) map[string]string {

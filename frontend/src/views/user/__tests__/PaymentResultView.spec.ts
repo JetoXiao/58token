@@ -283,6 +283,41 @@ describe('PaymentResultView', () => {
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBeNull()
   })
 
+  it('actively verifies a pending order loaded by order_id using the order out_trade_no', async () => {
+    routeState.query = {
+      order_id: '77',
+    }
+    pollOrderStatus.mockResolvedValueOnce({
+      ...orderFactory('PENDING'),
+      id: 77,
+      out_trade_no: 'sub2_infini_77',
+      payment_type: 'usdt',
+    })
+    verifyOrder.mockResolvedValueOnce({
+      data: {
+        ...orderFactory('COMPLETED'),
+        id: 77,
+        out_trade_no: 'sub2_infini_77',
+        payment_type: 'usdt',
+      },
+    })
+
+    const wrapper = mount(PaymentResultView, {
+      global: {
+        stubs: {
+          OrderStatusBadge: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    expect(pollOrderStatus).toHaveBeenCalledWith(77)
+    expect(verifyOrder).toHaveBeenCalledWith('sub2_infini_77')
+    expect(verifyOrderPublic).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('payment.result.success')
+  })
+
   it('falls back to public out_trade_no verification when resume_token recovery fails in legacy return flows', async () => {
     routeState.query = {
       resume_token: 'resume-fail',

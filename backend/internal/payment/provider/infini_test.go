@@ -115,6 +115,24 @@ func TestInfiniVerifyNotificationMapsCompletedOrder(t *testing.T) {
 	require.Equal(t, payment.TypeUSDT, notification.Metadata["currency"])
 }
 
+func TestInfiniVerifyNotificationUsesConfirmedAmount(t *testing.T) {
+	prov, err := NewInfini("inst_1", map[string]string{
+		"keyId":         "merchant-001",
+		"secretKey":     "secret",
+		"webhookSecret": "whsec",
+		"apiBase":       infiniSandboxAPIBase,
+		"currency":      payment.TypeUSDT,
+	})
+	require.NoError(t, err)
+
+	raw := `{"event":"order.completed","order_id":"ord_123","client_reference":"sub2_abc","amount":"2.00","currency":"USD","status":"paid","amount_confirmed":"0.2858"}`
+	headers := signedInfiniWebhookHeaders(raw, "whsec", time.Now())
+	notification, err := prov.VerifyNotification(context.Background(), raw, headers)
+	require.NoError(t, err)
+	require.NotNil(t, notification)
+	require.InDelta(t, 0.2858, notification.Amount, 0.000001)
+}
+
 func TestInfiniQueryOrderUsesPayStatusForSettlement(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, infiniOrderCreatePath, r.URL.Path)
@@ -140,6 +158,32 @@ func TestInfiniQueryOrderUsesPayStatusForSettlement(t *testing.T) {
 	require.Equal(t, payment.ProviderStatusPaid, resp.Status)
 	require.InDelta(t, 4.1667, resp.Amount, 0.000001)
 	require.Equal(t, "sub2_abc", resp.Metadata["client_reference"])
+}
+
+func TestInfiniQueryOrderUsesConfirmedAmountAndOverpaidStatus(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, infiniOrderCreatePath, r.URL.Path)
+		require.Equal(t, "ord_overpaid_123", r.URL.Query().Get("order_id"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"order_id":"ord_overpaid_123","status":"overpaid","amount":"2.00","currency":"USD","amount_confirmed":"0.2858","client_reference":"sub2_abc"}`))
+	}))
+	defer server.Close()
+
+	prov, err := NewInfini("inst_1", map[string]string{
+		"keyId":         "merchant-001",
+		"secretKey":     "secret",
+		"webhookSecret": "whsec",
+		"apiBase":       infiniSandboxAPIBase,
+		"currency":      payment.TypeUSDT,
+	})
+	require.NoError(t, err)
+	prov.config["apiBase"] = server.URL
+	prov.httpClient = server.Client()
+
+	resp, err := prov.QueryOrder(context.Background(), "ord_overpaid_123")
+	require.NoError(t, err)
+	require.Equal(t, payment.ProviderStatusPaid, resp.Status)
+	require.InDelta(t, 0.2858, resp.Amount, 0.000001)
 }
 
 func TestInfiniVerifyNotificationParsesWrappedPayload(t *testing.T) {

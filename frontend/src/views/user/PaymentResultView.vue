@@ -365,7 +365,16 @@ onMounted(async () => {
   }
 
   const hasLegacyFallbackContext = readRouteQueryString('trade_status').trim() !== ''
-  const canVerifyByOutTradeNo = outTradeNo !== '' && (hasLegacyFallbackContext || routeOrderId > 0 || orderId > 0 || resumeToken !== '')
+  const hasVerificationContext = () => hasLegacyFallbackContext || routeOrderId > 0 || orderId > 0 || resumeToken !== '' || !!order.value?.id
+  const currentOutTradeNo = () => String(outTradeNo || order.value?.out_trade_no || '').trim()
+  const resolveCurrentOutTradeNo = async (): Promise<PaymentOrder | null> => {
+    const candidate = currentOutTradeNo()
+    if (!candidate || !hasVerificationContext()) {
+      return null
+    }
+    return await resolveOrderFromOutTradeNo(candidate)
+  }
+  const canVerifyByOutTradeNo = outTradeNo !== '' && hasVerificationContext()
 
   if (canVerifyByOutTradeNo && !isSuccessStatus(order.value?.status)) {
     const verifiedOrder = await resolveOrderFromOutTradeNo(outTradeNo)
@@ -382,6 +391,16 @@ onMounted(async () => {
       setResolvedOrder(await paymentStore.pollOrderStatus(orderId))
     } catch (_err: unknown) {
       // Order lookup failed, will try legacy fallback below when possible.
+    }
+  }
+
+  if (order.value && isPendingStatus(order.value.status)) {
+    const verifiedOrder = await resolveCurrentOutTradeNo()
+    if (verifiedOrder) {
+      setResolvedOrder(verifiedOrder)
+      if (!orderId) {
+        orderId = verifiedOrder.id
+      }
     }
   }
 
@@ -405,8 +424,8 @@ onMounted(async () => {
   }
 
   const refreshOrder = async (): Promise<PaymentOrder | null> => {
-    if (canVerifyByOutTradeNo) {
-      const verifiedOrder = await resolveOrderFromOutTradeNo(outTradeNo)
+    if (currentOutTradeNo() && hasVerificationContext()) {
+      const verifiedOrder = await resolveCurrentOutTradeNo()
       if (verifiedOrder) {
         return verifiedOrder
       }

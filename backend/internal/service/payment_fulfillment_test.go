@@ -451,6 +451,23 @@ func TestStablecoinPaidAmountRejectsUnderpayment(t *testing.T) {
 	assert.False(t, isProviderPaidAmountAcceptable(order, 0.13, payment.TypeInfini))
 }
 
+func TestStablecoinPaidAmountAcceptsLegacyTwoDecimalRoundedExpectedAmount(t *testing.T) {
+	t.Parallel()
+
+	order := &dbent.PaymentOrder{
+		PaymentType: payment.TypeUSDT,
+		PayAmount:   0.29,
+		ProviderSnapshot: map[string]any{
+			"schema_version": 2,
+			"provider_key":   payment.TypeInfini,
+			"currency":       payment.TypeUSDT,
+		},
+	}
+
+	assert.True(t, isProviderPaidAmountAcceptable(order, 0.2858, payment.TypeInfini))
+	assert.False(t, isProviderPaidAmountAcceptable(order, 0.28, payment.TypeInfini))
+}
+
 func TestFiatPaidAmountRejectsOverpaymentOutsideTolerance(t *testing.T) {
 	t.Parallel()
 
