@@ -44,7 +44,7 @@ import alipayIcon from '@/assets/icons/alipay.svg'
 import wxpayIcon from '@/assets/icons/wxpay.svg'
 import stripeIcon from '@/assets/icons/stripe.svg'
 import airwallexIcon from '@/assets/icons/airwallex.svg'
-import logoIcon from '@/assets/logo/useaiforme_dark_rounded_logo.png'
+import infiniIcon from '@/assets/icons/infini.png'
 
 export interface PaymentMethodOption {
   type: string
@@ -68,7 +68,7 @@ const METHOD_ICONS: Record<string, string> = {
   wxpay: wxpayIcon,
   stripe: stripeIcon,
   airwallex: airwallexIcon,
-  usdt: logoIcon,
+  usdt: infiniIcon,
 }
 
 const sortedMethods = computed(() => {
