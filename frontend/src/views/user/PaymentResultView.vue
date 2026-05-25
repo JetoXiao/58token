@@ -135,8 +135,8 @@ const returnInfo = ref<ReturnInfo | null>(null)
 
 const SUCCESS_STATUSES = new Set(['COMPLETED', 'PAID', 'RECHARGING'])
 const PENDING_STATUSES = new Set(['PENDING', 'CREATED', 'WAITING', 'PROCESSING'])
-const STATUS_REFRESH_INTERVAL_MS = 2000
-const STATUS_REFRESH_MAX_ATTEMPTS = 15
+const STATUS_REFRESH_INTERVAL_MS = 5000
+const STATUS_REFRESH_MAX_ATTEMPTS = 360
 
 let statusRefreshTimer: ReturnType<typeof setTimeout> | null = null
 const refreshAttempts = ref(0)
@@ -365,7 +365,17 @@ onMounted(async () => {
   }
 
   const hasLegacyFallbackContext = readRouteQueryString('trade_status').trim() !== ''
-  const shouldUsePublicOutTradeNo = outTradeNo !== '' && (hasLegacyFallbackContext || routeOrderId > 0 || orderId > 0)
+  const canVerifyByOutTradeNo = outTradeNo !== '' && (hasLegacyFallbackContext || routeOrderId > 0 || orderId > 0 || resumeToken !== '')
+
+  if (canVerifyByOutTradeNo && !isSuccessStatus(order.value?.status)) {
+    const verifiedOrder = await resolveOrderFromOutTradeNo(outTradeNo)
+    if (verifiedOrder) {
+      setResolvedOrder(verifiedOrder)
+      if (!orderId) {
+        orderId = verifiedOrder.id
+      }
+    }
+  }
 
   if (!order.value && orderId && (!resumeToken || routeOrderId > 0)) {
     try {
@@ -375,7 +385,7 @@ onMounted(async () => {
     }
   }
 
-  if (!order.value && shouldUsePublicOutTradeNo && (!resumeToken || resumeTokenLookupFailed)) {
+  if (!order.value && canVerifyByOutTradeNo && (!resumeToken || resumeTokenLookupFailed)) {
     const legacyOrder = await resolveOrderFromOutTradeNo(outTradeNo)
     if (legacyOrder) {
       setResolvedOrder(legacyOrder)
@@ -395,6 +405,13 @@ onMounted(async () => {
   }
 
   const refreshOrder = async (): Promise<PaymentOrder | null> => {
+    if (canVerifyByOutTradeNo) {
+      const verifiedOrder = await resolveOrderFromOutTradeNo(outTradeNo)
+      if (verifiedOrder) {
+        return verifiedOrder
+      }
+    }
+
     if (resumeToken) {
       const resolvedOrder = await resolveOrderFromResumeToken(resumeToken)
       if (resolvedOrder) {
@@ -410,7 +427,7 @@ onMounted(async () => {
       }
     }
 
-    if (shouldUsePublicOutTradeNo) {
+    if (canVerifyByOutTradeNo) {
       return await resolveOrderFromOutTradeNo(outTradeNo)
     }
 

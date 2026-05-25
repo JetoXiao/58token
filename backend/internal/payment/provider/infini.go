@@ -31,14 +31,15 @@ const (
 	infiniOrderCreatePath = "/v1/acquiring/order"
 	infiniCryptoPayMethod = 1
 
-	infiniEventOrderCompleted  = "order.completed"
-	infiniEventOrderProcessing = "order.processing"
-	infiniEventOrderExpired    = "order.expired"
-	infiniStatusPaid           = "paid"
-	infiniStatusProcessing     = "processing"
-	infiniStatusPending        = "pending"
-	infiniStatusExpired        = "expired"
-	infiniStatusPartialPaid    = "partial_paid"
+	infiniEventOrderCompleted   = "order.completed"
+	infiniEventOrderProcessing  = "order.processing"
+	infiniEventOrderExpired     = "order.expired"
+	infiniEventOrderLatePayment = "order.late_payment"
+	infiniStatusPaid            = "paid"
+	infiniStatusProcessing      = "processing"
+	infiniStatusPending         = "pending"
+	infiniStatusExpired         = "expired"
+	infiniStatusPartialPaid     = "partial_paid"
 )
 
 type Infini struct {
@@ -168,9 +169,18 @@ func (i *Infini) QueryOrder(ctx context.Context, tradeNo string) (*payment.Query
 	if confirmed := infiniAmount(order.AmountConfirmed); confirmed > amount {
 		amount = confirmed
 	}
+	status := infiniProviderStatus(order.PayStatus, order.ExceptionTags)
+	if strings.TrimSpace(order.PayStatus) == "" {
+		status = infiniProviderStatus(order.Status, order.ExceptionTags)
+	}
+	if status != payment.ProviderStatusPaid {
+		if fallbackStatus := infiniProviderStatus(order.Status, order.ExceptionTags); fallbackStatus == payment.ProviderStatusPaid {
+			status = fallbackStatus
+		}
+	}
 	return &payment.QueryOrderResponse{
 		TradeNo:  order.OrderID,
-		Status:   infiniProviderStatus(order.Status, nil),
+		Status:   status,
 		Amount:   amount,
 		Metadata: infiniOrderMetadata(order.OrderID, order.Currency, order.ClientReference, ""),
 	}, nil
@@ -182,8 +192,8 @@ func (i *Infini) VerifyNotification(_ context.Context, rawBody string, headers m
 		return nil, err
 	}
 
-	var event infiniWebhookPayload
-	if err := json.Unmarshal([]byte(rawBody), &event); err != nil {
+	event, err := decodeInfiniWebhookPayload([]byte(rawBody))
+	if err != nil {
 		return nil, fmt.Errorf("infini parse webhook: %w", err)
 	}
 	if strings.TrimSpace(event.ClientReference) == "" || strings.TrimSpace(event.OrderID) == "" {
@@ -196,9 +206,10 @@ func (i *Infini) VerifyNotification(_ context.Context, rawBody string, headers m
 		status = payment.ProviderStatusSuccess
 	case infiniEventOrderProcessing:
 		status = payment.ProviderStatusPending
-	case infiniEventOrderExpired:
+	case infiniEventOrderExpired, infiniEventOrderLatePayment:
 		if status == payment.ProviderStatusPaid {
-			return nil, nil
+			status = payment.ProviderStatusSuccess
+			break
 		}
 		status = payment.ProviderStatusFailed
 	default:
@@ -289,6 +300,47 @@ func decodeInfiniJSONResponse(respBody []byte, out any) error {
 	return nil
 }
 
+func decodeInfiniWebhookPayload(rawBody []byte) (infiniWebhookPayload, error) {
+	var event infiniWebhookPayload
+	body := bytes.TrimSpace(rawBody)
+	if len(body) == 0 {
+		return event, fmt.Errorf("empty webhook body")
+	}
+	if err := json.Unmarshal(body, &event); err != nil {
+		return event, err
+	}
+	if strings.TrimSpace(event.OrderID) != "" || strings.TrimSpace(event.ClientReference) != "" {
+		return event, nil
+	}
+
+	var envelope struct {
+		Event     string          `json:"event"`
+		EventType string          `json:"event_type"`
+		Type      string          `json:"type"`
+		Data      json.RawMessage `json:"data"`
+		Result    json.RawMessage `json:"result"`
+		Object    json.RawMessage `json:"object"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return event, err
+	}
+
+	for _, raw := range []json.RawMessage{envelope.Data, envelope.Result, envelope.Object} {
+		if len(bytes.TrimSpace(raw)) == 0 || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+			continue
+		}
+		if err := json.Unmarshal(raw, &event); err != nil {
+			return event, err
+		}
+		if event.Event == "" {
+			event.Event = firstNonEmptyString(envelope.Event, envelope.EventType, envelope.Type)
+		}
+		return event, nil
+	}
+
+	return event, nil
+}
+
 func (i *Infini) signRequest(req *http.Request, method, path string, body []byte) {
 	date := time.Now().UTC().Format(http.TimeFormat)
 	keyID := strings.TrimSpace(i.config["keyId"])
@@ -364,11 +416,11 @@ func parseInfiniWebhookTimestamp(raw string) (time.Time, error) {
 
 func infiniProviderStatus(status string, tags []string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case infiniStatusPaid:
+	case infiniStatusPaid, "success", "succeeded", "completed", "confirmed":
 		return payment.ProviderStatusPaid
-	case infiniStatusProcessing, infiniStatusPending:
+	case infiniStatusProcessing, infiniStatusPending, "created", "waiting", "unpaid", "confirming":
 		return payment.ProviderStatusPending
-	case infiniStatusExpired, infiniStatusPartialPaid:
+	case infiniStatusExpired, infiniStatusPartialPaid, "failed", "failure", "cancelled", "canceled":
 		for _, tag := range tags {
 			if strings.EqualFold(strings.TrimSpace(tag), "late") {
 				return payment.ProviderStatusPaid
@@ -378,6 +430,15 @@ func infiniProviderStatus(status string, tags []string) string {
 	default:
 		return payment.ProviderStatusPending
 	}
+}
+
+func firstNonEmptyString(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
 
 func infiniAmount(raw any) float64 {
@@ -448,13 +509,15 @@ type infiniCreateOrderResponse struct {
 }
 
 type infiniOrderStatusResponse struct {
-	OrderID         string `json:"order_id"`
-	Status          string `json:"status"`
-	PayStatus       string `json:"pay_status"`
-	Amount          any    `json:"amount"`
-	Currency        string `json:"currency"`
-	AmountConfirmed any    `json:"amount_confirmed"`
-	ClientReference string `json:"client_reference"`
+	OrderID          string   `json:"order_id"`
+	Status           string   `json:"status"`
+	PayStatus        string   `json:"pay_status"`
+	Amount           any      `json:"amount"`
+	Currency         string   `json:"currency"`
+	AmountConfirming any      `json:"amount_confirming"`
+	AmountConfirmed  any      `json:"amount_confirmed"`
+	ExceptionTags    []string `json:"exception_tags"`
+	ClientReference  string   `json:"client_reference"`
 }
 
 type infiniWebhookPayload struct {

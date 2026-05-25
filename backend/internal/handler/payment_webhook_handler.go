@@ -173,9 +173,27 @@ func extractOutTradeNo(rawBody, providerKey string) string {
 	case payment.TypeInfini:
 		var payload struct {
 			ClientReference string `json:"client_reference"`
+			Data            struct {
+				ClientReference string `json:"client_reference"`
+			} `json:"data"`
+			Result struct {
+				ClientReference string `json:"client_reference"`
+			} `json:"result"`
+			Object struct {
+				ClientReference string `json:"client_reference"`
+			} `json:"object"`
 		}
 		if err := json.Unmarshal([]byte(rawBody), &payload); err == nil {
-			return strings.TrimSpace(payload.ClientReference)
+			for _, candidate := range []string{
+				payload.ClientReference,
+				payload.Data.ClientReference,
+				payload.Result.ClientReference,
+				payload.Object.ClientReference,
+			} {
+				if trimmed := strings.TrimSpace(candidate); trimmed != "" {
+					return trimmed
+				}
+			}
 		}
 	}
 	// For other providers (Stripe, Alipay direct, WxPay direct), the registry

@@ -10,6 +10,7 @@ const pollOrderStatus = vi.hoisted(() => vi.fn())
 const verifyOrder = vi.hoisted(() => vi.fn())
 const verifyOrderPublic = vi.hoisted(() => vi.fn())
 const resolveOrderPublicByResumeToken = vi.hoisted(() => vi.fn())
+const refreshUser = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router')
@@ -33,6 +34,12 @@ vi.mock('vue-i18n', async () => {
 vi.mock('@/stores/payment', () => ({
   usePaymentStore: () => ({
     pollOrderStatus,
+  }),
+}))
+
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    refreshUser,
   }),
 }))
 
@@ -91,6 +98,10 @@ describe('PaymentResultView', () => {
     verifyOrder.mockReset()
     verifyOrderPublic.mockReset()
     resolveOrderPublicByResumeToken.mockReset()
+    refreshUser.mockReset()
+    verifyOrder.mockRejectedValue(new Error('not authenticated'))
+    verifyOrderPublic.mockRejectedValue(new Error('order not found'))
+    refreshUser.mockResolvedValue(undefined)
     window.localStorage.clear()
   })
 
@@ -227,7 +238,7 @@ describe('PaymentResultView', () => {
     expect(wrapper.text()).toContain('payment.result.processing')
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).not.toBeNull()
 
-    await vi.advanceTimersByTimeAsync(2000)
+    await vi.advanceTimersByTimeAsync(5000)
     await flushPromises()
 
     expect(resolveOrderPublicByResumeToken).toHaveBeenCalledTimes(2)
@@ -266,7 +277,8 @@ describe('PaymentResultView', () => {
 
     expect(resolveOrderPublicByResumeToken).toHaveBeenCalledWith('resume-fail')
     expect(pollOrderStatus).toHaveBeenCalledWith(77)
-    expect(verifyOrderPublic).not.toHaveBeenCalled()
+    expect(verifyOrder).toHaveBeenCalledWith('sub2_20260420abcd1234')
+    expect(verifyOrderPublic).toHaveBeenCalledWith('sub2_20260420abcd1234')
     expect(wrapper.text()).toContain('payment.result.success')
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toBeNull()
   })

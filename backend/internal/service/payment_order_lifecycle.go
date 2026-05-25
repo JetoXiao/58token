@@ -27,7 +27,7 @@ const (
 	checkPaidResultAlreadyPaid = "already_paid"
 	checkPaidResultCancelled   = "cancelled"
 
-	pendingWxpayReconcileLimit = 20
+	pendingPaymentReconcileLimit = 20
 )
 
 type checkPaidOptions struct {
@@ -297,9 +297,9 @@ func (s *PaymentService) VerifyOrderByOutTradeNo(ctx context.Context, outTradeNo
 	return o, nil
 }
 
-// ReconcilePendingWxpayOrders actively checks recent pending WeChat orders so
+// ReconcilePendingProviderOrders actively checks recent pending provider orders so
 // missed provider notifications do not wait until order expiry to fulfill.
-func (s *PaymentService) ReconcilePendingWxpayOrders(ctx context.Context) (int, error) {
+func (s *PaymentService) ReconcilePendingProviderOrders(ctx context.Context) (int, error) {
 	now := time.Now()
 	orders, err := s.entClient.PaymentOrder.Query().
 		Where(
@@ -310,13 +310,17 @@ func (s *PaymentService) ReconcilePendingWxpayOrders(ctx context.Context) (int, 
 				paymentorder.PaymentTypeHasPrefix(payment.TypeWxpay+"_"),
 				paymentorder.ProviderKeyEQ(payment.TypeWxpay),
 				paymentorder.ProviderKeyHasPrefix(payment.TypeWxpay+"_"),
+				paymentorder.PaymentTypeEQ(payment.TypeInfini),
+				paymentorder.PaymentTypeEQ(payment.TypeUSDT),
+				paymentorder.ProviderKeyEQ(payment.TypeInfini),
+				paymentorder.ProviderKeyHasPrefix(payment.TypeInfini+"_"),
 			),
 		).
 		Order(dbent.Asc(paymentorder.FieldCreatedAt)).
-		Limit(pendingWxpayReconcileLimit).
+		Limit(pendingPaymentReconcileLimit).
 		All(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("query pending wxpay orders: %w", err)
+		return 0, fmt.Errorf("query pending provider orders: %w", err)
 	}
 
 	recovered := 0
@@ -326,6 +330,11 @@ func (s *PaymentService) ReconcilePendingWxpayOrders(ctx context.Context) (int, 
 		}
 	}
 	return recovered, nil
+}
+
+// ReconcilePendingWxpayOrders is kept for older callers and tests.
+func (s *PaymentService) ReconcilePendingWxpayOrders(ctx context.Context) (int, error) {
+	return s.ReconcilePendingProviderOrders(ctx)
 }
 
 // VerifyOrderPublic returns the currently persisted public order state without
@@ -416,13 +425,7 @@ func paymentOrderAllowsRegistryFallback(order *dbent.PaymentOrder) bool {
 	if order == nil {
 		return false
 	}
-	if psOrderProviderSnapshot(order) != nil {
-		return false
-	}
 	if strings.TrimSpace(psStringValue(order.ProviderInstanceID)) != "" {
-		return false
-	}
-	if strings.TrimSpace(psStringValue(order.ProviderKey)) != "" {
 		return false
 	}
 	return true
