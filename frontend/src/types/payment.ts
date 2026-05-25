@@ -34,6 +34,7 @@ export interface PaymentConfig {
   balance_disabled: boolean
   balance_recharge_multiplier: number
   usdt_cny_exchange_rate: number
+  marketplace_group_multipliers?: Record<string, number>
   enabled_payment_types: PaymentType[]
   help_image_url: string
   help_text: string

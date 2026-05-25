@@ -62,13 +62,23 @@ export function formatCurrency(amount: number | null | undefined, currency: stri
   if (amount === null || amount === undefined) return '$0.00'
 
   const locale = getLocale()
+  const normalizedCurrency = currency.toUpperCase()
 
   // For very small amounts, show more decimals
   const fractionDigits = amount > 0 && amount < 0.01 ? 6 : 2
 
+  if (normalizedCurrency === 'USD') {
+    const formattedAmount = new Intl.NumberFormat(locale, {
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits
+    }).format(amount)
+    return `$${formattedAmount}`
+  }
+
   return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: currency,
+    currency: normalizedCurrency,
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits
   }).format(amount)

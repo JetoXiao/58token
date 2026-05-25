@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -14,28 +15,29 @@ import (
 )
 
 const (
-	SettingPaymentEnabled      = "payment_enabled"
-	SettingMinRechargeAmount   = "MIN_RECHARGE_AMOUNT"
-	SettingMaxRechargeAmount   = "MAX_RECHARGE_AMOUNT"
-	SettingDailyRechargeLimit  = "DAILY_RECHARGE_LIMIT"
-	SettingOrderTimeoutMinutes = "ORDER_TIMEOUT_MINUTES"
-	SettingMaxPendingOrders    = "MAX_PENDING_ORDERS"
-	SettingEnabledPaymentTypes = "ENABLED_PAYMENT_TYPES"
-	SettingLoadBalanceStrategy = "LOAD_BALANCE_STRATEGY"
-	SettingBalancePayDisabled  = "BALANCE_PAYMENT_DISABLED"
-	SettingBalanceRechargeMult = "BALANCE_RECHARGE_MULTIPLIER"
-	SettingRechargeFeeRate     = "RECHARGE_FEE_RATE"
-	SettingUsdtCnyExchangeRate = "USDT_CNY_EXCHANGE_RATE"
-	SettingProductNamePrefix   = "PRODUCT_NAME_PREFIX"
-	SettingProductNameSuffix   = "PRODUCT_NAME_SUFFIX"
-	SettingHelpImageURL        = "PAYMENT_HELP_IMAGE_URL"
-	SettingHelpText            = "PAYMENT_HELP_TEXT"
-	SettingCancelRateLimitOn   = "CANCEL_RATE_LIMIT_ENABLED"
-	SettingCancelRateLimitMax  = "CANCEL_RATE_LIMIT_MAX"
-	SettingCancelWindowSize    = "CANCEL_RATE_LIMIT_WINDOW"
-	SettingCancelWindowUnit    = "CANCEL_RATE_LIMIT_UNIT"
-	SettingCancelWindowMode    = "CANCEL_RATE_LIMIT_WINDOW_MODE"
-	SettingAlipayForceQRCode   = "ALIPAY_FORCE_QRCODE"
+	SettingPaymentEnabled              = "payment_enabled"
+	SettingMinRechargeAmount           = "MIN_RECHARGE_AMOUNT"
+	SettingMaxRechargeAmount           = "MAX_RECHARGE_AMOUNT"
+	SettingDailyRechargeLimit          = "DAILY_RECHARGE_LIMIT"
+	SettingOrderTimeoutMinutes         = "ORDER_TIMEOUT_MINUTES"
+	SettingMaxPendingOrders            = "MAX_PENDING_ORDERS"
+	SettingEnabledPaymentTypes         = "ENABLED_PAYMENT_TYPES"
+	SettingLoadBalanceStrategy         = "LOAD_BALANCE_STRATEGY"
+	SettingBalancePayDisabled          = "BALANCE_PAYMENT_DISABLED"
+	SettingBalanceRechargeMult         = "BALANCE_RECHARGE_MULTIPLIER"
+	SettingRechargeFeeRate             = "RECHARGE_FEE_RATE"
+	SettingUsdtCnyExchangeRate         = "USDT_CNY_EXCHANGE_RATE"
+	SettingMarketplaceGroupMultipliers = "MARKETPLACE_GROUP_MULTIPLIERS"
+	SettingProductNamePrefix           = "PRODUCT_NAME_PREFIX"
+	SettingProductNameSuffix           = "PRODUCT_NAME_SUFFIX"
+	SettingHelpImageURL                = "PAYMENT_HELP_IMAGE_URL"
+	SettingHelpText                    = "PAYMENT_HELP_TEXT"
+	SettingCancelRateLimitOn           = "CANCEL_RATE_LIMIT_ENABLED"
+	SettingCancelRateLimitMax          = "CANCEL_RATE_LIMIT_MAX"
+	SettingCancelWindowSize            = "CANCEL_RATE_LIMIT_WINDOW"
+	SettingCancelWindowUnit            = "CANCEL_RATE_LIMIT_UNIT"
+	SettingCancelWindowMode            = "CANCEL_RATE_LIMIT_WINDOW_MODE"
+	SettingAlipayForceQRCode           = "ALIPAY_FORCE_QRCODE"
 )
 
 // Default values for payment configuration settings.
@@ -46,23 +48,24 @@ const (
 
 // PaymentConfig holds the payment system configuration.
 type PaymentConfig struct {
-	Enabled                   bool     `json:"enabled"`
-	MinAmount                 float64  `json:"min_amount"`
-	MaxAmount                 float64  `json:"max_amount"`
-	DailyLimit                float64  `json:"daily_limit"`
-	OrderTimeoutMin           int      `json:"order_timeout_minutes"`
-	MaxPendingOrders          int      `json:"max_pending_orders"`
-	EnabledTypes              []string `json:"enabled_payment_types"`
-	BalanceDisabled           bool     `json:"balance_disabled"`
-	BalanceRechargeMultiplier float64  `json:"balance_recharge_multiplier"`
-	RechargeFeeRate           float64  `json:"recharge_fee_rate"`
-	UsdtCnyExchangeRate       float64  `json:"usdt_cny_exchange_rate"`
-	LoadBalanceStrategy       string   `json:"load_balance_strategy"`
-	ProductNamePrefix         string   `json:"product_name_prefix"`
-	ProductNameSuffix         string   `json:"product_name_suffix"`
-	HelpImageURL              string   `json:"help_image_url"`
-	HelpText                  string   `json:"help_text"`
-	StripePublishableKey      string   `json:"stripe_publishable_key,omitempty"`
+	Enabled                     bool               `json:"enabled"`
+	MinAmount                   float64            `json:"min_amount"`
+	MaxAmount                   float64            `json:"max_amount"`
+	DailyLimit                  float64            `json:"daily_limit"`
+	OrderTimeoutMin             int                `json:"order_timeout_minutes"`
+	MaxPendingOrders            int                `json:"max_pending_orders"`
+	EnabledTypes                []string           `json:"enabled_payment_types"`
+	BalanceDisabled             bool               `json:"balance_disabled"`
+	BalanceRechargeMultiplier   float64            `json:"balance_recharge_multiplier"`
+	RechargeFeeRate             float64            `json:"recharge_fee_rate"`
+	UsdtCnyExchangeRate         float64            `json:"usdt_cny_exchange_rate"`
+	MarketplaceGroupMultipliers map[string]float64 `json:"marketplace_group_multipliers"`
+	LoadBalanceStrategy         string             `json:"load_balance_strategy"`
+	ProductNamePrefix           string             `json:"product_name_prefix"`
+	ProductNameSuffix           string             `json:"product_name_suffix"`
+	HelpImageURL                string             `json:"help_image_url"`
+	HelpText                    string             `json:"help_text"`
+	StripePublishableKey        string             `json:"stripe_publishable_key,omitempty"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled bool   `json:"cancel_rate_limit_enabled"`
@@ -77,22 +80,23 @@ type PaymentConfig struct {
 
 // UpdatePaymentConfigRequest contains fields to update payment configuration.
 type UpdatePaymentConfigRequest struct {
-	Enabled                   *bool    `json:"enabled"`
-	MinAmount                 *float64 `json:"min_amount"`
-	MaxAmount                 *float64 `json:"max_amount"`
-	DailyLimit                *float64 `json:"daily_limit"`
-	OrderTimeoutMin           *int     `json:"order_timeout_minutes"`
-	MaxPendingOrders          *int     `json:"max_pending_orders"`
-	EnabledTypes              []string `json:"enabled_payment_types"`
-	BalanceDisabled           *bool    `json:"balance_disabled"`
-	BalanceRechargeMultiplier *float64 `json:"balance_recharge_multiplier"`
-	RechargeFeeRate           *float64 `json:"recharge_fee_rate"`
-	UsdtCnyExchangeRate       *float64 `json:"usdt_cny_exchange_rate"`
-	LoadBalanceStrategy       *string  `json:"load_balance_strategy"`
-	ProductNamePrefix         *string  `json:"product_name_prefix"`
-	ProductNameSuffix         *string  `json:"product_name_suffix"`
-	HelpImageURL              *string  `json:"help_image_url"`
-	HelpText                  *string  `json:"help_text"`
+	Enabled                     *bool              `json:"enabled"`
+	MinAmount                   *float64           `json:"min_amount"`
+	MaxAmount                   *float64           `json:"max_amount"`
+	DailyLimit                  *float64           `json:"daily_limit"`
+	OrderTimeoutMin             *int               `json:"order_timeout_minutes"`
+	MaxPendingOrders            *int               `json:"max_pending_orders"`
+	EnabledTypes                []string           `json:"enabled_payment_types"`
+	BalanceDisabled             *bool              `json:"balance_disabled"`
+	BalanceRechargeMultiplier   *float64           `json:"balance_recharge_multiplier"`
+	RechargeFeeRate             *float64           `json:"recharge_fee_rate"`
+	UsdtCnyExchangeRate         *float64           `json:"usdt_cny_exchange_rate"`
+	MarketplaceGroupMultipliers map[string]float64 `json:"marketplace_group_multipliers"`
+	LoadBalanceStrategy         *string            `json:"load_balance_strategy"`
+	ProductNamePrefix           *string            `json:"product_name_prefix"`
+	ProductNameSuffix           *string            `json:"product_name_suffix"`
+	HelpImageURL                *string            `json:"help_image_url"`
+	HelpText                    *string            `json:"help_text"`
 
 	// Cancel rate limit settings
 	CancelRateLimitEnabled *bool   `json:"cancel_rate_limit_enabled"`
@@ -207,7 +211,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 	keys := []string{
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
-		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeFeeRate, SettingUsdtCnyExchangeRate, SettingLoadBalanceStrategy,
+		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeFeeRate, SettingUsdtCnyExchangeRate, SettingMarketplaceGroupMultipliers, SettingLoadBalanceStrategy,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
@@ -228,21 +232,22 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 
 func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *PaymentConfig {
 	cfg := &PaymentConfig{
-		Enabled:                   vals[SettingPaymentEnabled] == "true",
-		MinAmount:                 pcParseFloat(vals[SettingMinRechargeAmount], 1),
-		MaxAmount:                 pcParseFloat(vals[SettingMaxRechargeAmount], 0),
-		DailyLimit:                pcParseFloat(vals[SettingDailyRechargeLimit], 0),
-		OrderTimeoutMin:           pcParseInt(vals[SettingOrderTimeoutMinutes], defaultOrderTimeoutMin),
-		MaxPendingOrders:          pcParseInt(vals[SettingMaxPendingOrders], defaultMaxPendingOrders),
-		BalanceDisabled:           vals[SettingBalancePayDisabled] == "true",
-		BalanceRechargeMultiplier: normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
-		RechargeFeeRate:           pcParseFloat(vals[SettingRechargeFeeRate], 0),
-		UsdtCnyExchangeRate:       normalizeUsdtCnyExchangeRate(pcParseFloat(vals[SettingUsdtCnyExchangeRate], defaultUsdtCnyExchangeRate)),
-		LoadBalanceStrategy:       vals[SettingLoadBalanceStrategy],
-		ProductNamePrefix:         vals[SettingProductNamePrefix],
-		ProductNameSuffix:         vals[SettingProductNameSuffix],
-		HelpImageURL:              vals[SettingHelpImageURL],
-		HelpText:                  vals[SettingHelpText],
+		Enabled:                     vals[SettingPaymentEnabled] == "true",
+		MinAmount:                   pcParseFloat(vals[SettingMinRechargeAmount], 1),
+		MaxAmount:                   pcParseFloat(vals[SettingMaxRechargeAmount], 0),
+		DailyLimit:                  pcParseFloat(vals[SettingDailyRechargeLimit], 0),
+		OrderTimeoutMin:             pcParseInt(vals[SettingOrderTimeoutMinutes], defaultOrderTimeoutMin),
+		MaxPendingOrders:            pcParseInt(vals[SettingMaxPendingOrders], defaultMaxPendingOrders),
+		BalanceDisabled:             vals[SettingBalancePayDisabled] == "true",
+		BalanceRechargeMultiplier:   normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
+		RechargeFeeRate:             pcParseFloat(vals[SettingRechargeFeeRate], 0),
+		UsdtCnyExchangeRate:         normalizeUsdtCnyExchangeRate(pcParseFloat(vals[SettingUsdtCnyExchangeRate], defaultUsdtCnyExchangeRate)),
+		MarketplaceGroupMultipliers: parseMarketplaceGroupMultipliers(vals[SettingMarketplaceGroupMultipliers]),
+		LoadBalanceStrategy:         vals[SettingLoadBalanceStrategy],
+		ProductNamePrefix:           vals[SettingProductNamePrefix],
+		ProductNameSuffix:           vals[SettingProductNameSuffix],
+		HelpImageURL:                vals[SettingHelpImageURL],
+		HelpText:                    vals[SettingHelpText],
 
 		CancelRateLimitEnabled: vals[SettingCancelRateLimitOn] == "true",
 		CancelRateLimitMax:     pcParseInt(vals[SettingCancelRateLimitMax], 10),
@@ -314,6 +319,17 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 			return infraerrors.BadRequest("INVALID_USDT_CNY_EXCHANGE_RATE", "USDT/CNY exchange rate must be greater than 0")
 		}
 	}
+	if req.MarketplaceGroupMultipliers != nil {
+		for group, multiplier := range req.MarketplaceGroupMultipliers {
+			group = strings.TrimSpace(group)
+			if group == "" {
+				return infraerrors.BadRequest("INVALID_MARKETPLACE_GROUP_MULTIPLIER", "marketplace group name cannot be empty")
+			}
+			if math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
+				return infraerrors.BadRequest("INVALID_MARKETPLACE_GROUP_MULTIPLIER", "marketplace group multiplier must be greater than 0")
+			}
+		}
+	}
 	m := map[string]string{
 		SettingPaymentEnabled:                    formatBoolOrEmpty(req.Enabled),
 		SettingMinRechargeAmount:                 formatPositiveFloat(req.MinAmount),
@@ -346,6 +362,13 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 	} else {
 		m[SettingEnabledPaymentTypes] = ""
 	}
+	if req.MarketplaceGroupMultipliers != nil {
+		marketplaceMultipliers, err := marshalMarketplaceGroupMultipliers(req.MarketplaceGroupMultipliers)
+		if err != nil {
+			return err
+		}
+		m[SettingMarketplaceGroupMultipliers] = marketplaceMultipliers
+	}
 	return s.settingRepo.SetMultiple(ctx, m)
 }
 
@@ -368,6 +391,55 @@ func formatNonNegativeFloat(v *float64) string {
 		return ""
 	}
 	return strconv.FormatFloat(*v, 'f', 2, 64)
+}
+
+func defaultMarketplaceGroupMultipliers() map[string]float64 {
+	return map[string]float64{
+		"Claude Lite": 1,
+		"Claude Plus": 1,
+		"Claude Max":  1,
+		"Codex Lite":  1,
+		"Codex Pro":   1,
+	}
+}
+
+func parseMarketplaceGroupMultipliers(raw string) map[string]float64 {
+	result := defaultMarketplaceGroupMultipliers()
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return result
+	}
+	var parsed map[string]float64
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return result
+	}
+	for group, multiplier := range parsed {
+		group = strings.TrimSpace(group)
+		if group == "" || math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
+			continue
+		}
+		result[group] = multiplier
+	}
+	return result
+}
+
+func marshalMarketplaceGroupMultipliers(input map[string]float64) (string, error) {
+	if input == nil {
+		return "", nil
+	}
+	normalized := defaultMarketplaceGroupMultipliers()
+	for group, multiplier := range input {
+		group = strings.TrimSpace(group)
+		if group == "" || math.IsNaN(multiplier) || math.IsInf(multiplier, 0) || multiplier <= 0 {
+			continue
+		}
+		normalized[group] = multiplier
+	}
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", fmt.Errorf("marshal marketplace group multipliers: %w", err)
+	}
+	return string(data), nil
 }
 
 func formatPositiveInt(v *int) string {

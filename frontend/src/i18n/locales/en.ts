@@ -421,7 +421,7 @@ export default {
     users: 'Users',
     groups: 'Groups',
     channels: 'Channels',
-    availableChannels: 'Available Channels',
+    availableChannels: 'Model Marketplace',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -1070,12 +1070,58 @@ export default {
 
   // Available Channels (user-facing)
   availableChannels: {
-    title: 'Available Channels',
-    description: 'Channels you can access, along with their supported models and pricing',
-    searchPlaceholder: 'Search channels or models...',
-    empty: 'No available channels',
+    title: 'Model Marketplace',
+    description: 'Browse available models, input/output prices, and CNY estimates',
+    searchPlaceholder: 'Search models, providers, channels, or groups...',
+    empty: 'No matching models',
     noModels: 'No models configured',
     noPricing: 'Pricing not configured',
+    results: '{count} models',
+    activeFilters: '{count} filters active',
+    copyModel: 'Copy model ID',
+    hero: {
+      eyebrow: 'Model Marketplace',
+      subtitle: 'Compare available AI models by provider and group, with official rates and your platform price shown side by side.',
+      exchangeRate: 'Reference FX: 1 USD = ¥{rate}',
+      unit: 'Official prices shown per 1M tokens',
+      pricingFormula: 'Platform price = official price × group multiplier ÷ RMB/USD exchange rate',
+      pricingExample: 'Example: official {official}, group multiplier {multiplier}, FX 1 USD = ¥{rate}, platform price is about {price} / 1M tokens.'
+    },
+    stats: {
+      models: 'Models',
+      providers: 'Providers',
+      groups: 'Groups',
+      priced: 'Priced'
+    },
+    filters: {
+      title: 'Filters',
+      description: 'Narrow models by provider, group, and capability.',
+      reset: 'Reset',
+      providers: 'Providers',
+      groups: 'Accessible Groups',
+      billing: 'Billing Type',
+      capabilities: 'Capabilities'
+    },
+    view: {
+      cards: 'Cards',
+      table: 'Table'
+    },
+    currency: {
+      usd: 'USD',
+      cny: 'CNY'
+    },
+    modelDescriptions: {
+      openai: 'OpenAI-compatible model for reasoning, tools, coding, and multimodal workloads.',
+      anthropic: 'Claude-family model with strong long-context reasoning, coding, and tool use.',
+      image: 'Image generation model priced per request.',
+      default: 'Available model exposed through the unified API gateway.'
+    },
+    dataVersion: 'Version: {version}',
+    table: {
+      model: 'Model ID',
+      provider: 'Provider',
+      groups: 'Groups'
+    },
     exclusive: 'Exclusive',
     public: 'Public',
     exclusiveTooltip: 'Exclusive groups granted to you by an admin',
@@ -1092,6 +1138,7 @@ export default {
       billingModeToken: 'Per Token',
       billingModePerRequest: 'Per Request',
       billingModeImage: 'Per Image',
+      billingModeUnknown: 'Not configured',
       inputPrice: 'Input',
       outputPrice: 'Output',
       cacheWritePrice: 'Cache Write',
@@ -1100,7 +1147,11 @@ export default {
       perRequestPrice: 'Per Request',
       intervals: 'Tiered Pricing',
       unitPerMillion: '/ 1M tokens',
-      unitPerRequest: '/ request'
+      unitPerRequest: '/ request',
+      officialPrice: 'Official {price}',
+      convertedPrice: '~ {price}',
+      noOfficialPrice: 'No official reference',
+      discountOff: '{discount}% off official'
     }
   },
 
@@ -5721,6 +5772,11 @@ export default {
         balanceRechargePreview: 'Preview: 1 CNY = {usd} USD',
         usdtCnyExchangeRate: 'USDT/CNY Exchange Rate',
         usdtCnyExchangeRateHint: 'Used to convert RMB package amounts into payable USDT for recharge orders',
+        marketplaceGroupMultipliers: {
+          title: 'Model Marketplace Group Multipliers',
+          description: 'Configure the group multiplier used by the model marketplace. Platform price = official price x group multiplier / USD-CNY rate.',
+          hint: 'Used only for model marketplace display pricing'
+        },
         rechargeFeeRate: 'Recharge Fee Rate',
         rechargeFeeRateHint: 'Percentage of service fee charged on top of recharge amount, 0 means no fee',
         rechargeFeePreview: 'Preview: Recharge 100, fee {fee}',

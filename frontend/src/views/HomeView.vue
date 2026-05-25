@@ -33,6 +33,8 @@
       :docs-label="t('home.docs')"
       :cta-to="isAuthenticated ? dashboardPath : '/login'"
       :cta-label="isAuthenticated ? t('home.dashboard') : t('home.login')"
+      model-marketplace-to="/available-channels"
+      :model-marketplace-label="t('nav.availableChannels')"
     >
       <template #tools>
         <LocaleSwitcher />

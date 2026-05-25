@@ -1,127 +1,671 @@
 <template>
-  <AppLayout>
-    <TablePageLayout>
-      <template #filters>
-        <div class="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
-          <div class="flex flex-1 flex-wrap items-center gap-3">
-            <div class="relative w-full sm:w-80">
-              <Icon
-                name="search"
-                size="md"
-                class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
-              />
-              <input
-                v-model="searchQuery"
-                type="text"
-                :placeholder="t('availableChannels.searchPlaceholder')"
-                class="input pl-10"
-              />
+  <div class="relative flex min-h-screen flex-col overflow-hidden bg-[#f7f8fb] text-gray-950 dark:bg-[#05060a] dark:text-white">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-400/20"></div>
+      <div class="absolute right-[-14rem] top-24 h-[34rem] w-[34rem] rounded-full bg-violet-300/25 blur-3xl dark:bg-violet-500/18"></div>
+      <div class="absolute bottom-[-18rem] left-[-10rem] h-[38rem] w-[38rem] rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-400/10"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+    </div>
+
+    <MarketingNavbar
+      :site-name="siteName"
+      :subtitle="siteSubtitle"
+      :logo="siteLogo"
+      :doc-url="docUrl"
+      :docs-label="t('home.docs')"
+      :cta-to="isAuthenticated ? dashboardPath : '/login'"
+      :cta-label="isAuthenticated ? t('home.dashboard') : t('home.login')"
+      model-marketplace-to="/available-channels"
+      :model-marketplace-label="t('nav.availableChannels')"
+    >
+      <template #tools>
+        <LocaleSwitcher />
+        <button
+          type="button"
+          class="rounded-xl border border-gray-200/70 bg-white/70 p-2 text-gray-600 transition hover:bg-white hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+          :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
+          @click="toggleTheme"
+        >
+          <Icon v-if="isDark" name="sun" size="md" />
+          <Icon v-else name="moon" size="md" />
+        </button>
+      </template>
+    </MarketingNavbar>
+
+    <main class="relative z-10 flex-1 px-4 pb-14 pt-6 sm:px-6">
+      <section class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-gray-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8">
+        <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
+          <div>
+            <div class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-300">
+              <Icon name="sparkles" size="sm" />
+              {{ t('availableChannels.hero.eyebrow') }}
+            </div>
+            <h1 class="mt-5 max-w-4xl text-4xl font-semibold tracking-normal text-gray-950 dark:text-white md:text-6xl">
+              {{ t('availableChannels.title') }}
+            </h1>
+            <p class="mt-5 max-w-3xl text-base leading-8 text-gray-600 dark:text-slate-300">
+              {{ t('availableChannels.hero.subtitle') }}
+            </p>
+            <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+              <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                {{ t('availableChannels.hero.exchangeRate', { rate: usdToCnyLabel }) }}
+              </span>
+              <span class="rounded-full border border-gray-200 bg-white/70 px-3 py-1 dark:border-white/10 dark:bg-white/5">
+                {{ t('availableChannels.hero.unit') }}
+              </span>
+            </div>
+            <div class="mt-4 max-w-3xl rounded-2xl border border-emerald-200/80 bg-white/62 p-4 text-sm leading-6 text-gray-600 shadow-sm backdrop-blur dark:border-emerald-900/50 dark:bg-white/[0.04] dark:text-slate-300">
+              <p class="font-semibold text-emerald-700 dark:text-emerald-300">{{ t('availableChannels.hero.pricingFormula') }}</p>
+              <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">{{ pricingExample }}</p>
             </div>
           </div>
 
-          <div class="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-3 lg:w-auto">
-            <button
-              @click="loadChannels"
-              :disabled="loading"
-              class="btn btn-secondary"
-              :title="t('common.refresh', 'Refresh')"
-            >
-              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-            </button>
+          <div class="grid grid-cols-2 gap-3">
+            <StatCard :label="t('availableChannels.stats.models')" :value="uniqueModelCount" />
+            <StatCard :label="t('availableChannels.stats.providers')" :value="totalProviderCount" />
+            <StatCard :label="t('availableChannels.stats.groups')" :value="totalGroupCount" />
+            <StatCard :label="t('availableChannels.stats.priced')" :value="pricedModelCount" />
           </div>
         </div>
-      </template>
+      </section>
 
-      <template #table>
-        <AvailableChannelsTable
-          :columns="columnLabels"
-          :rows="filteredChannels"
-          :loading="loading"
-          :user-group-rates="userGroupRates"
-          pricing-key-prefix="availableChannels.pricing"
-          :no-pricing-label="t('availableChannels.noPricing')"
-          :no-models-label="t('availableChannels.noModels')"
-          :empty-label="t('availableChannels.empty')"
-        />
-      </template>
-    </TablePageLayout>
-  </AppLayout>
+      <div class="mx-auto mt-6 grid max-w-7xl gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] xl:sticky xl:top-6 xl:self-start">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ t('availableChannels.filters.title') }}</h2>
+              <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">{{ t('availableChannels.filters.description') }}</p>
+            </div>
+            <button type="button" class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-primary-300 hover:text-primary-600 dark:border-white/10 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:text-primary-300" @click="resetFilters">
+              {{ t('availableChannels.filters.reset') }}
+            </button>
+          </div>
+
+          <div class="mt-5 space-y-6">
+            <FilterBlock :title="t('availableChannels.filters.providers')" :options="providerOptions" :selected="selectedProvider ? [selectedProvider] : []" @toggle="selectProvider" />
+            <FilterBlock :title="t('availableChannels.filters.groups')" :options="groupOptions" :selected="selectedGroup ? [selectedGroup] : []" @toggle="selectGroup" />
+            <FilterBlock :title="t('availableChannels.filters.capabilities')" :options="capabilityOptions" :selected="selectedCapability ? [selectedCapability] : []" @toggle="selectCapability" />
+          </div>
+        </aside>
+
+        <section class="min-w-0 space-y-5">
+          <div class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 p-4 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="relative min-w-0 flex-1">
+                <Icon name="search" size="md" class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
+                <input
+                  v-model="searchQuery"
+                  type="text"
+                  :placeholder="t('availableChannels.searchPlaceholder')"
+                  class="h-12 w-full rounded-2xl border border-gray-200 bg-white/80 pl-11 pr-4 text-sm text-gray-950 outline-none transition placeholder:text-gray-400 focus:border-primary-300 focus:ring-4 focus:ring-primary-100 dark:border-white/10 dark:bg-white/[0.05] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-700 dark:focus:ring-primary-950/40"
+                />
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <SegmentedControl :items="currencyItems" :model-value="currencyMode" @update:model-value="currencyMode = $event as CurrencyMode" />
+                <SegmentedControl :items="viewItems" :model-value="viewMode" @update:model-value="viewMode = $event as ViewMode" />
+                <button type="button" class="inline-flex h-12 items-center justify-center rounded-2xl border border-gray-200 bg-white/80 px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300" :disabled="loading" @click="loadPricingConfig">
+                  <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+                </button>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+              <span>{{ t('availableChannels.results', { count: filteredModels.length }) }}</span>
+              <span v-if="activeFilterCount > 0" class="text-gray-300 dark:text-slate-700">/</span>
+              <span v-if="activeFilterCount > 0">{{ t('availableChannels.activeFilters', { count: activeFilterCount }) }}</span>
+              <span v-if="sourceVersion" class="ml-auto truncate">{{ t('availableChannels.dataVersion', { version: sourceVersion }) }}</span>
+            </div>
+          </div>
+
+          <div v-if="loading" class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
+            <Icon name="refresh" size="lg" class="mx-auto animate-spin text-primary-500" />
+            <p class="mt-3 text-sm text-gray-500 dark:text-slate-400">{{ t('common.loading') }}</p>
+          </div>
+
+          <div v-else-if="filteredModels.length === 0" class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
+            <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
+            <p class="text-sm text-gray-500 dark:text-slate-400">{{ t('availableChannels.empty') }}</p>
+          </div>
+
+          <div v-else-if="viewMode === 'cards'" class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+            <article v-for="item in filteredModels" :key="`${item.modelName}-${item.group}`" class="group rounded-[1.5rem] border border-gray-200/70 bg-white/82 p-5 shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-lg hover:shadow-primary-100/60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-primary-800 dark:hover:shadow-primary-950/20">
+              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <div class="flex min-w-0 items-start gap-3">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 shadow-sm dark:border-white/10 dark:bg-white/5">
+                    <ModelIcon :model="item.modelName" size="24px" />
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex min-w-0 items-start gap-2">
+                      <h3 class="min-w-0 max-w-full break-words text-base font-semibold leading-6 text-gray-950 dark:text-white" :title="item.modelName">{{ item.modelName }}</h3>
+                      <button type="button" class="shrink-0 rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/10 dark:hover:text-primary-300" :title="t('availableChannels.copyModel')" @click="copyModel(item.modelName)">
+                        <Icon name="copy" size="sm" />
+                      </button>
+                    </div>
+                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-slate-400">{{ item.vendorName }} / {{ item.group }} · {{ item.groupMultiplier }}x</p>
+                  </div>
+                </div>
+                <div class="flex shrink-0 flex-col items-end gap-2">
+                  <span class="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 dark:border-white/10 dark:text-slate-300">
+                    {{ item.billingLabel }}
+                  </span>
+                  <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                    {{ itemDiscountLabel(item) }}
+                  </span>
+                </div>
+              </div>
+
+              <p class="mt-4 line-clamp-2 text-sm leading-6 text-gray-500 dark:text-slate-400">
+                {{ item.description }}
+              </p>
+
+              <div class="mt-4 flex flex-wrap gap-1.5">
+                <span v-for="tag in item.capabilities.slice(0, 5)" :key="`${item.modelName}-${item.group}-${tag}`" class="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                  {{ tag }}
+                </span>
+              </div>
+
+              <div class="mt-5 grid gap-2">
+                <PriceRowView v-for="row in priceRows(item)" :key="row.key" :row="row" />
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="overflow-hidden rounded-[1.5rem] border border-gray-200/70 bg-white/82 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045]">
+            <div class="overflow-x-auto">
+              <table class="min-w-[980px] w-full border-collapse text-sm">
+                <thead class="bg-gray-50/80 text-xs font-medium uppercase text-gray-500 dark:bg-white/[0.04] dark:text-slate-400">
+                  <tr>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.table.model') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.table.provider') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.table.groups') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.pricing.inputPrice') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.pricing.outputPrice') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.pricing.cacheWritePrice') }}</th>
+                    <th class="px-5 py-4 text-left">{{ t('availableChannels.pricing.cacheReadPrice') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in filteredModels" :key="`row-${item.modelName}-${item.group}`" class="border-t border-gray-100 transition hover:bg-gray-50/70 dark:border-white/10 dark:hover:bg-white/[0.04]">
+                    <td class="px-5 py-4">
+                      <button type="button" class="flex min-w-0 items-center gap-3 font-semibold text-gray-950 hover:text-primary-600 dark:text-white dark:hover:text-primary-300" @click="copyModel(item.modelName)">
+                        <ModelIcon :model="item.modelName" size="20px" />
+                        <span class="break-words">{{ item.modelName }}</span>
+                      </button>
+                    </td>
+                    <td class="px-5 py-4 text-gray-600 dark:text-slate-300">{{ item.vendorName }}</td>
+                    <td class="px-5 py-4 text-gray-600 dark:text-slate-300">{{ item.group }}</td>
+                    <td class="px-5 py-4">{{ tablePrice(item, 'input') }}</td>
+                    <td class="px-5 py-4">{{ tablePrice(item, 'output') }}</td>
+                    <td class="px-5 py-4">{{ tablePrice(item, 'cacheWrite') }}</td>
+                    <td class="px-5 py-4">{{ tablePrice(item, 'cacheRead') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, ref, type PropType } from 'vue'
+import axios from 'axios'
 import { useI18n } from 'vue-i18n'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import TablePageLayout from '@/components/layout/TablePageLayout.vue'
+import { useAuthStore, useAppStore } from '@/stores'
+import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
+import MarketingNavbar from '@/components/marketing/MarketingNavbar.vue'
 import Icon from '@/components/icons/Icon.vue'
-import AvailableChannelsTable from '@/components/channels/AvailableChannelsTable.vue'
-import userChannelsAPI, { type UserAvailableChannel } from '@/api/channels'
-import userGroupsAPI from '@/api/groups'
-import { useAppStore } from '@/stores/app'
-import { extractApiErrorMessage } from '@/utils/apiError'
+import ModelIcon from '@/components/common/ModelIcon.vue'
+import { paymentAPI } from '@/api/payment'
+import { useClipboard } from '@/composables/useClipboard'
+import { BRAND_LOGO_URL } from '@/constants/brand'
 
-const { t } = useI18n()
-const appStore = useAppStore()
+type CurrencyMode = 'usd' | 'cny'
+type ViewMode = 'cards' | 'table'
+type PriceKey = 'input' | 'output' | 'cacheWrite' | 'cacheRead'
 
-const channels = ref<UserAvailableChannel[]>([])
-const userGroupRates = ref<Record<number, number>>({})
-const loading = ref(false)
-const searchQuery = ref('')
+interface FilterOption {
+  value: string
+  label: string
+  count: number
+}
 
-const columnLabels = computed(() => ({
-  name: t('availableChannels.columns.name'),
-  description: t('availableChannels.columns.description'),
-  platform: t('availableChannels.columns.platform'),
-  groups: t('availableChannels.columns.groups'),
-  supportedModels: t('availableChannels.columns.supportedModels'),
-}))
+interface PricingModel {
+  model_name: string
+  description?: string
+  tags?: string
+  vendor_id: number
+  quota_type: number
+  model_price: number
+  supported_endpoint_types?: string[]
+}
 
-/**
- * 搜索过滤：
- * - 命中渠道名/描述 → 整个渠道（所有 platforms）都保留
- * - 否则按 platform/group/model 维度在 sections 里过滤，保留有匹配的 section
- * - 所有 sections 都不匹配时，渠道本身被过滤掉
- */
-const filteredChannels = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return channels.value
-  return channels.value
-    .map((ch) => {
-      const nameHit = ch.name.toLowerCase().includes(q)
-      const descHit = (ch.description || '').toLowerCase().includes(q)
-      if (nameHit || descHit) return ch
-      const matchingSections = ch.platforms.filter(
-        (p) =>
-          p.platform.toLowerCase().includes(q) ||
-          p.groups.some((g) => g.name.toLowerCase().includes(q)) ||
-          p.supported_models.some((m) => m.name.toLowerCase().includes(q)),
-      )
-      if (matchingSections.length === 0) return null
-      return { ...ch, platforms: matchingSections }
-    })
-    .filter((ch): ch is UserAvailableChannel => ch !== null)
+interface PricingResponse {
+  success?: boolean
+  data?: PricingModel[]
+  pricing_version?: string
+}
+
+interface MarketplaceModel {
+  modelName: string
+  vendorName: string
+  group: string
+  groupMultiplier: number
+  capabilities: string[]
+  billingLabel: string
+  description: string
+  prices: Record<PriceKey, number | null>
+  requestPrice: number | null
+  searchText: string
+}
+
+interface PriceRow {
+  key: string
+  label: string
+  platform: string
+  official: string
+  discount: string
+  unit: string
+}
+
+const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fallback', data: [] }
+
+const MARKETPLACE_MODEL_DEFS = [
+  { modelName: 'claude-opus-4-7', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-opus-4-6', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-sonnet-4-6', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-haiku-4-5', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,200K', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'gpt-5.5', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,1.1M', endpoints: ['openai'] },
+  { modelName: 'gpt-5.4', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
+  { modelName: 'gpt-5.4-mini', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
+  { modelName: 'gpt-5.2', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
+  { modelName: 'gpt-5.3-codex', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Vision,400K', endpoints: ['openai'] }
+] as const
+
+const OFFICIAL_MODEL_PRICES: Record<string, Record<PriceKey, number | null>> = {
+  'claude-opus-4-7': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  'claude-opus-4-6': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  'claude-sonnet-4-6': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  'claude-haiku-4-5': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+  'gpt-5.5': { input: 2.5, output: 15, cacheWrite: null, cacheRead: 0.25 },
+  'gpt-5.4': { input: 2.5, output: 15, cacheWrite: null, cacheRead: 0.25 },
+  'gpt-5.4-mini': { input: 0.75, output: 4.5, cacheWrite: null, cacheRead: 0.075 },
+  'gpt-5.2': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 },
+  'gpt-5.3-codex': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 }
+}
+
+const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {
+  'Claude Lite': 1,
+  'Claude Plus': 1,
+  'Claude Max': 1,
+  'Codex Lite': 1,
+  'Codex Pro': 1
+}
+
+const DEFAULT_PROVIDER = 'OpenAI'
+const DEFAULT_GROUP = 'Codex Lite'
+const PROVIDER_ORDER = ['OpenAI', 'Anthropic']
+const GROUP_ORDER = ['Codex Lite', 'Codex Pro', 'Claude Lite', 'Claude Plus', 'Claude Max']
+
+const FilterBlock = defineComponent({
+  name: 'FilterBlock',
+  props: {
+    title: { type: String, required: true },
+    options: { type: Array as PropType<FilterOption[]>, required: true },
+    selected: { type: Array as PropType<string[]>, required: true }
+  },
+  emits: ['toggle'],
+  setup(props, { emit }) {
+    return () => h('div', [
+      h('h3', { class: 'mb-3 text-xs font-semibold uppercase text-gray-500 dark:text-slate-400' }, props.title),
+      h('div', { class: 'flex flex-wrap gap-2 xl:flex-col' }, props.options.map((option) => {
+        const active = props.selected.includes(option.value)
+        return h('button', {
+          key: option.value,
+          type: 'button',
+          class: [
+            'flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm font-medium transition',
+            active
+              ? 'border-primary-500 bg-primary-100 text-primary-800 shadow-[0_0_0_3px_rgba(20,184,166,0.16)] ring-1 ring-primary-300 dark:border-primary-400 dark:bg-primary-500/20 dark:text-primary-100 dark:shadow-[0_0_0_3px_rgba(45,212,191,0.16)] dark:ring-primary-500/60'
+              : 'border-gray-200 bg-white/70 text-gray-600 hover:border-primary-200 hover:text-primary-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:border-primary-800 dark:hover:text-primary-300'
+          ],
+          onClick: () => emit('toggle', option.value)
+        }, [
+          h('span', { class: 'truncate' }, option.label),
+          h('span', { class: 'shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500 dark:bg-white/10 dark:text-slate-400' }, option.count)
+        ])
+      }))
+    ])
+  }
 })
 
-async function loadChannels() {
+const StatCard = defineComponent({
+  name: 'StatCard',
+  props: {
+    label: { type: String, required: true },
+    value: { type: [String, Number], required: true }
+  },
+  setup(props) {
+    return () => h('div', { class: 'rounded-2xl border border-gray-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.05]' }, [
+      h('p', { class: 'text-xs font-medium text-gray-500 dark:text-slate-400' }, props.label),
+      h('p', { class: 'mt-2 text-2xl font-semibold text-gray-950 dark:text-white' }, props.value)
+    ])
+  }
+})
+
+const SegmentedControl = defineComponent({
+  name: 'SegmentedControl',
+  props: {
+    items: { type: Array as PropType<Array<{ value: string; label: string }>>, required: true },
+    modelValue: { type: String, required: true }
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit }) {
+    return () => h('div', { class: 'inline-flex rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-white/10 dark:bg-white/[0.04]' },
+      props.items.map((item) => h('button', {
+        key: item.value,
+        type: 'button',
+        class: [
+          'rounded-xl px-3 py-2 text-sm font-medium transition',
+          props.modelValue === item.value
+            ? 'bg-white text-gray-950 shadow-sm dark:bg-white/10 dark:text-white'
+            : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+        ],
+        onClick: () => emit('update:modelValue', item.value)
+      }, item.label))
+    )
+  }
+})
+
+const PriceRowView = defineComponent({
+  name: 'PriceRowView',
+  props: {
+    row: { type: Object as PropType<PriceRow>, required: true }
+  },
+  setup(props) {
+    return () => h('div', { class: 'rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04]' }, [
+      h('div', { class: 'flex items-center justify-between gap-3' }, [
+        h('span', { class: 'text-xs font-medium text-gray-500 dark:text-slate-400' }, props.row.label),
+        h('span', { class: 'text-sm font-semibold text-gray-950 dark:text-white' }, props.row.platform)
+      ]),
+      h('div', { class: 'mt-1 flex items-center justify-between gap-3' }, [
+        h('span', { class: 'text-[11px] text-gray-400 dark:text-slate-500' }, props.row.unit),
+        h('span', { class: 'text-xs font-medium text-emerald-700 dark:text-emerald-300' }, props.row.official)
+      ])
+    ])
+  }
+})
+
+const { t } = useI18n()
+const authStore = useAuthStore()
+const appStore = useAppStore()
+const { copyToClipboard } = useClipboard()
+
+const rawPricing = ref<PricingResponse>(FALLBACK_PRICING)
+const loading = ref(false)
+const searchQuery = ref('')
+const selectedProvider = ref(DEFAULT_PROVIDER)
+const selectedGroup = ref(DEFAULT_GROUP)
+const selectedCapability = ref('')
+const viewMode = ref<ViewMode>('cards')
+const currencyMode = ref<CurrencyMode>('usd')
+const usdToCnyRate = ref(7.2)
+const marketplaceGroupMultipliers = ref<Record<string, number>>({ ...DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS })
+const isDark = ref(document.documentElement.classList.contains('dark'))
+
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
+const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
+const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const isAuthenticated = computed(() => authStore.isAuthenticated)
+const isAdmin = computed(() => authStore.isAdmin)
+const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
+const usdToCnyLabel = computed(() => trimNumber(usdToCnyRate.value, 2))
+const sourceVersion = computed(() => rawPricing.value.pricing_version || '')
+const pricingExample = computed(() => {
+  const official = 5
+  const multiplier = selectedGroup.value ? groupMultiplierFor(selectedGroup.value) : 1
+  const price = platformPrice(official, multiplier)
+  return t('availableChannels.hero.pricingExample', {
+    official: `$${trimNumber(official, 2)}`,
+    multiplier: `${trimNumber(multiplier, 2)}x`,
+    rate: usdToCnyLabel.value,
+    price: price == null ? '-' : `$${price.toFixed(2)}`
+  })
+})
+const currencyItems = computed(() => [
+  { value: 'usd', label: t('availableChannels.currency.usd') },
+  { value: 'cny', label: t('availableChannels.currency.cny') }
+])
+const viewItems = computed(() => [
+  { value: 'cards', label: t('availableChannels.view.cards') },
+  { value: 'table', label: t('availableChannels.view.table') }
+])
+
+const marketplaceModels = computed<MarketplaceModel[]>(() => MARKETPLACE_MODEL_DEFS.flatMap((definition) => {
+  const pricingModel = rawPricing.value.data?.find((item) => item.model_name.toLowerCase() === definition.modelName.toLowerCase())
+  const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
+  const description = pricingModel?.description || modelDescription(definition.modelName)
+  const prices = OFFICIAL_MODEL_PRICES[definition.modelName]
+
+  return definition.groups.map((group) => {
+    const groupMultiplier = groupMultiplierFor(group)
+    return {
+      modelName: definition.modelName,
+      vendorName: definition.vendorName,
+      group,
+      groupMultiplier,
+      capabilities,
+      billingLabel: t('availableChannels.pricing.billingModeToken'),
+      description,
+      prices,
+      requestPrice: null,
+      searchText: [definition.modelName, definition.vendorName, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
+    }
+  })
+}))
+
+const uniqueModelCount = computed(() => new Set(marketplaceModels.value.map((model) => model.modelName)).size)
+const pricedModelCount = computed(() => new Set(marketplaceModels.value.filter((model) => Object.values(model.prices).some((price) => price != null)).map((model) => model.modelName)).size)
+const totalProviderCount = computed(() => new Set(marketplaceModels.value.map((model) => model.vendorName)).size)
+const totalGroupCount = computed(() => new Set(marketplaceModels.value.map((model) => model.group)).size)
+const providerOptions = computed(() => toOptions(countUniqueModelsBy(marketplaceModels.value, (model) => model.vendorName), PROVIDER_ORDER))
+const groupOptions = computed(() => {
+  const models = selectedProvider.value ? marketplaceModels.value.filter((model) => model.vendorName === selectedProvider.value) : marketplaceModels.value
+  return toOptions(countUniqueModelsBy(models, (model) => model.group), GROUP_ORDER)
+})
+const capabilityOptions = computed(() => toOptions(countUniqueModelsBy(filterModelsByPrimarySelection(marketplaceModels.value), (model) => model.capabilities)))
+const activeFilterCount = computed(() => (selectedProvider.value ? 1 : 0) + (selectedGroup.value ? 1 : 0) + (selectedCapability.value ? 1 : 0))
+const filteredModels = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  return filterModelsByPrimarySelection(marketplaceModels.value).filter((model) => {
+    if (q && !model.searchText.includes(q)) return false
+    if (selectedCapability.value && !model.capabilities.includes(selectedCapability.value)) return false
+    return true
+  })
+})
+
+function countUniqueModelsBy(models: MarketplaceModel[], keyFn: (model: MarketplaceModel) => string | string[]): Map<string, number> {
+  const buckets = new Map<string, Set<string>>()
+  models.forEach((model) => {
+    const rawKeys = keyFn(model)
+    const keys = Array.isArray(rawKeys) ? rawKeys : [rawKeys]
+    keys.forEach((key) => {
+      if (!key) return
+      if (!buckets.has(key)) buckets.set(key, new Set<string>())
+      buckets.get(key)?.add(model.modelName)
+    })
+  })
+  return new Map(Array.from(buckets.entries()).map(([key, models]) => [key, models.size]))
+}
+
+function filterModelsByPrimarySelection(models: MarketplaceModel[]): MarketplaceModel[] {
+  return models.filter((model) => {
+    if (selectedProvider.value && model.vendorName !== selectedProvider.value) return false
+    if (selectedGroup.value && model.group !== selectedGroup.value) return false
+    return true
+  })
+}
+
+function toOptions(counts: Map<string, number>, order: string[] = []): FilterOption[] {
+  return Array.from(counts.entries())
+    .sort((a, b) => {
+      const orderA = order.indexOf(a[0])
+      const orderB = order.indexOf(b[0])
+      if (orderA >= 0 || orderB >= 0) {
+        if (orderA < 0) return 1
+        if (orderB < 0) return -1
+        return orderA - orderB
+      }
+      return b[1] - a[1] || a[0].localeCompare(b[0])
+    })
+    .map(([value, count]) => ({ value, label: value, count }))
+}
+
+function selectProvider(value: string) {
+  selectedProvider.value = value
+  const nextGroup = groupOptions.value.find((option) => option.value === selectedGroup.value)?.value || groupOptions.value[0]?.value || ''
+  selectedGroup.value = nextGroup
+}
+
+function selectGroup(value: string) {
+  selectedGroup.value = value
+}
+
+function selectCapability(value: string) {
+  selectedCapability.value = selectedCapability.value === value ? '' : value
+}
+
+function resetFilters() {
+  searchQuery.value = ''
+  selectedProvider.value = DEFAULT_PROVIDER
+  selectedGroup.value = DEFAULT_GROUP
+  selectedCapability.value = ''
+}
+
+function parseCapabilities(tags: string, endpoints: string[]): string[] {
+  const tagItems = tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+  const endpointItems = endpoints.map((endpoint) => endpoint === 'openai' ? 'OpenAI API' : endpoint)
+  return Array.from(new Set([...tagItems, ...endpointItems]))
+}
+
+function modelDescription(modelName: string): string {
+  if (modelName.includes('claude')) return t('availableChannels.modelDescriptions.anthropic')
+  if (modelName.includes('gpt') || modelName.includes('codex')) return t('availableChannels.modelDescriptions.openai')
+  return t('availableChannels.modelDescriptions.default')
+}
+
+function groupMultiplierFor(group: string): number {
+  const configured = Number(marketplaceGroupMultipliers.value[group])
+  return Number.isFinite(configured) && configured > 0 ? configured : 1
+}
+
+function itemDiscountLabel(item: MarketplaceModel): string {
+  const official = Object.values(item.prices).find((price): price is number => price != null && Number.isFinite(price)) ?? null
+  return discountLabel(official, platformPrice(official, item.groupMultiplier))
+}
+
+function priceRows(item: MarketplaceModel): PriceRow[] {
+  return [
+    makePriceRow(item, 'input', t('availableChannels.pricing.inputPrice'), item.prices.input),
+    makePriceRow(item, 'output', t('availableChannels.pricing.outputPrice'), item.prices.output),
+    makePriceRow(item, 'cacheWrite', t('availableChannels.pricing.cacheWritePrice'), item.prices.cacheWrite),
+    makePriceRow(item, 'cacheRead', t('availableChannels.pricing.cacheReadPrice'), item.prices.cacheRead)
+  ].filter((row) => row.platform !== '-')
+}
+
+function makePriceRow(item: MarketplaceModel, key: string, label: string, value: number | null): PriceRow {
+  const platformValue = platformPrice(value, item.groupMultiplier)
+  return {
+    key,
+    label,
+    platform: formatPrice(platformValue),
+    official: value == null ? t('availableChannels.pricing.noOfficialPrice') : t('availableChannels.pricing.officialPrice', { price: formatPrice(value) }),
+    discount: discountLabel(value, platformValue),
+    unit: key === 'request' ? t('availableChannels.pricing.unitPerRequest') : t('availableChannels.pricing.unitPerMillion')
+  }
+}
+
+function tablePrice(item: MarketplaceModel, key: PriceKey): string {
+  const official = item.prices[key]
+  const platform = platformPrice(official, item.groupMultiplier)
+  if (platform == null) return '-'
+  return formatPrice(platform)
+}
+
+function formatPrice(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '-'
+  if (currencyMode.value === 'cny') return `\u00A5${trimNumber(value * usdToCnyRate.value, 4)}`
+  return `$${value.toFixed(2)}`
+}
+
+function platformPrice(officialPrice: number | null, multiplier: number): number | null {
+  if (officialPrice == null || !Number.isFinite(officialPrice) || usdToCnyRate.value <= 0) return null
+  return officialPrice * multiplier / usdToCnyRate.value
+}
+
+function discountLabel(officialPrice: number | null, platformPriceValue: number | null): string {
+  if (officialPrice == null || platformPriceValue == null || officialPrice <= 0) {
+    return t('availableChannels.pricing.noOfficialPrice')
+  }
+  const ratio = platformPriceValue / officialPrice
+  const discount = Math.max(0, Math.min(100, (1 - ratio) * 100))
+  return t('availableChannels.pricing.discountOff', { discount: trimNumber(discount, 1) })
+}
+
+function trimNumber(value: number, maxDigits = 6): string {
+  if (!Number.isFinite(value)) return '0'
+  const fixed = value >= 100 ? value.toFixed(2) : value.toFixed(maxDigits)
+  return fixed.replace(/\.?0+$/, '')
+}
+
+async function copyModel(modelName: string) {
+  await copyToClipboard(modelName, t('common.copiedToClipboard'))
+}
+
+function toggleTheme() {
+  isDark.value = !isDark.value
+  document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.setItem('theme', isDark.value ? 'dark' : 'light')
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme')
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+  isDark.value = savedTheme === 'dark' || (!savedTheme && prefersDark)
+  document.documentElement.classList.toggle('dark', isDark.value)
+}
+
+async function loadPricingConfig() {
   loading.value = true
   try {
-    // 渠道列表和用户专属倍率并发拉取。专属倍率失败不阻塞渠道展示——
-    // 失败时只是无法渲染专属倍率角标，降级为仅显示默认倍率。
-    const [list, rates] = await Promise.all([
-      userChannelsAPI.getAvailable(),
-      userGroupsAPI.getUserGroupRates().catch((err: unknown) => {
-        console.error('Failed to load user group rates:', err)
-        return {} as Record<number, number>
-      }),
+    const [paymentConfig, pricing] = await Promise.all([
+      paymentAPI.getConfig(),
+      axios.get<PricingResponse>('/api/v1/public/model-pricing', { timeout: 12000 }).catch(() => ({ data: FALLBACK_PRICING }))
     ])
-    channels.value = list
-    userGroupRates.value = rates
-  } catch (err: unknown) {
-    appStore.showError(extractApiErrorMessage(err, t('common.error')))
+    const configuredRate = Number(paymentConfig.data?.usdt_cny_exchange_rate)
+    if (Number.isFinite(configuredRate) && configuredRate > 0) usdToCnyRate.value = configuredRate
+    marketplaceGroupMultipliers.value = normalizeMarketplaceGroupMultipliers(paymentConfig.data?.marketplace_group_multipliers)
+    rawPricing.value = pricing.data?.data?.length ? pricing.data : FALLBACK_PRICING
+  } catch (error) {
+    console.error('Failed to load model marketplace config:', error)
+    rawPricing.value = FALLBACK_PRICING
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadChannels)
+function normalizeMarketplaceGroupMultipliers(raw: Record<string, number> | undefined): Record<string, number> {
+  return Object.keys(DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS).reduce<Record<string, number>>((acc, group) => {
+    const value = Number(raw?.[group])
+    acc[group] = Number.isFinite(value) && value > 0 ? value : DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS[group]
+    return acc
+  }, {})
+}
+
+onMounted(() => {
+  initTheme()
+  loadPricingConfig()
+})
 </script>

@@ -421,7 +421,7 @@ export default {
     users: '用户管理',
     groups: '分组管理',
     channels: '渠道管理',
-    availableChannels: '可用渠道',
+    availableChannels: '模型广场',
     subscriptions: '订阅管理',
     accounts: '账号管理',
     proxies: 'IP管理',
@@ -1074,12 +1074,58 @@ export default {
 
   // Available Channels (user-facing)
   availableChannels: {
-    title: '可用渠道',
-    description: '查看您可访问的渠道与其支持的模型、定价',
-    searchPlaceholder: '搜索渠道或模型...',
-    empty: '暂无可用渠道',
+    title: '模型广场',
+    description: '查看可用模型、输入输出价格和人民币折算价格',
+    searchPlaceholder: '搜索模型、供应商、渠道或分组...',
+    empty: '暂无匹配模型',
     noModels: '未配置模型',
     noPricing: '未配置定价',
+    results: '{count} 个模型',
+    activeFilters: '已启用 {count} 个筛选',
+    copyModel: '复制模型 ID',
+    hero: {
+      eyebrow: 'Model Marketplace',
+      subtitle: '按供应商与可用分组快速比较模型，清晰查看官方价格、平台价格与对应折扣。',
+      exchangeRate: '参考汇率：1 USD = ¥{rate}',
+      unit: '官方价格按 1M tokens 展示',
+      pricingFormula: '平台价格 = 官方价格 × 分组倍率 ÷ 人民币兑换美元汇率',
+      pricingExample: '例如：官方价格 {official}，分组倍率 {multiplier}，汇率 1 USD = ¥{rate}，平台价格约 {price} / 1M tokens。'
+    },
+    stats: {
+      models: '模型',
+      providers: '供应商',
+      groups: '分组',
+      priced: '已定价'
+    },
+    filters: {
+      title: '筛选',
+      description: '按供应商、分组和计费类型细分模型。',
+      reset: '重置',
+      providers: '供应商',
+      groups: '可用分组',
+      billing: '计费类型',
+      capabilities: '模型能力'
+    },
+    view: {
+      cards: '卡片',
+      table: '表格'
+    },
+    currency: {
+      usd: '美元',
+      cny: '人民币'
+    },
+    modelDescriptions: {
+      openai: '兼容 OpenAI 接口的模型，适合推理、工具调用、代码与多模态任务。',
+      anthropic: 'Claude 系列模型，适合长上下文推理、代码生成与工具调用。',
+      image: '图片生成模型，按请求计费。',
+      default: '通过统一 API 网关开放的可用模型。'
+    },
+    dataVersion: '版本：{version}',
+    table: {
+      model: '模型 ID',
+      provider: '供应商',
+      groups: '分组'
+    },
     exclusive: '专属',
     public: '公开',
     exclusiveTooltip: '管理员授权给你的专属分组',
@@ -1096,6 +1142,7 @@ export default {
       billingModeToken: '按 Token',
       billingModePerRequest: '按次',
       billingModeImage: '按图片',
+      billingModeUnknown: '未配置',
       inputPrice: '输入',
       outputPrice: '输出',
       cacheWritePrice: '缓存写入',
@@ -1104,7 +1151,11 @@ export default {
       perRequestPrice: '每次请求',
       intervals: '阶梯定价',
       unitPerMillion: '/ 1M token',
-      unitPerRequest: '/ 次'
+      unitPerRequest: '/ 次',
+      officialPrice: '官方 {price}',
+      convertedPrice: '约 {price}',
+      noOfficialPrice: '暂无官方参考',
+      discountOff: '\u8f83\u5b98\u65b9\u4f18\u60e0 {discount}%'
     }
   },
 
@@ -5880,6 +5931,11 @@ export default {
         balanceRechargePreview: '预览：1 CNY = {usd} USD',
         usdtCnyExchangeRate: 'USDT/CNY 汇率',
         usdtCnyExchangeRateHint: '用于 USDT 充值时将人民币套餐金额折算为应付 USDT',
+        marketplaceGroupMultipliers: {
+          title: '模型广场分组倍率',
+          description: '配置模型广场各可用分组的倍率。平台价格 = 官方价格 × 分组倍率 ÷ 人民币兑换美元汇率。',
+          hint: '仅用于模型广场展示价格'
+        },
         rechargeFeeRate: '充值手续费率',
         rechargeFeeRateHint: '用户充值时额外收取的手续费百分比，0 表示不收取手续费',
         rechargeFeePreview: '预览：充值 100 元，手续费 {fee} 元',

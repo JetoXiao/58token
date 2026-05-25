@@ -6042,6 +6042,43 @@
             </div>
           </div>
 
+          <div class="card">
+            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.payment.marketplaceGroupMultipliers.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.payment.marketplaceGroupMultipliers.description") }}
+              </p>
+            </div>
+            <div class="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
+              <div
+                v-for="group in marketplaceGroupMultiplierKeys"
+                :key="group"
+                class="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-dark-700 dark:bg-dark-800"
+              >
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ group }}
+                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    v-model="marketplaceGroupMultiplierInputs[group]"
+                    @blur="commitMarketplaceGroupMultiplierInput(group)"
+                    type="text"
+                    inputmode="decimal"
+                    pattern="[0-9]*[.]?[0-9]*"
+                    autocomplete="off"
+                    class="input"
+                  />
+                  <span class="text-sm text-gray-500 dark:text-gray-400">x</span>
+                </div>
+                <p class="mt-2 text-xs text-gray-400">
+                  {{ t("admin.settings.payment.marketplaceGroupMultipliers.hint") }}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Provider Management -->
           <PaymentProviderList
             v-if="form.payment_enabled"
@@ -6660,6 +6697,16 @@ const settingsTabs = [
   { key: "backup" as SettingsTab, icon: "database" as const },
 ];
 
+const marketplaceGroupMultiplierKeys = [
+  "Claude Lite",
+  "Claude Plus",
+  "Claude Max",
+  "Codex Lite",
+  "Codex Pro",
+] as const;
+
+const marketplaceGroupMultiplierInputs = reactive<Record<string, string>>({});
+
 const settingsTabKeyboardActions = {
   ArrowLeft: -1,
   ArrowUp: -1,
@@ -6671,6 +6718,83 @@ const settingsTabKeyboardActions = {
 
 function selectSettingsTab(tab: SettingsTab): void {
   activeTab.value = tab;
+}
+
+function normalizeMarketplaceGroupMultipliers(
+  raw: Record<string, number> | null | undefined,
+): Record<string, number> {
+  return marketplaceGroupMultiplierKeys.reduce<Record<string, number>>(
+    (acc, group) => {
+      const value = Number(raw?.[group]);
+      acc[group] = Number.isFinite(value) && value > 0 ? value : 1;
+      return acc;
+    },
+    {},
+  );
+}
+
+function syncMarketplaceGroupMultiplierInputs(
+  values: Record<string, number>,
+): void {
+  for (const group of marketplaceGroupMultiplierKeys) {
+    marketplaceGroupMultiplierInputs[group] = String(values[group] ?? 1);
+  }
+}
+
+function commitMarketplaceGroupMultiplierInput(
+  group: (typeof marketplaceGroupMultiplierKeys)[number],
+): void {
+  const normalized =
+    parseMarketplaceGroupMultiplierInput(
+      marketplaceGroupMultiplierInputs[group],
+    ) ?? 1;
+  form.payment_marketplace_group_multipliers[group] = normalized;
+  marketplaceGroupMultiplierInputs[group] = String(normalized);
+}
+
+function marketplaceGroupMultipliersPayload(): Record<string, number> {
+  return marketplaceGroupMultiplierKeys.reduce<Record<string, number>>(
+    (acc, group) => {
+      const normalized =
+        parseMarketplaceGroupMultiplierInput(
+          marketplaceGroupMultiplierInputs[group],
+        ) ?? 1;
+      acc[group] = normalized;
+      form.payment_marketplace_group_multipliers[group] = normalized;
+      marketplaceGroupMultiplierInputs[group] = String(normalized);
+      return acc;
+    },
+    {},
+  );
+}
+
+function parseMarketplaceGroupMultiplierInput(
+  raw: string | number | null | undefined,
+): number | null {
+  const value = String(raw ?? "")
+    .trim()
+    .replace("，", ".")
+    .replace(",", ".")
+    .replace(/[xX]$/, "")
+    .trim();
+  if (!/^(?:\d+\.?\d*|\.\d+)$/.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function fetchPersistedMarketplaceGroupMultipliers(
+  fallback?: Record<string, number> | null,
+): Promise<Record<string, number>> {
+  try {
+    const paymentConfig = await adminAPI.payment.getConfig();
+    return normalizeMarketplaceGroupMultipliers(
+      paymentConfig.data?.marketplace_group_multipliers ?? fallback,
+    );
+  } catch {
+    return normalizeMarketplaceGroupMultipliers(fallback);
+  }
 }
 
 function focusSettingsTab(tab: SettingsTab): void {
@@ -6915,6 +7039,13 @@ const form = reactive<SettingsForm>({
   payment_balance_recharge_multiplier: 1,
   payment_recharge_fee_rate: 0,
   payment_usdt_cny_exchange_rate: 7.2,
+  payment_marketplace_group_multipliers: {
+    'Claude Lite': 1,
+    'Claude Plus': 1,
+    'Claude Max': 1,
+    'Codex Lite': 1,
+    'Codex Pro': 1,
+  },
   payment_enabled_types: [],
   payment_help_image_url: "",
   payment_help_text: "",
@@ -7682,6 +7813,13 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    form.payment_marketplace_group_multipliers =
+      await fetchPersistedMarketplaceGroupMultipliers(
+        settings.payment_marketplace_group_multipliers,
+      );
+    syncMarketplaceGroupMultiplierInputs(
+      form.payment_marketplace_group_multipliers,
+    );
     form.login_agreement_mode =
       settings.login_agreement_mode === "checkbox" ? "checkbox" : "modal";
     form.login_agreement_updated_at =
@@ -8185,6 +8323,8 @@ async function saveSettings() {
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
       payment_usdt_cny_exchange_rate:
         Number(form.payment_usdt_cny_exchange_rate) || 7.2,
+      payment_marketplace_group_multipliers:
+        marketplaceGroupMultipliersPayload(),
       payment_enabled_types: form.payment_enabled_types,
       payment_load_balance_strategy: form.payment_load_balance_strategy,
       payment_product_name_prefix: form.payment_product_name_prefix,
@@ -8253,6 +8393,8 @@ async function saveSettings() {
 
     appendAuthSourceDefaultsToUpdateRequest(payload, authSourceDefaults);
 
+    const requestedMarketplaceGroupMultipliers =
+      payload.payment_marketplace_group_multipliers;
     const updated = await adminAPI.settings.updateSettings(payload);
     for (const [key, value] of Object.entries(updated)) {
       if (key === "openai_fast_policy_settings") continue;
@@ -8260,6 +8402,14 @@ async function saveSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    form.payment_marketplace_group_multipliers =
+      await fetchPersistedMarketplaceGroupMultipliers(
+        updated.payment_marketplace_group_multipliers ??
+          requestedMarketplaceGroupMultipliers,
+      );
+    syncMarketplaceGroupMultiplierInputs(
+      form.payment_marketplace_group_multipliers,
+    );
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(

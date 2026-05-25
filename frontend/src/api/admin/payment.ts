@@ -25,6 +25,7 @@ export interface AdminPaymentConfig {
   balance_disabled: boolean
   balance_recharge_multiplier: number
   usdt_cny_exchange_rate: number
+  marketplace_group_multipliers: Record<string, number>
   load_balance_strategy: string
   product_name_prefix: string
   product_name_suffix: string
@@ -44,6 +45,7 @@ export interface UpdatePaymentConfigRequest {
   balance_disabled?: boolean
   balance_recharge_multiplier?: number
   usdt_cny_exchange_rate?: number
+  marketplace_group_multipliers?: Record<string, number>
   load_balance_strategy?: string
   product_name_prefix?: string
   product_name_suffix?: string
