@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -1490,6 +1491,83 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		}
 	}
 	return rows, nil
+}
+
+func (r *accountRepository) UpdateSortOrders(ctx context.Context, updates []service.AccountSortOrderUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	priorityByID := make(map[int64]int, len(updates))
+	accountIDs := make([]int64, 0, len(updates))
+	for _, u := range updates {
+		if u.ID <= 0 {
+			return service.ErrAccountNotFound
+		}
+		if u.Priority < 0 {
+			return errors.New("priority must be >= 0")
+		}
+		if _, exists := priorityByID[u.ID]; !exists {
+			accountIDs = append(accountIDs, u.ID)
+		}
+		priorityByID[u.ID] = u.Priority
+	}
+	if len(accountIDs) == 0 {
+		return nil
+	}
+
+	var existingCount int
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		`SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND id = ANY($1)`,
+		[]any{pq.Array(accountIDs)},
+		&existingCount,
+	); err != nil {
+		return err
+	}
+	if existingCount != len(accountIDs) {
+		return service.ErrAccountNotFound
+	}
+
+	args := make([]any, 0, len(accountIDs)*2+1)
+	caseClauses := make([]string, 0, len(accountIDs))
+	placeholder := 1
+	for _, id := range accountIDs {
+		caseClauses = append(caseClauses, fmt.Sprintf("WHEN $%d THEN $%d", placeholder, placeholder+1))
+		args = append(args, id, priorityByID[id])
+		placeholder += 2
+	}
+	args = append(args, pq.Array(accountIDs))
+
+	query := fmt.Sprintf(`
+		UPDATE accounts
+		SET priority = CASE id
+			%s
+			ELSE priority
+		END,
+		updated_at = NOW()
+		WHERE deleted_at IS NULL AND id = ANY($%d)
+	`, strings.Join(caseClauses, "\n\t\t\t"), placeholder)
+
+	result, err := r.sql.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != int64(len(accountIDs)) {
+		return service.ErrAccountNotFound
+	}
+
+	payload := map[string]any{"account_ids": accountIDs}
+	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountBulkChanged, nil, nil, payload); err != nil {
+		logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue account sort update failed: err=%v", err)
+	}
+	r.syncSchedulerAccountSnapshots(ctx, accountIDs)
+	return nil
 }
 
 type accountGroupQueryOptions struct {

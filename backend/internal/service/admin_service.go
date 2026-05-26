@@ -58,6 +58,7 @@ type AdminService interface {
 	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
 	BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error
+	UpdateAccountSortOrders(ctx context.Context, updates []AccountSortOrderUpdate) error
 
 	// API Key management (admin)
 	AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error)
@@ -2132,6 +2133,23 @@ func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupI
 
 func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error {
 	return s.groupRepo.UpdateSortOrders(ctx, updates)
+}
+
+func (s *adminServiceImpl) UpdateAccountSortOrders(ctx context.Context, updates []AccountSortOrderUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	for _, update := range updates {
+		if update.ID <= 0 {
+			return infraerrors.BadRequest("INVALID_ACCOUNT_ID", "account id must be positive")
+		}
+		if update.Priority < 0 {
+			return infraerrors.BadRequest("INVALID_PRIORITY", "priority must be non-negative")
+		}
+	}
+
+	return s.accountRepo.UpdateSortOrders(ctx, updates)
 }
 
 // AdminUpdateAPIKeyGroupID 管理员修改 API Key 分组绑定

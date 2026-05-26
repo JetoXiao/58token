@@ -39,9 +39,34 @@
             <span class="truncate">{{ modelMarketplaceLabel }}</span>
           </a>
         </router-link>
+        <router-link
+          v-if="docsTo"
+          :to="docsTo"
+          custom
+          v-slot="{ href, navigate, isActive }"
+        >
+          <a
+            :href="href"
+            @click="navigate"
+            :class="[
+              'inline-flex max-w-[8.5rem] items-center gap-1.5 truncate rounded-xl border px-3 py-2 text-xs font-semibold transition sm:max-w-none sm:px-3.5 sm:text-sm',
+              isActive
+                ? 'border-primary-300 bg-primary-50 text-primary-700 shadow-[0_10px_28px_rgba(20,184,166,0.16)] dark:border-primary-400/40 dark:bg-primary-400/10 dark:text-primary-200 dark:shadow-[0_0_28px_rgba(45,212,191,0.12)]'
+                : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-100 hover:text-gray-950 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white',
+            ]"
+          >
+            <span
+              :class="[
+                'h-1.5 w-1.5 shrink-0 rounded-full',
+                isActive ? 'bg-primary-500 dark:bg-primary-300' : 'bg-gray-300 dark:bg-slate-600',
+              ]"
+            ></span>
+            <span class="truncate">{{ docsLabel }}</span>
+          </a>
+        </router-link>
         <slot name="tools" />
         <a
-          v-if="docUrl"
+          v-if="docUrl && !docsTo"
           :href="docUrl"
           target="_blank"
           rel="noopener noreferrer"
@@ -69,6 +94,7 @@ defineProps<{
   logo?: string
   docUrl?: string
   docsLabel: string
+  docsTo?: string
   ctaTo: string
   ctaLabel: string
   modelMarketplaceTo?: string

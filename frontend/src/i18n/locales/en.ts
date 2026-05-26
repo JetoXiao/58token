@@ -448,6 +448,7 @@ export default {
     channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
+    integrationDocs: 'Docs',
     riskControl: 'Risk Control',
   },
 
@@ -1177,6 +1178,423 @@ export default {
       convertedPrice: '~ {price}',
       noOfficialPrice: 'No official reference',
       discountOff: '{discount}% off official'
+    }
+  },
+
+  integrationDocs: {
+    title: 'Integration Docs',
+    description: 'Register, recharge, create API keys, and call OpenAI-compatible or Claude-compatible endpoints.',
+    hero: {
+      eyebrow: 'API Integration Guide',
+      subtitle: 'A complete path from account setup to production API calls, including billing, model selection, SDK examples, testing, and troubleshooting.',
+      primaryCta: 'Create Account',
+      secondaryCta: 'View Models'
+    },
+    baseUrl: {
+      label: 'API Access Addresses',
+      gatewayLabel: 'Gateway origin',
+      gatewayDescription: 'Use this when the client automatically appends compatible API paths, such as Codex Desktop or Claude Code Anthropic mode.',
+      sdkLabel: 'OpenAI-compatible SDK Base URL',
+      sdkDescription: 'Use this when the client sends requests to /chat/completions or /messages relative to the configured Base URL.',
+      ruleTitle: 'Should I add /v1?',
+      ruleBody: 'Check the final request path. If your client calls /v1/chat/completions, configure only the gateway origin. If your client calls /chat/completions, configure the Base URL with /v1.',
+      description: 'Use the production gateway domain for real clients. Local preview still shows the production domain so 127.0.0.1 is not copied into client configs.'
+    },
+    toc: {
+      title: 'On This Page',
+      toggleClients: 'Toggle client types'
+    },
+    quickStart: {
+      title: 'Quick Start',
+      description: 'Finish these steps first. After that, every compatible client only needs the Base URL, API key, and model name.',
+      steps: [
+        {
+          title: 'Register an account',
+          description: 'Open the registration page, use an allowed email address, complete email verification, and sign in to the console.'
+        },
+        {
+          title: 'Recharge balance',
+          description: 'Go to Recharge / Subscription, choose a preset or custom amount, and complete USDT payment. Balance refreshes after the payment callback is confirmed.'
+        },
+        {
+          title: 'Create an API key',
+          description: 'Open API Keys, create a key, select the target group, copy the sk- prefixed key once, and keep it private.'
+        },
+        {
+          title: 'Pick a model',
+          description: 'Use Model Marketplace to compare available OpenAI and Anthropic groups, official prices, platform prices, and model capabilities.'
+        },
+        {
+          title: 'Configure your client',
+          description: 'Set baseURL to the gateway Base URL and set your API key in the Authorization header or SDK configuration.'
+        },
+        {
+          title: 'Run a small test',
+          description: 'Send a short prompt first, then check API Keys, Usage, Orders, and Dashboard to confirm routing, billing, and logs.'
+        }
+      ]
+    },
+    concepts: {
+      title: 'Core Concepts',
+      description: 'These concepts match the console screens, so users can understand how requests flow through the platform.',
+      cards: [
+        {
+          title: 'API Key',
+          description: 'A user-generated key used by clients. It is bound to a group and carries your balance, limits, and audit records.'
+        },
+        {
+          title: 'Group',
+          description: 'A routing and pricing layer. Groups decide which upstream accounts and models are available to a key.'
+        },
+        {
+          title: 'Model ID',
+          description: 'The exact model string sent in the request, such as gpt-5.5 or claude-opus-4-7. Copy it from Model Marketplace to avoid typos.'
+        },
+        {
+          title: 'Balance',
+          description: 'Recharge balance is recorded in USD quota. Usage deducts balance based on the actual request, tokens, and model price.'
+        },
+        {
+          title: 'Usage Record',
+          description: 'Each successful request creates usage detail for model, token, amount, latency, status, and API key.'
+        },
+        {
+          title: 'Payment Order',
+          description: 'Recharge orders keep the paid amount, payment method, credited balance, and status for reconciliation.'
+        }
+      ]
+    },
+    endpoints: {
+      title: 'Endpoints',
+      description: 'The gateway keeps common OpenAI and Anthropic style paths so most SDKs can be reused with a Base URL change.',
+      columns: {
+        endpoint: 'Endpoint',
+        method: 'Method',
+        auth: 'Auth',
+        usage: 'Usage'
+      },
+      rows: [
+        {
+          endpoint: '/v1/chat/completions',
+          method: 'POST',
+          auth: 'Authorization: Bearer sk-...',
+          usage: 'OpenAI-compatible chat completions for GPT and compatible models.'
+        },
+        {
+          endpoint: '/v1/messages',
+          method: 'POST',
+          auth: 'x-api-key: sk-... or Bearer token',
+          usage: 'Claude Messages style requests for Anthropic-compatible models.'
+        },
+        {
+          endpoint: '/v1/models',
+          method: 'GET',
+          auth: 'Authorization: Bearer sk-...',
+          usage: 'List models exposed to the current key and group when supported.'
+        },
+        {
+          endpoint: '/api/v1/user/*',
+          method: 'GET / POST',
+          auth: 'Web session',
+          usage: 'Console APIs used by the dashboard, billing, orders, and key management pages.'
+        }
+      ]
+    },
+    clients: {
+      title: 'Client Setup',
+      description: 'Copy the right address for Codex, Claude Code, Gemini CLI, TRAE SOLO, OpenClaw, Hermes, scripts, and SDKs. Different clients append endpoint paths differently, so the Base URL is not always the same.',
+      baseUrlLabel: 'Base URL',
+      matrix: {
+        columns: {
+          client: 'Client',
+          field: 'Configuration field',
+          baseUrl: 'Base URL to use',
+          reason: 'Why'
+        },
+        rows: [
+          { client: 'Codex Desktop', field: 'config.toml baseurl', baseUrl: 'gatewayOrigin', reason: 'Codex Desktop appends the compatible API path itself.' },
+          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'Custom OpenAI-compatible providers expect a /v1 Base URL.' },
+          { client: 'Claude Code', field: 'ANTHROPIC_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Claude Code appends the Anthropic /v1/messages path itself.' },
+          { client: 'Node.js / OpenAI SDK', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK appends /chat/completions relative to baseURL.' },
+          { client: 'OpenAI SDK', field: 'baseURL / base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK methods append /chat/completions relative to baseURL.' },
+          { client: 'Gemini CLI native mode', field: 'GOOGLE_GEMINI_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Native Gemini clients usually append their own Gemini API path.' },
+          { client: 'Gemini CLI OpenAI-compatible wrapper', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI-compatible wrappers use the same /v1 rule as OpenAI SDKs.' },
+          { client: 'TRAE SOLO OpenAI mode', field: 'Custom Provider baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI-compatible providers usually need the /v1 URL.' },
+          { client: 'TRAE SOLO Claude mode', field: 'Anthropic Base URL', baseUrl: 'gatewayOrigin', reason: 'Anthropic/Claude-compatible providers should use only the gateway origin.' },
+          { client: 'OpenClaw', field: 'OPENAI_BASE_URL', baseUrl: 'openAiSdkBaseUrl', reason: 'Treat it as an OpenAI-compatible client calling /chat/completions.' },
+          { client: 'Hermes OpenAI mode', field: 'base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI-compatible mode uses the /v1 Base URL.' },
+          { client: 'Hermes Claude mode', field: 'base_url', baseUrl: 'gatewayOrigin', reason: 'Claude/Anthropic-compatible mode uses the gateway origin without /v1.' },
+          { client: 'API scripts', field: 'Full request URL', baseUrl: 'openAiSdkBaseUrl', reason: 'Scripts often call full endpoint URLs, such as /v1/chat/completions.' }
+        ]
+      },
+      codexDesktop: {
+        title: 'Codex Desktop',
+        badge: 'Windows / macOS',
+        description: 'Use this when configuring the Codex desktop app on this machine. The value should be the gateway origin without a trailing slash and without /v1.',
+        baseUrlNote: 'Codex Desktop uses the gateway origin without /v1. See Troubleshooting for the Windows Codex baseurl rule.',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'notepad %USERPROFILE%\\.codex\\config.toml' },
+          { system: 'macOS', path: '~/.codex/config.toml', command: 'open -a TextEdit ~/.codex/config.toml' },
+          { system: 'Linux', path: '~/.codex/config.toml', command: 'nano ~/.codex/config.toml' }
+        ],
+        blocks: {
+          configTitle: 'Minimal Codex Desktop config',
+          configDescription: 'One-click copy this value into config.toml when the app exposes a top-level baseurl field.'
+        }
+      },
+      codexCli: {
+        title: 'Codex CLI',
+        badge: 'OpenAI-compatible',
+        description: 'Use this for Codex CLI custom provider configuration. Here the provider Base URL should include /v1.',
+        baseUrlNote: 'If the generated request path is /v1/chat/completions, do not add /v1 twice. If Codex CLI only appends /chat/completions, keep /v1 in base_url.',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
+          { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
+          { system: 'Linux', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' }
+        ],
+        blocks: {
+          configTitle: 'config.toml provider block',
+          configDescription: 'Copy this block to ~/.codex/config.toml and replace the API key environment variable.',
+          envTitle: 'API key environment variable',
+          envDescription: 'Set the generated API key once, then restart your terminal.'
+        }
+      },
+      claudeCode: {
+        title: 'Claude Code',
+        badge: 'Anthropic-compatible',
+        description: 'Use this for Claude Code or Anthropic SDK style clients. The base URL should be the gateway origin without /v1.',
+        baseUrlNote: 'Claude Code calls the Anthropic Messages API path itself, so ANTHROPIC_BASE_URL should be https://useaifor.me, not https://useaifor.me/v1.',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.claude\\settings.json', command: 'notepad %USERPROFILE%\\.claude\\settings.json' },
+          { system: 'macOS', path: '~/.claude/settings.json', command: 'open -a TextEdit ~/.claude/settings.json' },
+          { system: 'Linux', path: '~/.claude/settings.json', command: 'nano ~/.claude/settings.json' }
+        ],
+        blocks: {
+          settingsTitle: 'settings.json env block',
+          settingsDescription: 'Copy into Claude settings if you prefer project or user-level configuration.',
+          envTitle: 'Terminal environment variables',
+          envDescription: 'Use this when you launch Claude Code from a configured shell.'
+        }
+      },
+      geminiCli: {
+        title: 'Gemini CLI',
+        badge: 'Gemini / OpenAI-compatible',
+        description: 'Gemini CLI setups vary by provider mode. Native Gemini mode and OpenAI-compatible wrappers use different Base URL rules.',
+        baseUrlNote: 'Use the gateway origin for native Gemini-compatible mode. Use the /v1 URL only when your Gemini CLI wrapper explicitly says it is OpenAI-compatible.',
+        osRows: [
+          { system: 'Windows', path: 'User environment variables', command: 'setx GEMINI_API_KEY sk-your-api-key' },
+          { system: 'macOS', path: '~/.zshrc', command: 'nano ~/.zshrc' },
+          { system: 'Linux', path: '~/.bashrc or ~/.zshrc', command: 'nano ~/.bashrc' }
+        ],
+        blocks: {
+          nativeTitle: 'Native Gemini-compatible mode',
+          nativeDescription: 'Use this only when your Gemini CLI build supports overriding the native Gemini API base URL.',
+          openaiTitle: 'OpenAI-compatible wrapper mode',
+          openaiDescription: 'Use this when the Gemini client is actually calling an OpenAI-compatible provider.'
+        }
+      },
+      nodejs: {
+        title: 'Node.js Environment Setup',
+        badge: 'OpenAI SDK',
+        description: 'Use this for backend services, scheduled jobs, and local scripts. Node.js with the OpenAI SDK should use a Base URL that includes /v1.',
+        baseUrlNote: 'The Node.js OpenAI SDK appends /chat/completions after baseURL, so copy https://useaifor.me/v1.',
+        osRows: [
+          { system: 'Windows', path: 'PowerShell / Node.js LTS', command: 'winget install OpenJS.NodeJS.LTS' },
+          { system: 'macOS', path: 'Homebrew / Node.js LTS', command: 'brew install node' },
+          { system: 'Linux', path: 'NodeSource / apt', command: 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs' }
+        ],
+        blocks: {
+          installTitle: 'Install dependencies',
+          installDescription: 'Verify node and npm first, then install the OpenAI SDK.',
+          envTitle: '.env configuration',
+          envDescription: 'Keep the generated API key in environment variables, never frontend code.',
+          scriptTitle: 'Minimal Node.js script',
+          scriptDescription: 'Save as index.mjs and run node index.mjs.'
+        }
+      },
+      traeSolo: {
+        title: 'TRAE SOLO Setup',
+        badge: 'OpenAI / Claude',
+        description: 'If TRAE SOLO uses an OpenAI-compatible provider, use the /v1 URL. If it uses an Anthropic/Claude-compatible provider, use the gateway origin without /v1.',
+        baseUrlNote: 'The deciding factor is the provider type selected in TRAE SOLO, not just the model name. OpenAI-compatible uses /v1; Claude/Anthropic-compatible does not.',
+        osRows: [
+          { system: 'Windows', path: 'Settings / AI Provider / Custom', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
+          { system: 'macOS', path: 'Settings / AI Provider / Custom', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
+          { system: 'Linux', path: 'Settings / AI Provider / Custom', command: 'Choose OpenAI Compatible or Anthropic Compatible' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI-compatible mode',
+          openaiDescription: 'Use this for OpenAI group models such as gpt-5.5, gpt-5.4, and gpt-5.3-codex.',
+          anthropicTitle: 'Claude / Anthropic-compatible mode',
+          anthropicDescription: 'Use this for Claude group models such as claude-opus-4-7 and claude-sonnet-4-6.'
+        }
+      },
+      openClaw: {
+        title: 'OpenClaw Setup',
+        badge: 'OpenAI-compatible',
+        description: 'Treat OpenClaw as an OpenAI-compatible client. Use https://useaifor.me/v1 as the Base URL.',
+        baseUrlNote: 'If OpenClaw already produces final URLs containing /v1/chat/completions, do not append /v1 twice in the UI.',
+        osRows: [
+          { system: 'Windows', path: 'App settings or .env', command: 'setx OPENAI_BASE_URL https://useaifor.me/v1' },
+          { system: 'macOS', path: '~/.zshrc or app settings', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' },
+          { system: 'Linux', path: '~/.bashrc or app settings', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' }
+        ],
+        blocks: {
+          envTitle: 'Environment variable setup',
+          envDescription: 'Use this when OpenClaw reads standard OpenAI environment variables.',
+          jsonTitle: 'Custom provider JSON',
+          jsonDescription: 'Use this when manually adding an OpenAI-compatible provider in the app.'
+        }
+      },
+      hermes: {
+        title: 'Hermes Setup',
+        badge: 'OpenAI / Claude',
+        description: 'Hermes should follow provider type: OpenAI-compatible mode uses /v1, while Claude/Anthropic-compatible mode uses only the gateway origin.',
+        baseUrlNote: 'If Hermes only offers an OpenAI Compatible provider, use https://useaifor.me/v1. If it offers an Anthropic Compatible provider, use https://useaifor.me.',
+        osRows: [
+          { system: 'Windows', path: 'Provider settings', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
+          { system: 'macOS', path: 'Provider settings', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
+          { system: 'Linux', path: 'Provider settings', command: 'Choose OpenAI Compatible or Anthropic Compatible' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI-compatible config',
+          openaiDescription: 'Use this for OpenAI group models.',
+          claudeTitle: 'Claude-compatible config',
+          claudeDescription: 'Use this for Claude group models.'
+        }
+      },
+      apiScript: {
+        title: 'API Script Setup',
+        badge: 'curl / CI',
+        description: 'Scripts, CI jobs, and automation usually call full request URLs, so examples include both /v1 and the endpoint path.',
+        baseUrlNote: 'For direct curl usage, do not stop at the Base URL. Use the full URL, such as https://useaifor.me/v1/chat/completions or https://useaifor.me/v1/messages.',
+        osRows: [
+          { system: 'Windows', path: 'PowerShell', command: '$env:USE_AIFORME_API_KEY="sk-your-api-key"' },
+          { system: 'macOS', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' },
+          { system: 'Linux', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI-compatible curl',
+          openaiDescription: 'Use this for GPT / OpenAI-compatible models.',
+          claudeTitle: 'Claude Messages curl',
+          claudeDescription: 'Use this for Claude / Anthropic-compatible models.'
+        }
+      }
+    },
+    examples: {
+      title: 'Code Examples',
+      description: 'Start with curl, then use the OpenAI SDK for Node.js or Python. Claude-compatible traffic can use /v1/messages.',
+      curl: {
+        title: 'Minimal curl request',
+        description: 'Best first test because it verifies Base URL, key, model, and network path.'
+      },
+      node: {
+        title: 'Node.js with OpenAI SDK',
+        description: 'Compatible with server apps, scripts, and most OpenAI-style tools.'
+      },
+      python: {
+        title: 'Python with OpenAI SDK',
+        description: 'Use the same Base URL override in notebooks, backend services, and automation jobs.'
+      },
+      anthropic: {
+        title: 'Claude Messages request',
+        description: 'Use /v1/messages when your selected group exposes Claude models through Messages compatibility.'
+      }
+    },
+    workflow: {
+      title: 'Production Workflow',
+      description: 'Before moving real traffic, check billing, key security, and operational visibility.',
+      sections: [
+        {
+          title: 'Registration and verification',
+          description: 'Keep account creation predictable and reduce abuse before users reach the console.',
+          bullets: [
+            'Use an allowed email domain and complete the email verification code.',
+            'If invitation or affiliate features are enabled, register with the correct invite link or code.',
+            'After sign-in, confirm the dashboard shows the expected account and balance.'
+          ]
+        },
+        {
+          title: 'Recharge and reconciliation',
+          description: 'Recharge orders, payment callbacks, balance, and usage records should form a complete accounting chain.',
+          bullets: [
+            'USDT payments show the exact paid amount for later reconciliation.',
+            'Credited balance follows the platform recharge rule and refreshes after payment success.',
+            'Use Orders and Usage pages to compare payments, credited quota, and spending.'
+          ]
+        },
+        {
+          title: 'API key management',
+          description: 'Treat generated keys as production credentials and rotate them when ownership changes.',
+          bullets: [
+            'Create separate keys for development, staging, and production.',
+            'Bind each key to the correct group so pricing and routing match expectations.',
+            'Use the key test action before handing the key to an application.'
+          ]
+        },
+        {
+          title: 'Client configuration',
+          description: 'Most clients only need Base URL, key, and model. Avoid hardcoding secrets in frontend code.',
+          bullets: [
+            'Set the SDK baseURL to the platform Base URL.',
+            'Read API keys from environment variables or a secret manager.',
+            'Use exact model IDs copied from Model Marketplace.'
+          ]
+        },
+        {
+          title: 'Monitoring and limits',
+          description: 'Watch request success, latency, token usage, and spending after traffic goes live.',
+          bullets: [
+            'Dashboard summarizes balance, request volume, token usage, and average response time.',
+            'Usage records help locate failed requests, expensive models, and abnormal clients.',
+            'Channel status helps determine whether a routing group or upstream account needs attention.'
+          ]
+        },
+        {
+          title: 'Compatibility notes',
+          description: 'Different clients may expect different request shapes. Match endpoint style to the selected model family.',
+          bullets: [
+            'Use /v1/chat/completions for OpenAI-compatible chat clients.',
+            'Use /v1/messages for Claude Messages style clients.',
+            'If a model is not visible, confirm the key group has access to that provider and model.'
+          ]
+        }
+      ]
+    },
+    troubleshooting: {
+      title: 'Troubleshooting',
+      description: 'Common errors usually come from Base URL, key, group, balance, or model mismatch.',
+      viewClientConfig: 'View the client configuration table',
+      items: [
+        {
+          title: 'When should I add /v1?',
+          description: 'Check the final request path. If the client itself calls /v1/chat/completions or /v1/messages, configure only https://useaifor.me. If the client calls /chat/completions or /messages relative to baseURL, configure https://useaifor.me/v1.'
+        },
+        {
+          title: 'Which Base URL should Codex, Claude Code, and Gemini CLI use?',
+          description: 'Codex Desktop uses https://useaifor.me. Codex CLI OpenAI-compatible providers use https://useaifor.me/v1. Claude Code ANTHROPIC_BASE_URL uses https://useaifor.me. Gemini CLI native mode uses https://useaifor.me, while OpenAI-compatible wrappers use https://useaifor.me/v1.'
+        },
+        {
+          title: '401 or invalid API key',
+          description: 'Confirm the key starts with sk-, has not been disabled, and is sent in the correct Authorization or x-api-key header.'
+        },
+        {
+          title: 'Model not found',
+          description: 'Copy the model ID from Model Marketplace and check that your API key is bound to a group that can use the model.'
+        },
+        {
+          title: 'Insufficient balance',
+          description: 'Recharge first, wait for the order to reach paid status, then refresh the dashboard balance before retrying.'
+        },
+        {
+          title: 'Timeout or slow response',
+          description: 'Check Channel Status and retry with a small prompt. Long-context and reasoning models may take longer than lightweight models.'
+        },
+        {
+          title: 'Usage looks inconsistent',
+          description: 'Compare Orders, Usage, and Dashboard totals. Paid amount, credited balance, and actual usage are recorded separately for accounting clarity.'
+        }
+      ]
     }
   },
 
@@ -3029,6 +3447,11 @@ export default {
       dataExportSelected: 'Export Selected',
       dataExportIncludeProxies: 'Include proxies linked to the exported accounts',
       dataImport: 'Import',
+      sortOrder: 'Sort',
+      sortOrderHint: 'Drag accounts to adjust their display order. Accounts near the top get higher scheduling priority.',
+      sortOrderUpdated: 'Account order updated',
+      failedToUpdateSortOrder: 'Failed to update account order',
+      failedToLoadSortOrder: 'Failed to load account order',
       moreActions: 'More Actions',
       dataActions: 'Data',
       toolActions: 'Tools',

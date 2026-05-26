@@ -448,6 +448,7 @@ export default {
     channelPricing: '渠道定价',
     channelMonitor: '渠道监控',
     channelStatus: '渠道状态',
+    integrationDocs: '接入文档',
     riskControl: '风控中心',
   },
 
@@ -1181,6 +1182,423 @@ export default {
       convertedPrice: '约 {price}',
       noOfficialPrice: '暂无官方参考',
       discountOff: '\u8f83\u5b98\u65b9\u4f18\u60e0 {discount}%'
+    }
+  },
+
+  integrationDocs: {
+    title: '接入文档',
+    description: '从注册、充值、创建 API 密钥到调用 OpenAI / Claude 兼容接口的完整说明。',
+    hero: {
+      eyebrow: 'API 接入指南',
+      subtitle: '覆盖从账号开通到正式请求的完整路径，包括充值、模型选择、SDK 示例、连通性测试、用量对账和常见问题。',
+      primaryCta: '创建账户',
+      secondaryCta: '查看模型'
+    },
+    baseUrl: {
+      label: 'API 接入地址',
+      gatewayLabel: '网关域名',
+      gatewayDescription: '适用于会自动拼接兼容 API 路径的客户端，例如 Codex Desktop、Claude Code 的 Anthropic 模式。',
+      sdkLabel: 'OpenAI 兼容 SDK Base URL',
+      sdkDescription: '适用于客户端会基于 Base URL 继续请求 /chat/completions 或 /messages 的场景。',
+      ruleTitle: '什么时候需要加 /v1？',
+      ruleBody: '看客户端最终请求路径：如果客户端请求 /v1/chat/completions，配置时只填网关域名；如果客户端请求 /chat/completions，Base URL 需要写到 /v1。',
+      description: '生产环境请使用你的正式网关域名；本地预览会自动显示正式域名，避免把 127.0.0.1 复制到真实客户端。'
+    },
+    toc: {
+      title: '文档目录',
+      toggleClients: '展开客户端类型'
+    },
+    quickStart: {
+      title: '快速开始',
+      description: '先完成下面几步。之后任何兼容客户端只需要基础地址、API 密钥和模型名称。',
+      steps: [
+        {
+          title: '注册账户',
+          description: '打开注册页，使用允许的邮箱完成注册和邮箱验证码校验，然后登录控制台。'
+        },
+        {
+          title: '充值余额',
+          description: '进入充值/订阅页，选择固定套餐或自定义金额，通过 USDT 完成支付。支付回调确认后余额会刷新。'
+        },
+        {
+          title: '创建 API 密钥',
+          description: '进入 API 密钥页，创建密钥，选择目标分组，复制 sk- 开头的密钥并妥善保存。'
+        },
+        {
+          title: '选择模型',
+          description: '在模型广场比较 OpenAI 与 Anthropic 分组、官方价格、平台价格和模型能力。'
+        },
+        {
+          title: '配置客户端',
+          description: '把 baseURL 设置为平台基础地址，并在 Authorization 请求头或 SDK 配置中填入 API 密钥。'
+        },
+        {
+          title: '发送小请求测试',
+          description: '先发送一个短提示词，再查看 API 密钥、使用记录、订单和仪表盘，确认路由、扣费和日志闭环。'
+        }
+      ]
+    },
+    concepts: {
+      title: '核心概念',
+      description: '这些概念和控制台页面一一对应，方便理解一次请求在平台中的流转方式。',
+      cards: [
+        {
+          title: 'API 密钥',
+          description: '用户创建的访问凭证。密钥绑定分组，并关联余额、限制和审计记录。'
+        },
+        {
+          title: '分组',
+          description: '路由和价格层。分组决定一个密钥可用的上游账号、模型范围和平台价格。'
+        },
+        {
+          title: '模型 ID',
+          description: '请求中传入的精确模型字符串，例如 gpt-5.5 或 claude-opus-4-7。建议从模型广场复制，避免拼写错误。'
+        },
+        {
+          title: '余额',
+          description: '充值后以 USD 额度入账。实际调用会根据模型价格、Token 和请求情况扣减余额。'
+        },
+        {
+          title: '使用记录',
+          description: '每次成功请求都会记录模型、Token、金额、延迟、状态和 API 密钥，方便查询与对账。'
+        },
+        {
+          title: '支付订单',
+          description: '充值订单会保留实付金额、支付方式、到账额度和状态，方便后续财务核对。'
+        }
+      ]
+    },
+    endpoints: {
+      title: '接口端点',
+      description: '网关保留常见 OpenAI 与 Anthropic 风格路径，大多数 SDK 只需要替换 Base URL 即可复用。',
+      columns: {
+        endpoint: '端点',
+        method: '方法',
+        auth: '鉴权',
+        usage: '用途'
+      },
+      rows: [
+        {
+          endpoint: '/v1/chat/completions',
+          method: 'POST',
+          auth: 'Authorization: Bearer sk-...',
+          usage: 'OpenAI 兼容聊天补全，适用于 GPT 和兼容模型。'
+        },
+        {
+          endpoint: '/v1/messages',
+          method: 'POST',
+          auth: 'x-api-key: sk-... 或 Bearer token',
+          usage: 'Claude Messages 风格请求，适用于 Anthropic 兼容模型。'
+        },
+        {
+          endpoint: '/v1/models',
+          method: 'GET',
+          auth: 'Authorization: Bearer sk-...',
+          usage: '在支持时列出当前密钥和分组可用的模型。'
+        },
+        {
+          endpoint: '/api/v1/user/*',
+          method: 'GET / POST',
+          auth: 'Web 会话',
+          usage: '控制台使用的用户接口，例如仪表盘、账单、订单和密钥管理。'
+        }
+      ]
+    },
+    clients: {
+      title: '客户端配置',
+      description: '按客户端复制正确的接入地址。Codex、Claude Code、Gemini CLI、TRAE SOLO、OpenClaw、Hermes 和脚本对接口路径的拼接方式不同，所以 Base URL 不一定相同。',
+      baseUrlLabel: 'Base URL',
+      matrix: {
+        columns: {
+          client: '客户端',
+          field: '配置字段',
+          baseUrl: 'Base URL 应该填写',
+          reason: '原因'
+        },
+        rows: [
+          { client: 'Codex Desktop', field: 'config.toml baseurl', baseUrl: 'gatewayOrigin', reason: 'Codex 桌面端会自己拼接兼容 API 路径。' },
+          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'openAiSdkBaseUrl', reason: '自定义 OpenAI 兼容 provider 通常需要写到 /v1。' },
+          { client: 'Claude Code', field: 'ANTHROPIC_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Claude Code 会自己拼接 Anthropic 的 /v1/messages 路径。' },
+          { client: 'Node.js / OpenAI SDK', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK 会基于 baseURL 继续拼接 /chat/completions。' },
+          { client: 'OpenAI SDK', field: 'baseURL / base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK 方法会基于 baseURL 继续拼接 /chat/completions。' },
+          { client: 'Gemini CLI 原生模式', field: 'GOOGLE_GEMINI_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Gemini 原生客户端通常会自己拼接 Gemini API 路径。' },
+          { client: 'Gemini CLI OpenAI 兼容包装模式', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI 兼容包装模式遵循 OpenAI SDK 的 /v1 规则。' },
+          { client: 'TRAE SOLO OpenAI 模式', field: 'Custom Provider baseURL', baseUrl: 'openAiSdkBaseUrl', reason: '选择 OpenAI 兼容 provider 时，通常需要带 /v1。' },
+          { client: 'TRAE SOLO Claude 模式', field: 'Anthropic Base URL', baseUrl: 'gatewayOrigin', reason: '选择 Anthropic/Claude 兼容 provider 时，填写网关域名即可。' },
+          { client: 'OpenClaw', field: 'OPENAI_BASE_URL', baseUrl: 'openAiSdkBaseUrl', reason: '按 OpenAI 兼容客户端处理，模型走 /chat/completions。' },
+          { client: 'Hermes OpenAI 模式', field: 'base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI 兼容模式使用带 /v1 的 Base URL。' },
+          { client: 'Hermes Claude 模式', field: 'base_url', baseUrl: 'gatewayOrigin', reason: 'Claude/Anthropic 兼容模式使用不带 /v1 的网关域名。' },
+          { client: 'API 脚本', field: '完整请求 URL', baseUrl: 'openAiSdkBaseUrl', reason: '脚本通常直接请求完整端点，例如 /v1/chat/completions。' }
+        ]
+      },
+      codexDesktop: {
+        title: 'Codex Desktop',
+        badge: 'Windows / macOS',
+        description: '用于配置当前机器上的 Codex 桌面端。这里应该填写不带尾部斜杠、也不带 /v1 的网关域名。',
+        baseUrlNote: 'Codex Desktop 使用不带 /v1 的网关域名；关于 Windows Codex 的 baseurl 取值，可在常见问题中查看。',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'notepad %USERPROFILE%\\.codex\\config.toml' },
+          { system: 'macOS', path: '~/.codex/config.toml', command: 'open -a TextEdit ~/.codex/config.toml' },
+          { system: 'Linux', path: '~/.codex/config.toml', command: 'nano ~/.codex/config.toml' }
+        ],
+        blocks: {
+          configTitle: '最小 Codex Desktop 配置',
+          configDescription: '当应用提供顶层 baseurl 字段时，一键复制这个值到 config.toml。'
+        }
+      },
+      codexCli: {
+        title: 'Codex CLI',
+        badge: 'OpenAI 兼容',
+        description: '用于 Codex CLI 的自定义 provider 配置。这里的 provider Base URL 应该包含 /v1。',
+        baseUrlNote: '如果最终请求路径已经是 /v1/chat/completions，就不要重复加 /v1；如果 Codex CLI 只拼 /chat/completions，则 base_url 需要保留 /v1。',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
+          { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
+          { system: 'Linux', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' }
+        ],
+        blocks: {
+          configTitle: 'config.toml provider 配置',
+          configDescription: '复制到 ~/.codex/config.toml，并把 API Key 环境变量替换成自己的。',
+          envTitle: 'API Key 环境变量',
+          envDescription: '设置生成的 API Key 后，重启终端生效。'
+        }
+      },
+      claudeCode: {
+        title: 'Claude Code',
+        badge: 'Anthropic 兼容',
+        description: '用于 Claude Code 或 Anthropic SDK 风格的客户端。Base URL 应该填写不带 /v1 的网关域名。',
+        baseUrlNote: 'Claude Code 会自己请求 Anthropic Messages API 路径，所以 ANTHROPIC_BASE_URL 应该是 https://useaifor.me，不是 https://useaifor.me/v1。',
+        osRows: [
+          { system: 'Windows', path: '%USERPROFILE%\\.claude\\settings.json', command: 'notepad %USERPROFILE%\\.claude\\settings.json' },
+          { system: 'macOS', path: '~/.claude/settings.json', command: 'open -a TextEdit ~/.claude/settings.json' },
+          { system: 'Linux', path: '~/.claude/settings.json', command: 'nano ~/.claude/settings.json' }
+        ],
+        blocks: {
+          settingsTitle: 'settings.json 环境变量配置',
+          settingsDescription: '如果你希望在用户级或项目级配置 Claude，可以复制这一段。',
+          envTitle: '终端环境变量',
+          envDescription: '适合从已配置环境变量的 shell 中启动 Claude Code。'
+        }
+      },
+      geminiCli: {
+        title: 'Gemini CLI',
+        badge: 'Gemini / OpenAI 兼容',
+        description: 'Gemini CLI 的配置取决于 provider 模式。原生 Gemini 模式和 OpenAI 兼容包装模式使用不同的 Base URL 规则。',
+        baseUrlNote: '原生 Gemini 兼容模式使用网关域名；只有当你的 Gemini CLI 包装器明确说明走 OpenAI 兼容接口时，才使用带 /v1 的地址。',
+        osRows: [
+          { system: 'Windows', path: '用户环境变量', command: 'setx GEMINI_API_KEY sk-your-api-key' },
+          { system: 'macOS', path: '~/.zshrc', command: 'nano ~/.zshrc' },
+          { system: 'Linux', path: '~/.bashrc 或 ~/.zshrc', command: 'nano ~/.bashrc' }
+        ],
+        blocks: {
+          nativeTitle: '原生 Gemini 兼容模式',
+          nativeDescription: '仅在你的 Gemini CLI 版本支持覆盖原生 Gemini API Base URL 时使用。',
+          openaiTitle: 'OpenAI 兼容包装模式',
+          openaiDescription: '当 Gemini 客户端实际调用的是 OpenAI 兼容 provider 时使用。'
+        }
+      },
+      nodejs: {
+        title: 'Node.js 环境安装教程',
+        badge: 'OpenAI SDK',
+        description: '适合后端服务、定时任务和本地脚本。Node.js 使用 OpenAI SDK 时 Base URL 必须带 /v1。',
+        baseUrlNote: 'Node.js OpenAI SDK 会在 baseURL 后继续拼接 /chat/completions，所以请复制 https://useaifor.me/v1。',
+        osRows: [
+          { system: 'Windows', path: 'PowerShell / Node.js LTS', command: 'winget install OpenJS.NodeJS.LTS' },
+          { system: 'macOS', path: 'Homebrew / Node.js LTS', command: 'brew install node' },
+          { system: 'Linux', path: 'NodeSource / apt', command: 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs' }
+        ],
+        blocks: {
+          installTitle: '安装依赖',
+          installDescription: '先确认 node 和 npm 可用，再安装 OpenAI SDK。',
+          envTitle: '.env 配置',
+          envDescription: '把生成的 API Key 放到环境变量，不要写进前端代码。',
+          scriptTitle: '最小 Node.js 脚本',
+          scriptDescription: '保存为 index.mjs 后运行 node index.mjs。'
+        }
+      },
+      traeSolo: {
+        title: 'TRAE SOLO 配置教程',
+        badge: 'OpenAI / Claude',
+        description: 'TRAE SOLO 如果选择 OpenAI 兼容供应商，请使用带 /v1 的地址；如果选择 Anthropic/Claude 兼容供应商，请使用不带 /v1 的网关域名。',
+        baseUrlNote: '判断依据是你在 TRAE SOLO 里选的 provider 类型，而不是模型名称。OpenAI 兼容填 /v1，Claude/Anthropic 兼容不填 /v1。',
+        osRows: [
+          { system: 'Windows', path: 'Settings / AI Provider / Custom', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
+          { system: 'macOS', path: 'Settings / AI Provider / Custom', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
+          { system: 'Linux', path: 'Settings / AI Provider / Custom', command: '选择 OpenAI Compatible 或 Anthropic Compatible' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI 兼容模式',
+          openaiDescription: '用于 gpt-5.5、gpt-5.4、gpt-5.3-codex 等 OpenAI 分组模型。',
+          anthropicTitle: 'Claude / Anthropic 兼容模式',
+          anthropicDescription: '用于 claude-opus-4-7、claude-sonnet-4-6 等 Claude 分组模型。'
+        }
+      },
+      openClaw: {
+        title: 'OpenClaw 配置教程',
+        badge: 'OpenAI 兼容',
+        description: 'OpenClaw 按 OpenAI 兼容客户端处理，Base URL 使用 https://useaifor.me/v1。',
+        baseUrlNote: '如果 OpenClaw 的最终请求地址已经包含 /v1/chat/completions，就不要在界面里重复追加 /v1。',
+        osRows: [
+          { system: 'Windows', path: '应用设置或 .env', command: 'setx OPENAI_BASE_URL https://useaifor.me/v1' },
+          { system: 'macOS', path: '~/.zshrc 或应用设置', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' },
+          { system: 'Linux', path: '~/.bashrc 或应用设置', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' }
+        ],
+        blocks: {
+          envTitle: '环境变量方式',
+          envDescription: '适合支持读取 OpenAI 环境变量的 OpenClaw 配置。',
+          jsonTitle: '自定义 Provider JSON',
+          jsonDescription: '适合应用内手动添加 OpenAI 兼容 provider。'
+        }
+      },
+      hermes: {
+        title: 'Hermes 配置教程',
+        badge: 'OpenAI / Claude',
+        description: 'Hermes 根据 provider 类型选择地址：OpenAI 兼容模式使用 /v1，Claude/Anthropic 兼容模式使用网关域名。',
+        baseUrlNote: '如果 Hermes 只提供一个 OpenAI Compatible 入口，就使用 https://useaifor.me/v1；如果提供 Anthropic Compatible 入口，就使用 https://useaifor.me。',
+        osRows: [
+          { system: 'Windows', path: 'Provider 配置页', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
+          { system: 'macOS', path: 'Provider 配置页', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
+          { system: 'Linux', path: 'Provider 配置页', command: '选择 OpenAI Compatible 或 Anthropic Compatible' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI 兼容配置',
+          openaiDescription: '适合调用 OpenAI 分组模型。',
+          claudeTitle: 'Claude 兼容配置',
+          claudeDescription: '适合调用 Claude 分组模型。'
+        }
+      },
+      apiScript: {
+        title: 'API 脚本接入教程',
+        badge: 'curl / CI',
+        description: '脚本、CI、自动化任务通常直接请求完整接口 URL，因此示例里会把 /v1 和具体端点都写出来。',
+        baseUrlNote: '直接 curl 时不要只填 Base URL，要使用完整 URL，例如 https://useaifor.me/v1/chat/completions 或 https://useaifor.me/v1/messages。',
+        osRows: [
+          { system: 'Windows', path: 'PowerShell', command: '$env:USE_AIFORME_API_KEY="sk-your-api-key"' },
+          { system: 'macOS', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' },
+          { system: 'Linux', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' }
+        ],
+        blocks: {
+          openaiTitle: 'OpenAI 兼容 curl',
+          openaiDescription: '用于 GPT / OpenAI 兼容模型。',
+          claudeTitle: 'Claude Messages curl',
+          claudeDescription: '用于 Claude / Anthropic 兼容模型。'
+        }
+      }
+    },
+    examples: {
+      title: '代码示例',
+      description: '建议先用 curl 验证基础链路，再接入 Node.js 或 Python 的 OpenAI SDK。Claude 兼容请求可使用 /v1/messages。',
+      curl: {
+        title: '最小 curl 请求',
+        description: '最适合首次测试，可同时验证 Base URL、密钥、模型和网络路径。'
+      },
+      node: {
+        title: 'Node.js 使用 OpenAI SDK',
+        description: '适合服务端应用、脚本和多数 OpenAI 风格工具。'
+      },
+      python: {
+        title: 'Python 使用 OpenAI SDK',
+        description: '在 Notebook、后端服务和自动化任务中使用同样的 Base URL 覆盖方式。'
+      },
+      anthropic: {
+        title: 'Claude Messages 请求',
+        description: '当所选分组通过 Messages 兼容方式开放 Claude 模型时，使用 /v1/messages。'
+      }
+    },
+    workflow: {
+      title: '生产使用流程',
+      description: '接入真实流量前，建议确认账务、密钥安全和运行可观测性。',
+      sections: [
+        {
+          title: '注册与验证',
+          description: '先保证账号创建流程稳定，并在进入控制台前降低滥用风险。',
+          bullets: [
+            '使用允许的邮箱域名注册，并完成邮箱验证码校验。',
+            '如果开启邀请或返现功能，请通过正确的邀请码或邀请链接注册。',
+            '登录后确认仪表盘显示了正确账号与余额。'
+          ]
+        },
+        {
+          title: '充值与对账',
+          description: '充值订单、支付回调、余额和使用记录应该形成完整账务链路。',
+          bullets: [
+            'USDT 支付展示用户实际支付金额，方便后续对账。',
+            '到账余额按平台充值规则入账，并在支付成功后刷新。',
+            '可通过订单页和使用记录页核对支付、到账额度和消费。'
+          ]
+        },
+        {
+          title: 'API 密钥管理',
+          description: '把生成的密钥当作生产凭证处理，人员或用途变化时及时轮换。',
+          bullets: [
+            '为开发、测试、生产分别创建不同密钥。',
+            '为每个密钥绑定正确分组，确保价格和路由符合预期。',
+            '交给应用使用前，先在密钥页执行测试连接。'
+          ]
+        },
+        {
+          title: '客户端配置',
+          description: '多数客户端只需要基础地址、密钥和模型。不要把密钥硬编码在前端代码中。',
+          bullets: [
+            '把 SDK 的 baseURL 设置为平台 API 基础地址。',
+            '从环境变量或密钥管理系统读取 API 密钥。',
+            '模型名称使用模型广场复制的精确 ID。'
+          ]
+        },
+        {
+          title: '监控与限制',
+          description: '上线后持续观察请求成功率、延迟、Token 用量和消费。',
+          bullets: [
+            '仪表盘汇总余额、请求量、Token 用量和平均响应时间。',
+            '使用记录可定位失败请求、高成本模型和异常客户端。',
+            '渠道状态可判断分组或上游账号是否需要处理。'
+          ]
+        },
+        {
+          title: '兼容性说明',
+          description: '不同客户端期待的请求结构不同，需要按模型家族选择端点风格。',
+          bullets: [
+            'OpenAI 兼容聊天客户端使用 /v1/chat/completions。',
+            'Claude Messages 风格客户端使用 /v1/messages。',
+            '如果看不到模型，请确认密钥分组有对应供应商和模型权限。'
+          ]
+        }
+      ]
+    },
+    troubleshooting: {
+      title: '常见问题',
+      description: '常见错误通常来自 Base URL、密钥、分组、余额或模型名称不匹配。',
+      viewClientConfig: '具体可查看客户端配置表',
+      items: [
+        {
+          title: '什么时候需要加 /v1？',
+          description: '看客户端最终请求路径：如果客户端自己请求 /v1/chat/completions 或 /v1/messages，配置时只填 https://useaifor.me；如果客户端只请求 /chat/completions 或 /messages，Base URL 需要写成 https://useaifor.me/v1。'
+        },
+        {
+          title: 'Codex、Claude Code、Gemini CLI 分别该填哪个 Base URL？',
+          description: 'Codex Desktop 填 https://useaifor.me；Codex CLI 的 OpenAI 兼容 provider 填 https://useaifor.me/v1；Claude Code 的 ANTHROPIC_BASE_URL 填 https://useaifor.me；Gemini CLI 原生模式填 https://useaifor.me，OpenAI 兼容包装模式填 https://useaifor.me/v1。'
+        },
+        {
+          title: '401 或 API 密钥无效',
+          description: '确认密钥以 sk- 开头、没有被禁用，并且放在正确的 Authorization 或 x-api-key 请求头中。'
+        },
+        {
+          title: '模型不存在',
+          description: '从模型广场复制模型 ID，并确认当前 API 密钥绑定的分组可以使用该模型。'
+        },
+        {
+          title: '余额不足',
+          description: '先完成充值，等待订单变为已支付状态，再刷新仪表盘余额后重试。'
+        },
+        {
+          title: '超时或响应慢',
+          description: '先查看渠道状态并用短提示词重试。长上下文和推理模型通常比轻量模型耗时更久。'
+        },
+        {
+          title: '用量看起来不一致',
+          description: '对比订单、使用记录和仪表盘总额。实付金额、到账额度和实际消费会分别记录，便于账务清晰。'
+        }
+      ]
     }
   },
 
@@ -3105,6 +3523,11 @@ export default {
       dataExportSelected: '导出选中',
       dataExportIncludeProxies: '导出代理（导出账号关联的代理）',
       dataImport: '导入',
+      sortOrder: '排序',
+      sortOrderHint: '拖拽账号调整显示顺序，排在前面的账号会拥有更高调度优先级。',
+      sortOrderUpdated: '账号排序已更新',
+      failedToUpdateSortOrder: '更新账号排序失败',
+      failedToLoadSortOrder: '加载账号排序列表失败',
       moreActions: '更多操作',
       dataActions: '数据操作',
       toolActions: '工具',

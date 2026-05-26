@@ -146,6 +146,13 @@ export async function update(id: number, updates: UpdateAccountRequest): Promise
   return data
 }
 
+export async function updateSortOrder(updates: Array<{ id: number; priority: number }>): Promise<{ message: string }> {
+  const { data } = await apiClient.put<{ message: string }>('/admin/accounts/sort-order', {
+    updates
+  })
+  return data
+}
+
 /**
  * Check mixed-channel risk for account-group binding.
  */
@@ -660,6 +667,7 @@ export const accountsAPI = {
   getById,
   create,
   update,
+  updateSortOrder,
   checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,

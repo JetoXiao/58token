@@ -34,6 +34,7 @@ type AccountRepository interface {
 	// for all accounts that have been synced from CRS.
 	ListCRSAccountIDs(ctx context.Context) (map[string]int64, error)
 	Update(ctx context.Context, account *Account) error
+	UpdateSortOrders(ctx context.Context, updates []AccountSortOrderUpdate) error
 	Delete(ctx context.Context, id int64) error
 
 	List(ctx context.Context, params pagination.PaginationParams) ([]Account, *pagination.PaginationResult, error)
@@ -89,6 +90,12 @@ type AccountBulkUpdate struct {
 	Schedulable    *bool
 	Credentials    map[string]any
 	Extra          map[string]any
+}
+
+// AccountSortOrderUpdate describes a bulk account priority update.
+type AccountSortOrderUpdate struct {
+	ID       int64
+	Priority int
 }
 
 // CreateAccountRequest 创建账号请求

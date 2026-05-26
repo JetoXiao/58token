@@ -290,7 +290,7 @@
             (turnstileEnabled && !emailVerifyEnabled && !turnstileToken) ||
             (emailVerifyEnabled && !formData.verify_code.trim())
           "
-          class="btn btn-primary w-full"
+          class="btn btn-primary btn-auth-primary w-full"
         >
           <svg
             v-if="isLoading"

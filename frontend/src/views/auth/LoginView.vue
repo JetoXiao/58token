@@ -93,7 +93,7 @@
         <button
           type="submit"
           :disabled="authActionDisabled || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary btn-auth-primary w-full"
         >
           <svg
             v-if="isLoading"

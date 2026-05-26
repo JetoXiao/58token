@@ -27,7 +27,11 @@
     <!-- Content Container -->
     <div class="relative z-10 w-full max-w-md">
       <!-- Logo/Brand -->
-      <div class="mb-8 text-center">
+      <RouterLink
+        to="/home"
+        class="mb-8 block rounded-2xl text-center transition duration-200 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:ring-offset-2 focus:ring-offset-transparent"
+        :aria-label="siteName"
+      >
         <template v-if="settingsLoaded">
           <h1 class="text-gradient mb-2 text-3xl font-bold">
             {{ siteName }}
@@ -36,7 +40,7 @@
             {{ siteSubtitle }}
           </p>
         </template>
-      </div>
+      </RouterLink>
 
       <!-- Card Container -->
       <div class="card-glass rounded-2xl p-8 shadow-glass">

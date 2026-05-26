@@ -159,6 +159,14 @@ type BulkUpdateAccountFilters struct {
 	PrivacyMode string `json:"privacy_mode"`
 }
 
+// UpdateAccountSortOrderRequest represents the request to update account priorities.
+type UpdateAccountSortOrderRequest struct {
+	Updates []struct {
+		ID       int64 `json:"id" binding:"required"`
+		Priority int   `json:"priority"`
+	} `json:"updates" binding:"required,min=1"`
+}
+
 // CheckMixedChannelRequest represents check mixed channel risk request
 type CheckMixedChannelRequest struct {
 	Platform  string  `json:"platform" binding:"required"`
@@ -676,6 +684,31 @@ func (h *AccountHandler) scheduleOpenAIResponsesProbe(account *service.Account) 
 		}()
 		h.accountTestService.ProbeOpenAIAPIKeyResponsesSupport(context.Background(), accountID)
 	}()
+}
+
+// UpdateSortOrder handles updating account display/scheduling priorities.
+// PUT /api/v1/admin/accounts/sort-order
+func (h *AccountHandler) UpdateSortOrder(c *gin.Context) {
+	var req UpdateAccountSortOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	updates := make([]service.AccountSortOrderUpdate, 0, len(req.Updates))
+	for _, u := range req.Updates {
+		updates = append(updates, service.AccountSortOrderUpdate{
+			ID:       u.ID,
+			Priority: u.Priority,
+		})
+	}
+
+	if err := h.adminService.UpdateAccountSortOrders(c.Request.Context(), updates); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Sort order updated successfully"})
 }
 
 // Delete handles deleting an account

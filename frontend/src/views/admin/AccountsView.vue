@@ -156,6 +156,16 @@
                 </div>
               </div>
             </template>
+            <template #beforeCreate>
+              <button
+                @click="openSortModal"
+                class="btn btn-secondary px-2 md:px-3"
+                :title="t('admin.accounts.sortOrder')"
+              >
+                <Icon name="arrowsUpDown" size="sm" class="md:mr-1.5" />
+                <span class="hidden md:inline">{{ t('admin.accounts.sortOrder') }}</span>
+              </button>
+            </template>
           </AccountTableActions>
         </div>
         <div
@@ -362,6 +372,117 @@
       @updated="handleBulkUpdated"
     />
     <TempUnschedStatusModal :show="showTempUnsched" :account="tempUnschedAcc" @close="showTempUnsched = false" @reset="handleTempUnschedReset" />
+    <BaseDialog
+      :show="showSortModal"
+      :title="t('admin.accounts.sortOrder')"
+      width="normal"
+      @close="closeSortModal"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {{ t('admin.accounts.sortOrderHint') }}
+        </p>
+        <div
+          v-if="sortLoading"
+          class="space-y-2"
+        >
+          <div
+            v-for="index in 6"
+            :key="index"
+            class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 dark:border-dark-600 dark:bg-dark-700"
+          >
+            <div class="h-5 w-5 animate-pulse rounded bg-gray-200 dark:bg-dark-500"></div>
+            <div class="min-w-0 flex-1 space-y-2">
+              <div class="h-4 w-48 animate-pulse rounded bg-gray-200 dark:bg-dark-500"></div>
+              <div class="h-3 w-64 animate-pulse rounded bg-gray-100 dark:bg-dark-600"></div>
+            </div>
+          </div>
+        </div>
+        <VueDraggable
+          v-else
+          v-model="sortableAccounts"
+          :animation="200"
+          class="space-y-2"
+        >
+          <div
+            v-for="account in sortableAccounts"
+            :key="account.id"
+            class="flex cursor-grab items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 transition-shadow hover:shadow-md active:cursor-grabbing dark:border-dark-600 dark:bg-dark-700"
+          >
+            <div class="text-gray-400">
+              <Icon name="menu" size="md" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="truncate font-medium text-gray-900 dark:text-white">
+                {{ account.name }}
+              </div>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <span
+                  :class="[
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                    account.platform === 'anthropic'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                      : account.platform === 'openai'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : account.platform === 'antigravity'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                  ]"
+                >
+                  {{ account.platform }}
+                </span>
+                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 dark:bg-dark-600 dark:text-gray-300">
+                  {{ account.type }}
+                </span>
+                <span v-if="account.groups?.length" class="max-w-[16rem] truncate">
+                  {{ account.groups.map(group => group.name).join(', ') }}
+                </span>
+              </div>
+            </div>
+            <div class="text-sm text-gray-400">#{{ account.id }}</div>
+          </div>
+        </VueDraggable>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3 pt-4">
+          <button
+            @click="closeSortModal"
+            type="button"
+            class="btn btn-secondary"
+          >
+            {{ t('common.cancel') }}
+          </button>
+          <button
+            @click="saveSortOrder"
+            :disabled="sortSubmitting || sortLoading || sortableAccounts.length === 0"
+            class="btn btn-primary"
+          >
+            <svg
+              v-if="sortSubmitting"
+              class="-ml-1 mr-2 h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            {{ sortSubmitting ? t('common.saving') : t('common.save') }}
+          </button>
+        </div>
+      </template>
+    </BaseDialog>
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
     <ConfirmDialog :show="showExportDataDialog" :title="t('admin.accounts.dataExport')" :message="t('admin.accounts.dataExportConfirmMessage')" :confirm-text="t('admin.accounts.dataExportConfirm')" :cancel-text="t('common.cancel')" @confirm="handleExportData" @cancel="showExportDataDialog = false">
       <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -388,6 +509,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
@@ -409,6 +531,7 @@ import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
 import TLSFingerprintProfilesModal from '@/components/admin/TLSFingerprintProfilesModal.vue'
+import { VueDraggable } from 'vue-draggable-plus'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { formatDateTime, formatRelativeTime } from '@/utils/format'
 import type { Account, AccountPlatform, AccountType, Proxy as AccountProxy, AdminGroup, WindowStats, ClaudeModel } from '@/types'
@@ -487,6 +610,10 @@ const scheduleModelOptions = ref<SelectOption[]>([])
 const togglingSchedulable = ref<number | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, pos:{top:number, left:number}|null}>({ show: false, acc: null, pos: null })
 const exportingData = ref(false)
+const showSortModal = ref(false)
+const sortSubmitting = ref(false)
+const sortLoading = ref(false)
+const sortableAccounts = ref<Account[]>([])
 
 // Account tools dropdown
 const showAccountToolsDropdown = ref(false)
@@ -512,7 +639,7 @@ const ACCOUNT_SORTABLE_KEYS = new Set([
   'expires_at'
 ])
 const loadInitialAccountSortState = (): AccountSortState => {
-  const fallback: AccountSortState = { sort_by: 'name', sort_order: 'asc' }
+  const fallback: AccountSortState = { sort_by: 'priority', sort_order: 'asc' }
   try {
     const raw = localStorage.getItem(ACCOUNT_SORT_STORAGE_KEY)
     if (!raw) return fallback
@@ -828,6 +955,79 @@ const handleSort = (key: string, order: AccountSortOrder) => {
   load()
 }
 
+const fetchAllAccountsForSorting = async () => {
+  const pageSize = 1000
+  let page = 1
+  const allAccounts: Account[] = []
+
+  while (true) {
+    const result = await adminAPI.accounts.list(page, pageSize, {
+      sort_by: 'priority',
+      sort_order: 'asc',
+      lite: '1'
+    })
+    const items = result.items || []
+    allAccounts.push(...items)
+    if (items.length === 0 || allAccounts.length >= (result.total || 0)) {
+      break
+    }
+    page += 1
+  }
+
+  return allAccounts
+}
+
+const openSortModal = async () => {
+  showAccountToolsDropdown.value = false
+  showAutoRefreshDropdown.value = false
+  menu.show = false
+  showSortModal.value = true
+  sortLoading.value = true
+  sortableAccounts.value = []
+  try {
+    sortableAccounts.value = await fetchAllAccountsForSorting()
+  } catch (error: any) {
+    console.error('Failed to load account sort order:', error)
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.failedToLoadSortOrder'))
+    showSortModal.value = false
+  } finally {
+    sortLoading.value = false
+  }
+}
+
+const closeSortModal = () => {
+  if (sortSubmitting.value || sortLoading.value) return
+  showSortModal.value = false
+  sortableAccounts.value = []
+}
+
+const saveSortOrder = async () => {
+  if (sortLoading.value || sortableAccounts.value.length === 0) return
+  sortSubmitting.value = true
+  try {
+    const updates = sortableAccounts.value.map((account, index) => ({
+      id: account.id,
+      priority: index + 1
+    }))
+    await adminAPI.accounts.updateSortOrder(updates)
+    appStore.showSuccess(t('admin.accounts.sortOrderUpdated'))
+    showSortModal.value = false
+    sortableAccounts.value = []
+    sortState.sort_by = 'priority'
+    sortState.sort_order = 'asc'
+    const requestParams = params as any
+    requestParams.sort_by = 'priority'
+    requestParams.sort_order = 'asc'
+    pagination.page = 1
+    await reload()
+  } catch (error: any) {
+    console.error('Failed to update account sort order:', error)
+    appStore.showError(error.response?.data?.detail || t('admin.accounts.failedToUpdateSortOrder'))
+  } finally {
+    sortSubmitting.value = false
+  }
+}
+
 watch(loading, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading && pendingTodayStatsRefresh.value) {
     pendingTodayStatsRefresh.value = false
@@ -847,6 +1047,7 @@ const isAnyModalOpen = computed(() => {
     showBulkEdit.value ||
     showTempUnsched.value ||
     showDeleteDialog.value ||
+    showSortModal.value ||
     showReAuth.value ||
     showTest.value ||
     showStats.value ||
