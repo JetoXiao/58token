@@ -73,20 +73,62 @@
                       </span>
                     </div>
                     <div class="grid gap-3 md:grid-cols-2">
-                      <div class="rounded-xl border border-gray-200 bg-gray-50/80 p-4 opacity-80 dark:border-dark-700 dark:bg-dark-800/80">
+                      <button
+                        type="button"
+                        :disabled="!rmbRailAvailable"
+                        :class="[
+                          'rounded-xl border p-4 text-left transition-all',
+                          selectedRechargeRail === 'rmb'
+                            ? 'border-primary-400 bg-primary-50/80 ring-4 ring-primary-100 dark:border-primary-500 dark:bg-primary-900/20 dark:ring-primary-950'
+                            : rmbRailAvailable
+                              ? 'border-gray-200 bg-white/80 hover:border-primary-200 dark:border-dark-700 dark:bg-dark-800/80 dark:hover:border-primary-800'
+                              : 'cursor-not-allowed border-gray-200 bg-gray-50/80 opacity-60 dark:border-dark-700 dark:bg-dark-800/80',
+                        ]"
+                        @click="rmbRailAvailable && (selectedRechargeRail = 'rmb')"
+                      >
                         <div class="flex items-center justify-between gap-2">
                           <p class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ t('payment.paymentRailRmb') }}</p>
-                          <span class="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-600 dark:bg-dark-700 dark:text-gray-300">{{ t('payment.paymentRailComingSoon') }}</span>
+                          <span
+                            :class="[
+                              'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                              rmbRailAvailable
+                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                : 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300',
+                            ]"
+                          >
+                            {{ rmbRailAvailable ? t('payment.paymentRailOpen') : t('payment.paymentRailUnavailable') }}
+                          </span>
                         </div>
                         <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('payment.paymentRailRmbDesc') }}</p>
-                      </div>
-                      <div class="rounded-xl border border-primary-200 bg-primary-50/70 p-4 dark:border-primary-900/50 dark:bg-primary-900/20">
+                      </button>
+                      <button
+                        type="button"
+                        :disabled="!usdtRailAvailable"
+                        :class="[
+                          'rounded-xl border p-4 text-left transition-all',
+                          selectedRechargeRail === 'usdt'
+                            ? 'border-primary-400 bg-primary-50/80 ring-4 ring-primary-100 dark:border-primary-500 dark:bg-primary-900/20 dark:ring-primary-950'
+                            : usdtRailAvailable
+                              ? 'border-gray-200 bg-white/80 hover:border-primary-200 dark:border-dark-700 dark:bg-dark-800/80 dark:hover:border-primary-800'
+                              : 'cursor-not-allowed border-gray-200 bg-gray-50/80 opacity-60 dark:border-dark-700 dark:bg-dark-800/80',
+                        ]"
+                        @click="usdtRailAvailable && (selectedRechargeRail = 'usdt')"
+                      >
                         <div class="flex items-center justify-between gap-2">
                           <p class="text-sm font-bold text-gray-950 dark:text-white">{{ t('payment.paymentRailUsdt') }}</p>
-                          <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">{{ t('payment.paymentRailOpen') }}</span>
+                          <span
+                            :class="[
+                              'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                              usdtRailAvailable
+                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                : 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300',
+                            ]"
+                          >
+                            {{ usdtRailAvailable ? t('payment.paymentRailOpen') : t('payment.paymentRailUnavailable') }}
+                          </span>
                         </div>
                         <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">{{ t('payment.paymentRailUsdtDesc') }}</p>
-                      </div>
+                      </button>
                     </div>
                   </div>
 
@@ -117,12 +159,20 @@
                         <div class="mt-5">
                           <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('payment.payRmb') }}</p>
                           <p class="mt-1 text-4xl font-black tracking-tight text-gray-950 dark:text-white">{{ formatRmbAmount(pkg.amount) }}</p>
-                          <p class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">
+                          <p v-if="selectedRechargeRail === 'usdt'" class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">
                             {{ t('payment.usdtEquivalent', { amount: formatUsdtAmount(usdtPaymentForAmount(pkg.amount)) }) }}
+                          </p>
+                          <p v-else class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">
+                            {{ t('payment.rmbOnlinePayHint') }}
                           </p>
                         </div>
                         <div class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-900/20">
-                          <p class="text-xs font-medium text-emerald-700 dark:text-emerald-300">{{ t('payment.receiveUsd') }}</p>
+                          <div class="flex items-start justify-between gap-3">
+                            <p class="text-xs font-medium text-emerald-700 dark:text-emerald-300">{{ t('payment.receiveUsd') }}</p>
+                            <span v-if="bonusForAmount(pkg.amount) > 0" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                              {{ t('payment.rechargeBonusBadge', { amount: formatUsdBalance(bonusForAmount(pkg.amount)) }) }}
+                            </span>
+                          </div>
                           <p class="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ formatUsdBalance(creditedForAmount(pkg.amount)) }}</p>
                         </div>
                       </button>
@@ -146,7 +196,7 @@
                 </div>
 
                 <div class="space-y-4 lg:sticky lg:top-24 lg:self-start">
-                  <div v-if="enabledMethods.length >= 1" class="card p-6">
+                  <div v-if="rechargeMethods.length >= 1" class="card p-6">
                     <PaymentMethodSelector
                       :methods="methodOptions"
                       :selected="selectedMethod"
@@ -164,17 +214,21 @@
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.paymentAmount') }}</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ formatRmbAmount(validAmount) }}</span>
                       </div>
-                      <div class="flex justify-between gap-4">
+                      <div v-if="selectedRechargeRail === 'usdt'" class="flex justify-between gap-4">
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.usdtPayAmount') }}</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ formatUsdtAmount(usdtPaymentAmount) }}</span>
                       </div>
                       <div v-if="feeRate > 0" class="flex justify-between gap-4">
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ formatUsdtAmount(usdtFeeAmount) }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">{{ formatRechargePaymentAmount(rechargeFeeAmount) }}</span>
                       </div>
                       <div class="flex justify-between gap-4 border-t border-gray-200 pt-3 dark:border-dark-600">
                         <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
-                        <span class="text-lg font-black text-gray-950 dark:text-white">{{ formatUsdtAmount(usdtTotalPaymentAmount) }}</span>
+                        <span class="text-lg font-black text-gray-950 dark:text-white">{{ formatRechargePaymentAmount(rechargeTotalPaymentAmount) }}</span>
+                      </div>
+                      <div v-if="rechargeBonusAmount > 0" class="flex justify-between gap-4">
+                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.rechargeBonus') }}</span>
+                        <span class="font-semibold text-emerald-700 dark:text-emerald-300">{{ formatUsdBalance(rechargeBonusAmount) }}</span>
                       </div>
                       <div class="rounded-xl bg-emerald-50 p-4 dark:bg-emerald-900/20">
                         <div class="flex items-center justify-between gap-4">
@@ -194,8 +248,8 @@
                         <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                         {{ t('common.processing') }}
                       </span>
-                      <span v-else-if="enabledMethods.length === 0">{{ t('payment.notAvailable') }}</span>
-                      <span v-else>{{ t('payment.createOrder') }} {{ formatUsdtAmount(usdtTotalPaymentAmount) }}</span>
+                      <span v-else-if="rechargeMethods.length === 0">{{ t('payment.notAvailable') }}</span>
+                      <span v-else>{{ t('payment.createOrder') }} {{ formatRechargePaymentAmount(rechargeTotalPaymentAmount) }}</span>
                     </button>
                     <div class="mt-5 space-y-2 border-t border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400">
                       <p>{{ t('payment.rechargeRuleRate') }}</p>
@@ -422,6 +476,7 @@ const errorHintMessage = ref('')
 const activeTab = ref<'recharge' | 'subscription'>('recharge')
 const amount = ref<number | null>(null)
 const selectedMethod = ref('')
+const selectedRechargeRail = ref<'rmb' | 'usdt'>('rmb')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
 const previewImage = ref('')
 
@@ -597,7 +652,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, usdt_cny_exchange_rate: 7.2, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, recharge_bonus_threshold: 100, recharge_bonus_amount: 10, usdt_cny_exchange_rate: 7.2, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
@@ -608,13 +663,28 @@ const tabs = computed(() => {
 })
 
 const visibleMethods = computed(() => getVisibleMethods(checkout.value.methods))
+const rmbPaymentMethods = ['alipay', 'wxpay']
+const usdtPaymentMethods = ['usdt']
+function isVisibleMethodOpen(method: string): boolean {
+  const limit = visibleMethods.value[method]
+  return !!limit && limit.available !== false
+}
+const rmbRailAvailable = computed(() => rmbPaymentMethods.some((method) => isVisibleMethodOpen(method)))
+const usdtRailAvailable = computed(() => usdtPaymentMethods.some((method) => isVisibleMethodOpen(method)))
+const rechargeMethods = computed(() => {
+  const allowed = selectedRechargeRail.value === 'rmb' ? rmbPaymentMethods : usdtPaymentMethods
+  return allowed.filter((method) => isVisibleMethodOpen(method))
+})
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const validAmount = computed(() => amount.value ?? 0)
 const balanceRechargeMultiplier = computed(() => {
   const multiplier = checkout.value.balance_recharge_multiplier
   return multiplier > 0 ? multiplier : 1
 })
-const creditedAmount = computed(() => Math.round((validAmount.value * balanceRechargeMultiplier.value) * 100) / 100)
+const rechargeBonusThreshold = computed(() => normalizeNonNegativeNumber(checkout.value.recharge_bonus_threshold, 100))
+const rechargeBonusUnitAmount = computed(() => normalizeNonNegativeNumber(checkout.value.recharge_bonus_amount, 10))
+const rechargeBonusAmount = computed(() => bonusForAmount(validAmount.value))
+const creditedAmount = computed(() => creditedForAmount(validAmount.value))
 const usdtCnyExchangeRate = computed(() => {
   const rate = Number(checkout.value.usdt_cny_exchange_rate)
   return Number.isFinite(rate) && rate > 0 ? rate : 7.2
@@ -631,6 +701,18 @@ const usdtTotalPaymentAmount = computed(() =>
     ? Math.round((usdtPaymentAmount.value + usdtFeeAmount.value) * 10000) / 10000
     : usdtPaymentAmount.value
 )
+const rmbFeeAmount = computed(() =>
+  feeRate.value > 0 && validAmount.value > 0
+    ? Math.ceil(((validAmount.value * feeRate.value) / 100) * 100) / 100
+    : 0
+)
+const rmbTotalPaymentAmount = computed(() =>
+  feeRate.value > 0 && validAmount.value > 0
+    ? Math.round((validAmount.value + rmbFeeAmount.value) * 100) / 100
+    : validAmount.value
+)
+const rechargeFeeAmount = computed(() => selectedRechargeRail.value === 'usdt' ? usdtFeeAmount.value : rmbFeeAmount.value)
+const rechargeTotalPaymentAmount = computed(() => selectedRechargeRail.value === 'usdt' ? usdtTotalPaymentAmount.value : rmbTotalPaymentAmount.value)
 
 const rechargePackages = [
   { amount: 30, nameKey: 'payment.packageStarter' },
@@ -640,7 +722,20 @@ const rechargePackages = [
 ]
 
 function creditedForAmount(value: number): number {
-  return Math.round((value * balanceRechargeMultiplier.value) * 100) / 100
+  return Math.round(((value * balanceRechargeMultiplier.value) + bonusForAmount(value)) * 100) / 100
+}
+
+function normalizeNonNegativeNumber(value: number | undefined, fallback: number): number {
+  const amountValue = Number(value)
+  return Number.isFinite(amountValue) && amountValue >= 0 ? amountValue : fallback
+}
+
+function bonusForAmount(value: number): number {
+  const amountValue = Number.isFinite(value) ? value : 0
+  const threshold = rechargeBonusThreshold.value
+  const bonusAmount = rechargeBonusUnitAmount.value
+  if (amountValue <= 0 || threshold <= 0 || bonusAmount <= 0) return 0
+  return Math.floor(amountValue / threshold) * bonusAmount
 }
 
 function usdtPaymentForAmount(value: number): number {
@@ -649,8 +744,8 @@ function usdtPaymentForAmount(value: number): number {
 }
 
 function amountFitsAnyMethod(value: number): boolean {
-  if (enabledMethods.value.length === 0) return true
-  return enabledMethods.value.some((m) => amountFitsMethod(value, m))
+  if (rechargeMethods.value.length === 0) return true
+  return rechargeMethods.value.some((m) => amountFitsMethod(value, m))
 }
 
 function selectRechargePackage(value: number) {
@@ -665,10 +760,10 @@ function formatRmbAmount(value: number): string {
       currency: 'CNY',
       currencyDisplay: 'narrowSymbol',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(value)
   } catch {
-    return `¥${value}`
+    return `¥${formatRateNumber(value)}`
   }
 }
 
@@ -680,6 +775,12 @@ function formatRateNumber(value: number): string {
 function formatUsdtAmount(value: number): string {
   const amountValue = Number.isFinite(value) ? value : 0
   return `${amountValue.toFixed(4).replace(/\.?0+$/, '')} USDT`
+}
+
+function formatRechargePaymentAmount(value: number): string {
+  return selectedRechargeRail.value === 'usdt'
+    ? formatUsdtAmount(value)
+    : formatRmbAmount(value)
 }
 
 function formatUsdBalance(value: number): string {
@@ -728,13 +829,13 @@ function rmbAmountFromMethodLimit(value: number, limit: { currency?: string }): 
 
 // Visible methods decide the amount range shown to users.
 const globalMinAmount = computed(() => {
-  const limits = Object.values(visibleMethods.value)
+  const limits = rechargeMethods.value.map(method => visibleMethods.value[method]).filter(Boolean)
   if (limits.length === 0) return 0
   if (limits.some(limit => limit.single_min <= 0)) return 0
   return Math.min(...limits.map(limit => rmbAmountFromMethodLimit(limit.single_min, limit)))
 })
 const globalMaxAmount = computed(() => {
-  const limits = Object.values(visibleMethods.value)
+  const limits = rechargeMethods.value.map(method => visibleMethods.value[method]).filter(Boolean)
   if (limits.length === 0) return 0
   if (limits.some(limit => limit.single_max <= 0)) return 0
   return Math.max(...limits.map(limit => rmbAmountFromMethodLimit(limit.single_max, limit)))
@@ -757,7 +858,7 @@ function formatSelectedPaymentAmount(value: number): string {
 }
 
 const methodOptions = computed<PaymentMethodOption[]>(() =>
-  enabledMethods.value.map((type) => {
+  rechargeMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
     return {
       type,
@@ -772,7 +873,7 @@ const feeRate = computed(() => checkout.value?.recharge_fee_rate ?? 0)
 const amountError = computed(() => {
   if (validAmount.value <= 0) return ''
   // No method can handle this amount
-  if (!enabledMethods.value.some((m) => amountFitsMethod(validAmount.value, m))) {
+  if (!rechargeMethods.value.some((m) => amountFitsMethod(validAmount.value, m))) {
     return t('payment.amountNoMethod')
   }
   // Selected method can't handle this amount (but others can)
@@ -787,6 +888,7 @@ const amountError = computed(() => {
 
 const canSubmit = computed(() =>
   validAmount.value > 0
+    && rechargeMethods.value.includes(selectedMethod.value)
     && amountFitsMethod(validAmount.value, selectedMethod.value)
     && selectedLimit.value?.available !== false
 )
@@ -823,11 +925,19 @@ const canSubmitSubscription = computed(() =>
 )
 
 // Auto-switch to first available method when current selection can't handle the amount
-watch(() => [validAmount.value, selectedMethod.value] as const, ([amt, method]) => {
-  if (amt <= 0 || amountFitsMethod(amt, method)) return
-  const available = enabledMethods.value.find((m) => amountFitsMethod(amt, m))
+watch(() => [validAmount.value, selectedMethod.value, selectedRechargeRail.value, rechargeMethods.value.join(',')] as const, ([amt, method]) => {
+  if (amt > 0 && rechargeMethods.value.includes(method) && amountFitsMethod(amt, method)) return
+  const available = rechargeMethods.value.find((m) => amountFitsMethod(amt, m))
   if (available) selectedMethod.value = available
 })
+
+watch([rmbRailAvailable, usdtRailAvailable], ([rmbAvailable, usdtAvailable]) => {
+  if (selectedRechargeRail.value === 'rmb' && !rmbAvailable && usdtAvailable) {
+    selectedRechargeRail.value = 'usdt'
+  } else if (selectedRechargeRail.value === 'usdt' && !usdtAvailable && rmbAvailable) {
+    selectedRechargeRail.value = 'rmb'
+  }
+}, { immediate: true })
 
 // Payment button class: follows selected payment method color
 const paymentButtonClass = computed(() => {
@@ -1235,9 +1345,9 @@ onMounted(async () => {
   try {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
-    if (enabledMethods.value.length) {
+    if (rechargeMethods.value.length) {
       const order: readonly string[] = METHOD_ORDER
-      const sorted = [...enabledMethods.value].sort((a, b) => {
+      const sorted = [...rechargeMethods.value].sort((a, b) => {
         const ai = order.indexOf(a)
         const bi = order.indexOf(b)
         return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)

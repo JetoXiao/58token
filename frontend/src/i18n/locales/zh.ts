@@ -1252,7 +1252,7 @@ export default {
         },
         {
           title: '模型 ID',
-          description: '请求中传入的精确模型字符串，例如 gpt-5.5 或 claude-opus-4-7。建议从模型广场复制，避免拼写错误。'
+          description: '请求中传入的精确模型字符串，例如 gpt-5.5 或 claude-opus-4.7。建议从模型广场复制，避免拼写错误。'
         },
         {
           title: '余额',
@@ -1430,7 +1430,7 @@ export default {
           openaiTitle: 'OpenAI 兼容模式',
           openaiDescription: '用于 gpt-5.5、gpt-5.4、gpt-5.3-codex 等 OpenAI 分组模型。',
           anthropicTitle: 'Claude / Anthropic 兼容模式',
-          anthropicDescription: '用于 claude-opus-4-7、claude-sonnet-4-6 等 Claude 分组模型。'
+          anthropicDescription: '用于 claude-opus-4.7、claude-sonnet-4.6 等 Claude 分组模型。'
         }
       },
       openClaw: {
@@ -6379,6 +6379,9 @@ export default {
         balanceRechargePreview: '预览：1 CNY = {usd} USD',
         usdtCnyExchangeRate: 'USDT/CNY 汇率',
         usdtCnyExchangeRateHint: '用于 USDT 充值时将人民币套餐金额折算为应付 USDT',
+        rechargeBonusThreshold: '充值赠送门槛',
+        rechargeBonusAmount: '每档赠送金额',
+        rechargeBonusHint: '当前规则：每满 {threshold} RMB 赠送 {amount} USD 余额，填 0 可关闭赠送',
         marketplaceGroupMultipliers: {
           title: '模型广场分组倍率',
           description: '配置模型广场各可用分组的倍率。平台价格 = 官方价格 × 分组倍率 ÷ 人民币兑换美元汇率。',
@@ -7472,11 +7475,12 @@ export default {
     rechargeValueTitle: '1 RMB = 1 USD 余额',
     paymentRailTitle: '支付通道',
     paymentRailRmb: 'RMB 充值',
-    paymentRailRmbDesc: '人民币充值通道准备中，后续开放。',
+    paymentRailRmbDesc: '当前开放，支持使用已启用的本地支付方式直接充值。',
     paymentRailUsdt: 'USDT 充值',
     paymentRailUsdtDesc: '当前开放，适合海外用户与链上付款。',
     paymentRailOpen: '当前开放',
     paymentRailComingSoon: '即将推出',
+    paymentRailUnavailable: '即将推出',
     packageTitle: '充值套餐',
     packageSubtitle: '选择一个常用额度，或输入自定义金额。',
     packageStarter: '体验',
@@ -7487,8 +7491,11 @@ export default {
     packageBestValue: '最佳价值',
     payRmb: '支付 RMB',
     usdtEquivalent: '约 {amount}',
+    rmbOnlinePayHint: '人民币在线支付',
     usdtPayAmount: '应付 USDT',
     receiveUsd: '到账 USD 余额',
+    rechargeBonus: '赠送余额',
+    rechargeBonusBadge: '赠送 {amount}',
     customRechargeTitle: '自定义充值',
     customRechargeDescription: '需要更灵活的额度时，可以手动输入人民币金额。',
     checkoutSummary: '结算摘要',

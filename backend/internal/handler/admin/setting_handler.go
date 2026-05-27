@@ -278,6 +278,8 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PaymentBalanceDisabled:                 paymentCfg.BalanceDisabled,
 		PaymentBalanceRechargeMultiplier:       paymentCfg.BalanceRechargeMultiplier,
 		PaymentRechargeFeeRate:                 paymentCfg.RechargeFeeRate,
+		PaymentRechargeBonusThreshold:          paymentCfg.RechargeBonusThreshold,
+		PaymentRechargeBonusAmount:             paymentCfg.RechargeBonusAmount,
 		PaymentUsdtCnyExchangeRate:             paymentCfg.UsdtCnyExchangeRate,
 		PaymentMarketplaceGroupMultipliers:     paymentCfg.MarketplaceGroupMultipliers,
 		PaymentLoadBalanceStrat:                paymentCfg.LoadBalanceStrategy,
@@ -608,6 +610,8 @@ type UpdateSettingsRequest struct {
 	PaymentBalanceDisabled             *bool              `json:"payment_balance_disabled"`
 	PaymentBalanceRechargeMultiplier   *float64           `json:"payment_balance_recharge_multiplier"`
 	PaymentRechargeFeeRate             *float64           `json:"payment_recharge_fee_rate"`
+	PaymentRechargeBonusThreshold      *float64           `json:"payment_recharge_bonus_threshold"`
+	PaymentRechargeBonusAmount         *float64           `json:"payment_recharge_bonus_amount"`
 	PaymentUsdtCnyExchangeRate         *float64           `json:"payment_usdt_cny_exchange_rate"`
 	PaymentMarketplaceGroupMultipliers map[string]float64 `json:"payment_marketplace_group_multipliers"`
 	PaymentLoadBalanceStrat            *string            `json:"payment_load_balance_strategy"`
@@ -1814,6 +1818,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			BalanceDisabled:             req.PaymentBalanceDisabled,
 			BalanceRechargeMultiplier:   req.PaymentBalanceRechargeMultiplier,
 			RechargeFeeRate:             req.PaymentRechargeFeeRate,
+			RechargeBonusThreshold:      req.PaymentRechargeBonusThreshold,
+			RechargeBonusAmount:         req.PaymentRechargeBonusAmount,
 			UsdtCnyExchangeRate:         req.PaymentUsdtCnyExchangeRate,
 			MarketplaceGroupMultipliers: req.PaymentMarketplaceGroupMultipliers,
 			LoadBalanceStrategy:         req.PaymentLoadBalanceStrat,
@@ -2027,6 +2033,8 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentBalanceDisabled:                 updatedPaymentCfg.BalanceDisabled,
 		PaymentBalanceRechargeMultiplier:       updatedPaymentCfg.BalanceRechargeMultiplier,
 		PaymentRechargeFeeRate:                 updatedPaymentCfg.RechargeFeeRate,
+		PaymentRechargeBonusThreshold:          updatedPaymentCfg.RechargeBonusThreshold,
+		PaymentRechargeBonusAmount:             updatedPaymentCfg.RechargeBonusAmount,
 		PaymentUsdtCnyExchangeRate:             updatedPaymentCfg.UsdtCnyExchangeRate,
 		PaymentMarketplaceGroupMultipliers:     updatedPaymentCfg.MarketplaceGroupMultipliers,
 		PaymentLoadBalanceStrat:                updatedPaymentCfg.LoadBalanceStrategy,
@@ -2077,6 +2085,7 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentOrderTimeoutMin != nil || req.PaymentMaxPendingOrders != nil ||
 		req.PaymentEnabledTypes != nil || req.PaymentBalanceDisabled != nil ||
 		req.PaymentBalanceRechargeMultiplier != nil || req.PaymentRechargeFeeRate != nil ||
+		req.PaymentRechargeBonusThreshold != nil || req.PaymentRechargeBonusAmount != nil ||
 		req.PaymentUsdtCnyExchangeRate != nil || req.PaymentMarketplaceGroupMultipliers != nil ||
 		req.PaymentLoadBalanceStrat != nil || req.PaymentProductNamePrefix != nil ||
 		req.PaymentProductNameSuffix != nil || req.PaymentHelpImageURL != nil ||

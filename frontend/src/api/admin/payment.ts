@@ -24,6 +24,8 @@ export interface AdminPaymentConfig {
   enabled_payment_types: string[]
   balance_disabled: boolean
   balance_recharge_multiplier: number
+  recharge_bonus_threshold: number
+  recharge_bonus_amount: number
   usdt_cny_exchange_rate: number
   marketplace_group_multipliers: Record<string, number>
   load_balance_strategy: string
@@ -44,6 +46,8 @@ export interface UpdatePaymentConfigRequest {
   enabled_payment_types?: string[]
   balance_disabled?: boolean
   balance_recharge_multiplier?: number
+  recharge_bonus_threshold?: number
+  recharge_bonus_amount?: number
   usdt_cny_exchange_rate?: number
   marketplace_group_multipliers?: Record<string, number>
   load_balance_strategy?: string

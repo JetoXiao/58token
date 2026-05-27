@@ -59,7 +59,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		limitAmount = plan.Price
 		paymentBaseAmount = plan.Price
 	} else if req.OrderType == payment.OrderTypeBalance {
-		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier)
+		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier, cfg.RechargeBonusThreshold, cfg.RechargeBonusAmount)
 		if req.PaymentAmount > 0 {
 			if math.IsNaN(req.PaymentAmount) || math.IsInf(req.PaymentAmount, 0) {
 				return nil, infraerrors.BadRequest("INVALID_PAYMENT_AMOUNT", "payment amount must be a positive number")

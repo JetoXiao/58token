@@ -10,6 +10,8 @@ import (
 const (
 	defaultBalanceRechargeMultiplier = 1.0
 	defaultUsdtCnyExchangeRate       = 7.2
+	defaultRechargeBonusThreshold    = 100.0
+	defaultRechargeBonusAmount       = 10.0
 )
 
 func normalizeBalanceRechargeMultiplier(multiplier float64) float64 {
@@ -26,9 +28,39 @@ func normalizeUsdtCnyExchangeRate(rate float64) float64 {
 	return rate
 }
 
-func calculateCreditedBalance(paymentAmount, multiplier float64) float64 {
+func normalizeRechargeBonusThreshold(threshold float64) float64 {
+	if math.IsNaN(threshold) || math.IsInf(threshold, 0) || threshold < 0 {
+		return defaultRechargeBonusThreshold
+	}
+	return threshold
+}
+
+func normalizeRechargeBonusAmount(amount float64) float64 {
+	if math.IsNaN(amount) || math.IsInf(amount, 0) || amount < 0 {
+		return defaultRechargeBonusAmount
+	}
+	return amount
+}
+
+func calculateRechargeBonus(paymentAmount, threshold, bonusAmount float64) float64 {
+	threshold = normalizeRechargeBonusThreshold(threshold)
+	bonusAmount = normalizeRechargeBonusAmount(bonusAmount)
+	if paymentAmount <= 0 || threshold <= 0 || bonusAmount <= 0 {
+		return 0
+	}
 	return decimal.NewFromFloat(paymentAmount).
-		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
+		Div(decimal.NewFromFloat(threshold)).
+		Floor().
+		Mul(decimal.NewFromFloat(bonusAmount)).
+		Round(2).
+		InexactFloat64()
+}
+
+func calculateCreditedBalance(paymentAmount, multiplier, bonusThreshold, bonusAmount float64) float64 {
+	base := decimal.NewFromFloat(paymentAmount).
+		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier)))
+	bonus := decimal.NewFromFloat(calculateRechargeBonus(paymentAmount, bonusThreshold, bonusAmount))
+	return base.Add(bonus).
 		Round(2).
 		InexactFloat64()
 }

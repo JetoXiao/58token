@@ -5755,6 +5755,60 @@
                   </div>
                   <div>
                     <label class="input-label">{{
+                      t("admin.settings.payment.rechargeBonusThreshold")
+                    }}</label>
+                    <input
+                      :value="form.payment_recharge_bonus_threshold ?? ''"
+                      @input="
+                        form.payment_recharge_bonus_threshold =
+                          Math.max(
+                            0,
+                            parseFloat(
+                              ($event.target as HTMLInputElement).value ||
+                                '0',
+                            ) || 0,
+                          )
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.rechargeBonusAmount")
+                    }}</label>
+                    <input
+                      :value="form.payment_recharge_bonus_amount ?? ''"
+                      @input="
+                        form.payment_recharge_bonus_amount =
+                          Math.max(
+                            0,
+                            parseFloat(
+                              ($event.target as HTMLInputElement).value ||
+                                '0',
+                            ) || 0,
+                          )
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input"
+                    />
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{
+                        t("admin.settings.payment.rechargeBonusHint", {
+                          threshold:
+                            Number(form.payment_recharge_bonus_threshold) || 0,
+                          amount:
+                            Number(form.payment_recharge_bonus_amount) || 0,
+                        })
+                      }}
+                    </p>
+                  </div>
+                  <div>
+                    <label class="input-label">{{
                       t("admin.settings.payment.rechargeFeeRate")
                     }}</label>
                     <div class="relative">
@@ -7038,6 +7092,8 @@ const form = reactive<SettingsForm>({
   payment_balance_disabled: false,
   payment_balance_recharge_multiplier: 1,
   payment_recharge_fee_rate: 0,
+  payment_recharge_bonus_threshold: 100,
+  payment_recharge_bonus_amount: 10,
   payment_usdt_cny_exchange_rate: 7.2,
   payment_marketplace_group_multipliers: {
     'Claude Lite': 1,
@@ -8321,6 +8377,10 @@ async function saveSettings() {
       payment_balance_recharge_multiplier:
         Number(form.payment_balance_recharge_multiplier) || 1,
       payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
+      payment_recharge_bonus_threshold:
+        Number(form.payment_recharge_bonus_threshold) || 0,
+      payment_recharge_bonus_amount:
+        Number(form.payment_recharge_bonus_amount) || 0,
       payment_usdt_cny_exchange_rate:
         Number(form.payment_usdt_cny_exchange_rate) || 7.2,
       payment_marketplace_group_multipliers:

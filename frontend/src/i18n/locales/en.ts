@@ -1248,7 +1248,7 @@ export default {
         },
         {
           title: 'Model ID',
-          description: 'The exact model string sent in the request, such as gpt-5.5 or claude-opus-4-7. Copy it from Model Marketplace to avoid typos.'
+          description: 'The exact model string sent in the request, such as gpt-5.5 or claude-opus-4.7. Copy it from Model Marketplace to avoid typos.'
         },
         {
           title: 'Balance',
@@ -1426,7 +1426,7 @@ export default {
           openaiTitle: 'OpenAI-compatible mode',
           openaiDescription: 'Use this for OpenAI group models such as gpt-5.5, gpt-5.4, and gpt-5.3-codex.',
           anthropicTitle: 'Claude / Anthropic-compatible mode',
-          anthropicDescription: 'Use this for Claude group models such as claude-opus-4-7 and claude-sonnet-4-6.'
+          anthropicDescription: 'Use this for Claude group models such as claude-opus-4.7 and claude-sonnet-4.6.'
         }
       },
       openClaw: {
@@ -6220,6 +6220,9 @@ export default {
         balanceRechargePreview: 'Preview: 1 CNY = {usd} USD',
         usdtCnyExchangeRate: 'USDT/CNY Exchange Rate',
         usdtCnyExchangeRateHint: 'Used to convert RMB package amounts into payable USDT for recharge orders',
+        rechargeBonusThreshold: 'Recharge Bonus Threshold',
+        rechargeBonusAmount: 'Bonus Per Step',
+        rechargeBonusHint: 'Current rule: every {threshold} RMB gives {amount} USD balance. Set 0 to disable the bonus.',
         marketplaceGroupMultipliers: {
           title: 'Model Marketplace Group Multipliers',
           description: 'Configure the group multiplier used by the model marketplace. Platform price = official price x group multiplier / USD-CNY rate.',
@@ -7289,11 +7292,12 @@ export default {
     rechargeValueTitle: '1 RMB = 1 USD balance',
     paymentRailTitle: 'Payment rails',
     paymentRailRmb: 'RMB recharge',
-    paymentRailRmbDesc: 'RMB recharge is being prepared and will be available later.',
+    paymentRailRmbDesc: 'Available now through enabled local payment methods.',
     paymentRailUsdt: 'USDT recharge',
     paymentRailUsdtDesc: 'Available now for overseas users and crypto transfers.',
     paymentRailOpen: 'Available now',
     paymentRailComingSoon: 'Coming soon',
+    paymentRailUnavailable: 'Coming soon',
     packageTitle: 'Recharge packages',
     packageSubtitle: 'Choose a common amount or enter a custom recharge.',
     packageStarter: 'Starter',
@@ -7304,8 +7308,11 @@ export default {
     packageBestValue: 'Best value',
     payRmb: 'Pay RMB',
     usdtEquivalent: 'Approx. {amount}',
+    rmbOnlinePayHint: 'Online RMB payment',
     usdtPayAmount: 'Payable USDT',
     receiveUsd: 'Receive USD balance',
+    rechargeBonus: 'Bonus balance',
+    rechargeBonusBadge: 'Bonus {amount}',
     customRechargeTitle: 'Custom recharge',
     customRechargeDescription: 'Enter a custom RMB amount when you need a more flexible balance.',
     checkoutSummary: 'Checkout summary',

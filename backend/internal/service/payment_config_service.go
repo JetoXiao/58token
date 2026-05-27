@@ -26,6 +26,8 @@ const (
 	SettingBalancePayDisabled          = "BALANCE_PAYMENT_DISABLED"
 	SettingBalanceRechargeMult         = "BALANCE_RECHARGE_MULTIPLIER"
 	SettingRechargeFeeRate             = "RECHARGE_FEE_RATE"
+	SettingRechargeBonusThreshold      = "RECHARGE_BONUS_THRESHOLD"
+	SettingRechargeBonusAmount         = "RECHARGE_BONUS_AMOUNT"
 	SettingUsdtCnyExchangeRate         = "USDT_CNY_EXCHANGE_RATE"
 	SettingMarketplaceGroupMultipliers = "MARKETPLACE_GROUP_MULTIPLIERS"
 	SettingProductNamePrefix           = "PRODUCT_NAME_PREFIX"
@@ -58,6 +60,8 @@ type PaymentConfig struct {
 	BalanceDisabled             bool               `json:"balance_disabled"`
 	BalanceRechargeMultiplier   float64            `json:"balance_recharge_multiplier"`
 	RechargeFeeRate             float64            `json:"recharge_fee_rate"`
+	RechargeBonusThreshold      float64            `json:"recharge_bonus_threshold"`
+	RechargeBonusAmount         float64            `json:"recharge_bonus_amount"`
 	UsdtCnyExchangeRate         float64            `json:"usdt_cny_exchange_rate"`
 	MarketplaceGroupMultipliers map[string]float64 `json:"marketplace_group_multipliers"`
 	LoadBalanceStrategy         string             `json:"load_balance_strategy"`
@@ -90,6 +94,8 @@ type UpdatePaymentConfigRequest struct {
 	BalanceDisabled             *bool              `json:"balance_disabled"`
 	BalanceRechargeMultiplier   *float64           `json:"balance_recharge_multiplier"`
 	RechargeFeeRate             *float64           `json:"recharge_fee_rate"`
+	RechargeBonusThreshold      *float64           `json:"recharge_bonus_threshold"`
+	RechargeBonusAmount         *float64           `json:"recharge_bonus_amount"`
 	UsdtCnyExchangeRate         *float64           `json:"usdt_cny_exchange_rate"`
 	MarketplaceGroupMultipliers map[string]float64 `json:"marketplace_group_multipliers"`
 	LoadBalanceStrategy         *string            `json:"load_balance_strategy"`
@@ -211,7 +217,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 	keys := []string{
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
-		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeFeeRate, SettingUsdtCnyExchangeRate, SettingMarketplaceGroupMultipliers, SettingLoadBalanceStrategy,
+		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeFeeRate, SettingRechargeBonusThreshold, SettingRechargeBonusAmount, SettingUsdtCnyExchangeRate, SettingMarketplaceGroupMultipliers, SettingLoadBalanceStrategy,
 		SettingProductNamePrefix, SettingProductNameSuffix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
@@ -241,6 +247,8 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		BalanceDisabled:             vals[SettingBalancePayDisabled] == "true",
 		BalanceRechargeMultiplier:   normalizeBalanceRechargeMultiplier(pcParseFloat(vals[SettingBalanceRechargeMult], defaultBalanceRechargeMultiplier)),
 		RechargeFeeRate:             pcParseFloat(vals[SettingRechargeFeeRate], 0),
+		RechargeBonusThreshold:      normalizeRechargeBonusThreshold(pcParseFloat(vals[SettingRechargeBonusThreshold], defaultRechargeBonusThreshold)),
+		RechargeBonusAmount:         normalizeRechargeBonusAmount(pcParseFloat(vals[SettingRechargeBonusAmount], defaultRechargeBonusAmount)),
 		UsdtCnyExchangeRate:         normalizeUsdtCnyExchangeRate(pcParseFloat(vals[SettingUsdtCnyExchangeRate], defaultUsdtCnyExchangeRate)),
 		MarketplaceGroupMultipliers: parseMarketplaceGroupMultipliers(vals[SettingMarketplaceGroupMultipliers]),
 		LoadBalanceStrategy:         vals[SettingLoadBalanceStrategy],
@@ -313,6 +321,18 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 			return infraerrors.BadRequest("INVALID_RECHARGE_FEE_RATE", "recharge fee rate allows at most 2 decimal places")
 		}
 	}
+	if req.RechargeBonusThreshold != nil {
+		v := *req.RechargeBonusThreshold
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+			return infraerrors.BadRequest("INVALID_RECHARGE_BONUS_THRESHOLD", "recharge bonus threshold must be a non-negative number")
+		}
+	}
+	if req.RechargeBonusAmount != nil {
+		v := *req.RechargeBonusAmount
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+			return infraerrors.BadRequest("INVALID_RECHARGE_BONUS_AMOUNT", "recharge bonus amount must be a non-negative number")
+		}
+	}
 	if req.UsdtCnyExchangeRate != nil {
 		v := *req.UsdtCnyExchangeRate
 		if math.IsNaN(v) || math.IsInf(v, 0) || v <= 0 {
@@ -340,6 +360,8 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		SettingBalancePayDisabled:                formatBoolOrEmpty(req.BalanceDisabled),
 		SettingBalanceRechargeMult:               formatPositiveFloat(req.BalanceRechargeMultiplier),
 		SettingRechargeFeeRate:                   formatNonNegativeFloat(req.RechargeFeeRate),
+		SettingRechargeBonusThreshold:            formatNonNegativeFloat(req.RechargeBonusThreshold),
+		SettingRechargeBonusAmount:               formatNonNegativeFloat(req.RechargeBonusAmount),
 		SettingUsdtCnyExchangeRate:               formatPositiveFloat(req.UsdtCnyExchangeRate),
 		SettingLoadBalanceStrategy:               derefStr(req.LoadBalanceStrategy),
 		SettingProductNamePrefix:                 derefStr(req.ProductNamePrefix),

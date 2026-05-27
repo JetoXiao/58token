@@ -520,6 +520,8 @@ export interface SystemSettings {
   payment_balance_disabled: boolean;
   payment_balance_recharge_multiplier: number;
   payment_recharge_fee_rate: number;
+  payment_recharge_bonus_threshold: number;
+  payment_recharge_bonus_amount: number;
   payment_usdt_cny_exchange_rate: number;
   payment_marketplace_group_multipliers: Record<string, number>;
   payment_load_balance_strategy: string;
@@ -743,6 +745,8 @@ export interface UpdateSettingsRequest {
   payment_balance_disabled?: boolean;
   payment_balance_recharge_multiplier?: number;
   payment_recharge_fee_rate?: number;
+  payment_recharge_bonus_threshold?: number;
+  payment_recharge_bonus_amount?: number;
   payment_usdt_cny_exchange_rate?: number;
   payment_marketplace_group_multipliers?: Record<string, number>;
   payment_load_balance_strategy?: string;

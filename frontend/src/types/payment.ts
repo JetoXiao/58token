@@ -68,6 +68,8 @@ export interface CheckoutInfoResponse {
   balance_disabled: boolean
   balance_recharge_multiplier: number
   recharge_fee_rate: number
+  recharge_bonus_threshold: number
+  recharge_bonus_amount: number
   usdt_cny_exchange_rate: number
   help_text: string
   help_image_url: string

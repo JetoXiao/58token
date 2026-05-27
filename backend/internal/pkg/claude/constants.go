@@ -169,8 +169,11 @@ const DefaultTestModel = "claude-sonnet-4-5-20250929"
 // ModelIDOverrides Claude OAuth 请求需要的模型 ID 映射
 var ModelIDOverrides = map[string]string{
 	"claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
+	"claude-sonnet-4.5": "claude-sonnet-4-5-20250929",
 	"claude-opus-4-5":   "claude-opus-4-5-20251101",
+	"claude-opus-4.5":   "claude-opus-4-5-20251101",
 	"claude-haiku-4-5":  "claude-haiku-4-5-20251001",
+	"claude-haiku-4.5":  "claude-haiku-4-5-20251001",
 }
 
 // ModelIDReverseOverrides 用于将上游模型 ID 还原为短名

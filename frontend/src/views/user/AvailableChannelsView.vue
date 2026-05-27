@@ -218,13 +218,19 @@ import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import MarketingNavbar from '@/components/marketing/MarketingNavbar.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ModelIcon from '@/components/common/ModelIcon.vue'
-import { paymentAPI } from '@/api/payment'
 import { useClipboard } from '@/composables/useClipboard'
 import { BRAND_LOGO_URL } from '@/constants/brand'
+import type { PaymentConfig } from '@/types/payment'
 
 type CurrencyMode = 'usd' | 'cny'
 type ViewMode = 'cards' | 'table'
 type PriceKey = 'input' | 'output' | 'cacheWrite' | 'cacheRead'
+type OfficialPrice = number | PriceTier[] | null
+
+interface PriceTier {
+  label: string
+  value: number
+}
 
 interface FilterOption {
   value: string
@@ -250,13 +256,14 @@ interface PricingResponse {
 
 interface MarketplaceModel {
   modelName: string
+  pricingAliases: string[]
   vendorName: string
   group: string
   groupMultiplier: number
   capabilities: string[]
   billingLabel: string
   description: string
-  prices: Record<PriceKey, number | null>
+  prices: Record<PriceKey, OfficialPrice>
   requestPrice: number | null
   searchText: string
 }
@@ -273,10 +280,10 @@ interface PriceRow {
 const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fallback', data: [] }
 
 const MARKETPLACE_MODEL_DEFS = [
-  { modelName: 'claude-opus-4-7', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-opus-4-6', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-sonnet-4-6', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-haiku-4-5', vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,200K', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-opus-4.7', pricingAliases: ['claude-opus-4-7'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-opus-4.6', pricingAliases: ['claude-opus-4-6'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-sonnet-4.6', pricingAliases: ['claude-sonnet-4-6'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
+  { modelName: 'claude-haiku-4.5', pricingAliases: ['claude-haiku-4-5'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,200K', endpoints: ['anthropic', 'openai'] },
   { modelName: 'gpt-5.5', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,1.1M', endpoints: ['openai'] },
   { modelName: 'gpt-5.4', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
   { modelName: 'gpt-5.4-mini', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
@@ -284,13 +291,23 @@ const MARKETPLACE_MODEL_DEFS = [
   { modelName: 'gpt-5.3-codex', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Vision,400K', endpoints: ['openai'] }
 ] as const
 
-const OFFICIAL_MODEL_PRICES: Record<string, Record<PriceKey, number | null>> = {
-  'claude-opus-4-7': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
-  'claude-opus-4-6': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
-  'claude-sonnet-4-6': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
-  'claude-haiku-4-5': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
-  'gpt-5.5': { input: 2.5, output: 15, cacheWrite: null, cacheRead: 0.25 },
-  'gpt-5.4': { input: 2.5, output: 15, cacheWrite: null, cacheRead: 0.25 },
+const OFFICIAL_MODEL_PRICES: Record<string, Record<PriceKey, OfficialPrice>> = {
+  'claude-opus-4.7': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  'claude-opus-4.6': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+  'claude-sonnet-4.6': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  'claude-haiku-4.5': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
+  'gpt-5.5': {
+    input: [{ label: '<=272K', value: 5 }, { label: '>272K', value: 10 }],
+    output: [{ label: '<=272K', value: 30 }, { label: '>272K', value: 45 }],
+    cacheWrite: null,
+    cacheRead: [{ label: '<=272K', value: 0.5 }, { label: '>272K', value: 1 }]
+  },
+  'gpt-5.4': {
+    input: [{ label: '<=272K', value: 2.5 }, { label: '>272K', value: 5 }],
+    output: [{ label: '<=272K', value: 15 }, { label: '>272K', value: 22.5 }],
+    cacheWrite: null,
+    cacheRead: [{ label: '<=272K', value: 0.25 }, { label: '>272K', value: 0.5 }]
+  },
   'gpt-5.4-mini': { input: 0.75, output: 4.5, cacheWrite: null, cacheRead: 0.075 },
   'gpt-5.2': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 },
   'gpt-5.3-codex': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 }
@@ -411,7 +428,7 @@ const selectedGroup = ref(DEFAULT_GROUP)
 const selectedCapability = ref('')
 const viewMode = ref<ViewMode>('cards')
 const currencyMode = ref<CurrencyMode>('usd')
-const usdToCnyRate = ref(7.2)
+const usdToCnyRate = ref(7)
 const marketplaceGroupMultipliers = ref<Record<string, number>>({ ...DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS })
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
@@ -445,15 +462,18 @@ const viewItems = computed(() => [
 ])
 
 const marketplaceModels = computed<MarketplaceModel[]>(() => MARKETPLACE_MODEL_DEFS.flatMap((definition) => {
-  const pricingModel = rawPricing.value.data?.find((item) => item.model_name.toLowerCase() === definition.modelName.toLowerCase())
+  const configuredAliases = 'pricingAliases' in definition ? definition.pricingAliases : undefined
+  const pricingAliases = modelPricingAliases(definition.modelName, configuredAliases)
+  const pricingModel = rawPricing.value.data?.find((item) => pricingAliases.includes(item.model_name.toLowerCase()))
   const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
   const description = pricingModel?.description || modelDescription(definition.modelName)
-  const prices = OFFICIAL_MODEL_PRICES[definition.modelName]
+  const prices = officialPricesFor(pricingAliases)
 
   return definition.groups.map((group) => {
     const groupMultiplier = groupMultiplierFor(group)
     return {
       modelName: definition.modelName,
+      pricingAliases,
       vendorName: definition.vendorName,
       group,
       groupMultiplier,
@@ -462,7 +482,7 @@ const marketplaceModels = computed<MarketplaceModel[]>(() => MARKETPLACE_MODEL_D
       description,
       prices,
       requestPrice: null,
-      searchText: [definition.modelName, definition.vendorName, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
+      searchText: [definition.modelName, ...pricingAliases, definition.vendorName, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
     }
   })
 }))
@@ -551,6 +571,20 @@ function parseCapabilities(tags: string, endpoints: string[]): string[] {
   return Array.from(new Set([...tagItems, ...endpointItems]))
 }
 
+function modelPricingAliases(modelName: string, configuredAliases: readonly string[] | undefined): string[] {
+  const aliases = [modelName, ...(configuredAliases || []), modelName.replace(/-(\d+)\.(\d+)(?=$|-)/g, '-$1-$2')]
+  return Array.from(new Set(aliases.map((alias) => alias.toLowerCase())))
+}
+
+function officialPricesFor(aliases: string[]): Record<PriceKey, OfficialPrice> {
+  return aliases.map((alias) => OFFICIAL_MODEL_PRICES[alias]).find(Boolean) || {
+    input: null,
+    output: null,
+    cacheWrite: null,
+    cacheRead: null
+  }
+}
+
 function modelDescription(modelName: string): string {
   if (modelName.includes('claude')) return t('availableChannels.modelDescriptions.anthropic')
   if (modelName.includes('gpt') || modelName.includes('codex')) return t('availableChannels.modelDescriptions.openai')
@@ -563,7 +597,7 @@ function groupMultiplierFor(group: string): number {
 }
 
 function itemDiscountLabel(item: MarketplaceModel): string {
-  const official = Object.values(item.prices).find((price): price is number => price != null && Number.isFinite(price)) ?? null
+  const official = firstOfficialPrice(item.prices)
   return discountLabel(official, platformPrice(official, item.groupMultiplier))
 }
 
@@ -576,29 +610,52 @@ function priceRows(item: MarketplaceModel): PriceRow[] {
   ].filter((row) => row.platform !== '-')
 }
 
-function makePriceRow(item: MarketplaceModel, key: string, label: string, value: number | null): PriceRow {
-  const platformValue = platformPrice(value, item.groupMultiplier)
+function makePriceRow(item: MarketplaceModel, key: string, label: string, value: OfficialPrice): PriceRow {
+  const firstValue = firstPriceValue(value)
   return {
     key,
     label,
-    platform: formatPrice(platformValue),
-    official: value == null ? t('availableChannels.pricing.noOfficialPrice') : t('availableChannels.pricing.officialPrice', { price: formatPrice(value) }),
-    discount: discountLabel(value, platformValue),
+    platform: formatPlatformPrice(value, item.groupMultiplier),
+    official: value == null ? t('availableChannels.pricing.noOfficialPrice') : t('availableChannels.pricing.officialPrice', { price: formatOfficialPrice(value) }),
+    discount: discountLabel(firstValue, platformPrice(firstValue, item.groupMultiplier)),
     unit: key === 'request' ? t('availableChannels.pricing.unitPerRequest') : t('availableChannels.pricing.unitPerMillion')
   }
 }
 
 function tablePrice(item: MarketplaceModel, key: PriceKey): string {
-  const official = item.prices[key]
-  const platform = platformPrice(official, item.groupMultiplier)
-  if (platform == null) return '-'
-  return formatPrice(platform)
+  return formatPlatformPrice(item.prices[key], item.groupMultiplier)
 }
 
 function formatPrice(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '-'
   if (currencyMode.value === 'cny') return `\u00A5${trimNumber(value * usdToCnyRate.value, 4)}`
   return `$${value.toFixed(2)}`
+}
+
+function formatOfficialPrice(value: OfficialPrice): string {
+  if (value == null) return '-'
+  if (typeof value === 'number') return formatPrice(value)
+  return value.map((tier) => `${tier.label} ${formatPrice(tier.value)}`).join(' / ')
+}
+
+function formatPlatformPrice(value: OfficialPrice, multiplier: number): string {
+  if (value == null) return '-'
+  if (typeof value === 'number') return formatPrice(platformPrice(value, multiplier))
+  return value.map((tier) => `${tier.label} ${formatPrice(platformPrice(tier.value, multiplier))}`).join(' / ')
+}
+
+function firstPriceValue(value: OfficialPrice): number | null {
+  if (value == null) return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  return value.find((tier) => Number.isFinite(tier.value))?.value ?? null
+}
+
+function firstOfficialPrice(prices: Record<PriceKey, OfficialPrice>): number | null {
+  for (const value of Object.values(prices)) {
+    const first = firstPriceValue(value)
+    if (first != null) return first
+  }
+  return null
 }
 
 function platformPrice(officialPrice: number | null, multiplier: number): number | null {
@@ -642,12 +699,12 @@ async function loadPricingConfig() {
   loading.value = true
   try {
     const [paymentConfig, pricing] = await Promise.all([
-      paymentAPI.getConfig(),
+      loadMarketplacePaymentConfig(),
       axios.get<PricingResponse>('/api/v1/public/model-pricing', { timeout: 12000 }).catch(() => ({ data: FALLBACK_PRICING }))
     ])
-    const configuredRate = Number(paymentConfig.data?.usdt_cny_exchange_rate)
+    const configuredRate = Number(paymentConfig?.usdt_cny_exchange_rate)
     if (Number.isFinite(configuredRate) && configuredRate > 0) usdToCnyRate.value = configuredRate
-    marketplaceGroupMultipliers.value = normalizeMarketplaceGroupMultipliers(paymentConfig.data?.marketplace_group_multipliers)
+    marketplaceGroupMultipliers.value = normalizeMarketplaceGroupMultipliers(paymentConfig?.marketplace_group_multipliers)
     rawPricing.value = pricing.data?.data?.length ? pricing.data : FALLBACK_PRICING
   } catch (error) {
     console.error('Failed to load model marketplace config:', error)
@@ -655,6 +712,33 @@ async function loadPricingConfig() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadMarketplacePaymentConfig(): Promise<PaymentConfig | null> {
+  const token = localStorage.getItem('auth_token')
+  if (!token) return null
+
+  try {
+    const response = await axios.get('/api/v1/payment/config', {
+      timeout: 12000,
+      withCredentials: true,
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    return unwrapPaymentConfig(response.data)
+  } catch {
+    return null
+  }
+}
+
+function unwrapPaymentConfig(payload: unknown): PaymentConfig | null {
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const data = record.data
+  if (data && typeof data === 'object') return data as PaymentConfig
+  if ('usdt_cny_exchange_rate' in record || 'marketplace_group_multipliers' in record) {
+    return record as unknown as PaymentConfig
+  }
+  return null
 }
 
 function normalizeMarketplaceGroupMultipliers(raw: Record<string, number> | undefined): Record<string, number> {

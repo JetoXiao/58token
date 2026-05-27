@@ -99,6 +99,12 @@ func TestParsePaymentConfig(t *testing.T) {
 		if cfg.LoadBalanceStrategy != payment.DefaultLoadBalanceStrategy {
 			t.Fatalf("expected LoadBalanceStrategy=%s, got %q", payment.DefaultLoadBalanceStrategy, cfg.LoadBalanceStrategy)
 		}
+		if cfg.RechargeBonusThreshold != 100 {
+			t.Fatalf("expected RechargeBonusThreshold=100, got %v", cfg.RechargeBonusThreshold)
+		}
+		if cfg.RechargeBonusAmount != 10 {
+			t.Fatalf("expected RechargeBonusAmount=10, got %v", cfg.RechargeBonusAmount)
+		}
 		if len(cfg.EnabledTypes) != 0 {
 			t.Fatalf("expected empty EnabledTypes, got %v", cfg.EnabledTypes)
 		}
@@ -107,17 +113,19 @@ func TestParsePaymentConfig(t *testing.T) {
 	t.Run("all values populated", func(t *testing.T) {
 		t.Parallel()
 		vals := map[string]string{
-			SettingPaymentEnabled:      "true",
-			SettingMinRechargeAmount:   "5.00",
-			SettingMaxRechargeAmount:   "1000.00",
-			SettingDailyRechargeLimit:  "5000.00",
-			SettingOrderTimeoutMinutes: "15",
-			SettingMaxPendingOrders:    "5",
-			SettingEnabledPaymentTypes: "alipay,wxpay,stripe",
-			SettingBalancePayDisabled:  "true",
-			SettingLoadBalanceStrategy: "least_amount",
-			SettingProductNamePrefix:   "PRE",
-			SettingProductNameSuffix:   "SUF",
+			SettingPaymentEnabled:         "true",
+			SettingMinRechargeAmount:      "5.00",
+			SettingMaxRechargeAmount:      "1000.00",
+			SettingDailyRechargeLimit:     "5000.00",
+			SettingOrderTimeoutMinutes:    "15",
+			SettingMaxPendingOrders:       "5",
+			SettingEnabledPaymentTypes:    "alipay,wxpay,stripe",
+			SettingBalancePayDisabled:     "true",
+			SettingRechargeBonusThreshold: "200",
+			SettingRechargeBonusAmount:    "25",
+			SettingLoadBalanceStrategy:    "least_amount",
+			SettingProductNamePrefix:      "PRE",
+			SettingProductNameSuffix:      "SUF",
 		}
 		cfg := svc.parsePaymentConfig(vals)
 
@@ -147,6 +155,12 @@ func TestParsePaymentConfig(t *testing.T) {
 		}
 		if !cfg.BalanceDisabled {
 			t.Fatal("expected BalanceDisabled=true")
+		}
+		if cfg.RechargeBonusThreshold != 200 {
+			t.Fatalf("RechargeBonusThreshold = %v, want 200", cfg.RechargeBonusThreshold)
+		}
+		if cfg.RechargeBonusAmount != 25 {
+			t.Fatalf("RechargeBonusAmount = %v, want 25", cfg.RechargeBonusAmount)
 		}
 		if cfg.LoadBalanceStrategy != "least_amount" {
 			t.Fatalf("LoadBalanceStrategy = %q, want %q", cfg.LoadBalanceStrategy, "least_amount")
