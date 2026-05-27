@@ -18,7 +18,7 @@
         <span v-if="row.fee_rate > 0" class="ml-1 text-xs text-gray-400" :title="t('payment.orders.fee') + ': ' + row.fee_rate + '%'">
           ({{ t('payment.orders.fee') }} {{ row.fee_rate }}%)
         </span>
-        <div v-if="row.amount !== row.pay_amount" class="text-xs text-gray-500">
+        <div v-if="shouldShowCreditedAmount(row)" class="text-xs text-gray-500">
           {{ t('payment.orders.creditedAmount') }}: {{ formatOrderCreditedAmount(row) }}
         </div>
       </div>
@@ -56,6 +56,10 @@ const props = defineProps<{
 }>()
 
 function formatDate(dateStr: string) { return new Date(dateStr).toLocaleString() }
+
+function shouldShowCreditedAmount(row: PaymentOrder): boolean {
+  return row.order_type === 'balance' || row.amount !== row.pay_amount
+}
 
 const columns = computed((): Column[] => {
   const cols: Column[] = [
