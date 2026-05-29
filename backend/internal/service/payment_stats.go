@@ -12,6 +12,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 )
 
 // --- Dashboard & Analytics ---
@@ -36,8 +37,9 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 		return nil, err
 	}
 
+	exchangeRate := s.dashboardUsdtCnyExchangeRate(ctx)
 	st := &DashboardStats{}
-	computeBasicStats(st, orders, todayStart)
+	computeBasicStats(st, orders, todayStart, exchangeRate)
 
 	st.PendingOrders, err = s.entClient.PaymentOrder.Query().
 		Where(paymentorder.StatusEQ(OrderStatusPending)).
@@ -46,20 +48,35 @@ func (s *PaymentService) GetDashboardStats(ctx context.Context, days int) (*Dash
 		return nil, err
 	}
 
-	st.DailySeries = buildDailySeries(orders, since, days)
-	st.PaymentMethods = buildMethodDistribution(orders)
-	st.TopUsers = buildTopUsers(orders)
+	st.DailySeries = buildDailySeries(orders, since, days, exchangeRate)
+	st.PaymentMethods = buildMethodDistribution(orders, exchangeRate)
+	st.TopUsers = buildTopUsers(orders, exchangeRate)
 
 	return st, nil
 }
 
-func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todayStart time.Time) {
+func (s *PaymentService) dashboardUsdtCnyExchangeRate(ctx context.Context) float64 {
+	if s == nil || s.configService == nil {
+		return normalizeUsdtCnyExchangeRate(defaultUsdtCnyExchangeRate)
+	}
+	cfg, err := s.configService.GetPaymentConfig(ctx)
+	if err != nil || cfg == nil {
+		if err != nil {
+			slog.Warn("payment dashboard: failed to load exchange rate, using default", "error", err)
+		}
+		return normalizeUsdtCnyExchangeRate(defaultUsdtCnyExchangeRate)
+	}
+	return normalizeUsdtCnyExchangeRate(cfg.UsdtCnyExchangeRate)
+}
+
+func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todayStart time.Time, exchangeRate float64) {
 	var totalAmount, todayAmount float64
 	var todayCount int
 	for _, o := range orders {
-		totalAmount += o.PayAmount
+		amountCNY := paymentOrderAmountCNY(o, exchangeRate)
+		totalAmount += amountCNY
 		if o.PaidAt != nil && !o.PaidAt.Before(todayStart) {
-			todayAmount += o.PayAmount
+			todayAmount += amountCNY
 			todayCount++
 		}
 	}
@@ -72,7 +89,7 @@ func computeBasicStats(st *DashboardStats, orders []*dbent.PaymentOrder, todaySt
 	}
 }
 
-func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int) []DailyStats {
+func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int, exchangeRate float64) []DailyStats {
 	dailyMap := make(map[string]*DailyStats)
 	for _, o := range orders {
 		if o.PaidAt == nil {
@@ -84,7 +101,7 @@ func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int) [
 			ds = &DailyStats{Date: date}
 			dailyMap[date] = ds
 		}
-		ds.Amount += o.PayAmount
+		ds.Amount += paymentOrderAmountCNY(o, exchangeRate)
 		ds.Count++
 	}
 	series := make([]DailyStats, 0, days)
@@ -100,26 +117,28 @@ func buildDailySeries(orders []*dbent.PaymentOrder, since time.Time, days int) [
 	return series
 }
 
-func buildMethodDistribution(orders []*dbent.PaymentOrder) []PaymentMethodStat {
+func buildMethodDistribution(orders []*dbent.PaymentOrder, exchangeRate float64) []PaymentMethodStat {
 	methodMap := make(map[string]*PaymentMethodStat)
 	for _, o := range orders {
 		ms, ok := methodMap[o.PaymentType]
 		if !ok {
-			ms = &PaymentMethodStat{Type: o.PaymentType}
+			ms = &PaymentMethodStat{Type: o.PaymentType, Currency: paymentOrderDisplayCurrency(o)}
 			methodMap[o.PaymentType] = ms
 		}
 		ms.Amount += o.PayAmount
+		ms.AmountCNY += paymentOrderAmountCNY(o, exchangeRate)
 		ms.Count++
 	}
 	methods := make([]PaymentMethodStat, 0, len(methodMap))
 	for _, ms := range methodMap {
 		ms.Amount = math.Round(ms.Amount*100) / 100
+		ms.AmountCNY = math.Round(ms.AmountCNY*100) / 100
 		methods = append(methods, *ms)
 	}
 	return methods
 }
 
-func buildTopUsers(orders []*dbent.PaymentOrder) []TopUserStat {
+func buildTopUsers(orders []*dbent.PaymentOrder, exchangeRate float64) []TopUserStat {
 	userMap := make(map[int64]*TopUserStat)
 	for _, o := range orders {
 		us, ok := userMap[o.UserID]
@@ -127,11 +146,18 @@ func buildTopUsers(orders []*dbent.PaymentOrder) []TopUserStat {
 			us = &TopUserStat{UserID: o.UserID, Email: o.UserEmail}
 			userMap[o.UserID] = us
 		}
-		us.Amount += o.PayAmount
+		if paymentOrderIsUSDT(o) {
+			us.USDTAmount += o.PayAmount
+		} else {
+			us.RMBAmount += o.PayAmount
+		}
+		us.Amount += paymentOrderAmountCNY(o, exchangeRate)
 	}
 	userList := make([]*TopUserStat, 0, len(userMap))
 	for _, us := range userMap {
 		us.Amount = math.Round(us.Amount*100) / 100
+		us.RMBAmount = math.Round(us.RMBAmount*100) / 100
+		us.USDTAmount = math.Round(us.USDTAmount*100) / 100
 		userList = append(userList, us)
 	}
 	sort.Slice(userList, func(i, j int) bool {
@@ -146,6 +172,36 @@ func buildTopUsers(orders []*dbent.PaymentOrder) []TopUserStat {
 		result = append(result, *userList[i])
 	}
 	return result
+}
+
+func paymentOrderAmountCNY(o *dbent.PaymentOrder, exchangeRate float64) float64 {
+	if o == nil {
+		return 0
+	}
+	if paymentOrderIsUSDT(o) {
+		return o.PayAmount * normalizeUsdtCnyExchangeRate(exchangeRate)
+	}
+	return o.PayAmount
+}
+
+func paymentOrderDisplayCurrency(o *dbent.PaymentOrder) string {
+	if paymentOrderIsUSDT(o) {
+		return "USD"
+	}
+	return payment.DefaultPaymentCurrency
+}
+
+func paymentOrderIsUSDT(o *dbent.PaymentOrder) bool {
+	if o == nil {
+		return false
+	}
+	if payment.GetBasePaymentType(o.PaymentType) == payment.TypeUSDT {
+		return true
+	}
+	if o.ProviderKey != nil && payment.GetBasePaymentType(*o.ProviderKey) == payment.TypeUSDT {
+		return true
+	}
+	return PaymentOrderCurrency(o) == payment.TypeUSDT
 }
 
 // --- Audit Logs ---

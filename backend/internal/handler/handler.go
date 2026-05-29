@@ -57,6 +57,7 @@ type Handlers struct {
 	PaymentWebhook   *PaymentWebhookHandler
 	AvailableChannel *AvailableChannelHandler
 	ModelPricing     *ModelPricingHandler
+	ModelMarketplace *ModelMarketplaceHandler
 }
 
 // BuildInfo contains build-time information

@@ -42,7 +42,7 @@
                   <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('payment.methods.' + method.type, method.type) }}</span>
                 </div>
                 <div class="text-right">
-                  <span class="text-sm font-medium text-gray-900 dark:text-white">&yen;{{ method.amount.toFixed(2) }}</span>
+                  <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formatPaymentMethodAmount(method) }}</span>
                   <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">({{ method.count }})</span>
                 </div>
               </div>
@@ -57,7 +57,7 @@
                   <span :class="['flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold', rankClass(idx)]">{{ idx + 1 }}</span>
                   <span class="text-sm text-gray-700 dark:text-gray-300">{{ user.email }}</span>
                 </div>
-                <span class="text-sm font-medium text-gray-900 dark:text-white">&yen;{{ user.amount.toFixed(2) }}</span>
+                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ formatTopUserAmount(user) }}</span>
               </div>
             </div>
           </div>
@@ -102,6 +102,32 @@ function rankClass(idx: number): string {
   if (idx === 1) return 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
   if (idx === 2) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
   return 'bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-gray-400'
+}
+
+function formatPaymentMethodAmount(method: DashboardStats['payment_methods'][number]): string {
+  return formatCurrencyAmount(method.amount, method.currency)
+}
+
+function formatTopUserAmount(user: DashboardStats['top_users'][number]): string {
+  const rmb = user.rmb_amount || 0
+  const usdt = user.usdt_amount || 0
+  if (rmb > 0 && usdt > 0) {
+    return `¥${formatMoney(rmb)} / $${formatMoney(usdt)}`
+  }
+  if (usdt > 0) {
+    return `$${formatMoney(usdt)}`
+  }
+  return `¥${formatMoney(rmb || user.amount)}`
+}
+
+function formatCurrencyAmount(amount: number, currency?: string): string {
+  const normalized = (currency || 'CNY').toUpperCase()
+  const symbol = normalized === 'USD' || normalized === 'USDT' ? '$' : '¥'
+  return `${symbol}${formatMoney(amount)}`
+}
+
+function formatMoney(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : '0.00'
 }
 
 async function loadDashboard() {

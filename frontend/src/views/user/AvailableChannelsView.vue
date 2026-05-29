@@ -254,6 +254,24 @@ interface PricingResponse {
   pricing_version?: string
 }
 
+interface MarketplaceItemResponse {
+  id: number
+  model_name: string
+  pricing_aliases?: string[]
+  vendor_name: string
+  groups: string[]
+  tags: string[]
+  endpoints: string[]
+  description?: string
+  official_prices: Record<PriceKey, OfficialPrice>
+  sort_order: number
+  enabled: boolean
+}
+
+interface MarketplaceResponse {
+  items: MarketplaceItemResponse[]
+}
+
 interface MarketplaceModel {
   modelName: string
   pricingAliases: string[]
@@ -279,52 +297,7 @@ interface PriceRow {
 
 const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fallback', data: [] }
 
-const MARKETPLACE_MODEL_DEFS = [
-  { modelName: 'claude-opus-4.7', pricingAliases: ['claude-opus-4-7'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-opus-4.6', pricingAliases: ['claude-opus-4-6'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-sonnet-4.6', pricingAliases: ['claude-sonnet-4-6'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,1M', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'claude-haiku-4.5', pricingAliases: ['claude-haiku-4-5'], vendorName: 'Anthropic', groups: ['Claude Lite', 'Claude Plus', 'Claude Max'], tags: 'Reasoning,Tools,Files,Vision,200K', endpoints: ['anthropic', 'openai'] },
-  { modelName: 'gpt-5.5', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,1.1M', endpoints: ['openai'] },
-  { modelName: 'gpt-5.4', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
-  { modelName: 'gpt-5.4-mini', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
-  { modelName: 'gpt-5.2', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Files,Vision,400K', endpoints: ['openai'] },
-  { modelName: 'gpt-5.3-codex', vendorName: 'OpenAI', groups: ['Codex Lite', 'Codex Pro'], tags: 'Reasoning,Tools,Vision,400K', endpoints: ['openai'] }
-] as const
-
-const OFFICIAL_MODEL_PRICES: Record<string, Record<PriceKey, OfficialPrice>> = {
-  'claude-opus-4.7': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
-  'claude-opus-4.6': { input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 },
-  'claude-sonnet-4.6': { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 },
-  'claude-haiku-4.5': { input: 1, output: 5, cacheWrite: 1.25, cacheRead: 0.1 },
-  'gpt-5.5': {
-    input: [{ label: '<=272K', value: 5 }, { label: '>272K', value: 10 }],
-    output: [{ label: '<=272K', value: 30 }, { label: '>272K', value: 45 }],
-    cacheWrite: null,
-    cacheRead: [{ label: '<=272K', value: 0.5 }, { label: '>272K', value: 1 }]
-  },
-  'gpt-5.4': {
-    input: [{ label: '<=272K', value: 2.5 }, { label: '>272K', value: 5 }],
-    output: [{ label: '<=272K', value: 15 }, { label: '>272K', value: 22.5 }],
-    cacheWrite: null,
-    cacheRead: [{ label: '<=272K', value: 0.25 }, { label: '>272K', value: 0.5 }]
-  },
-  'gpt-5.4-mini': { input: 0.75, output: 4.5, cacheWrite: null, cacheRead: 0.075 },
-  'gpt-5.2': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 },
-  'gpt-5.3-codex': { input: 1.75, output: 14, cacheWrite: null, cacheRead: 0.175 }
-}
-
-const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {
-  'Claude Lite': 1,
-  'Claude Plus': 1,
-  'Claude Max': 1,
-  'Codex Lite': 1,
-  'Codex Pro': 1
-}
-
-const DEFAULT_PROVIDER = 'OpenAI'
-const DEFAULT_GROUP = 'Codex Lite'
-const PROVIDER_ORDER = ['OpenAI', 'Anthropic']
-const GROUP_ORDER = ['Codex Lite', 'Codex Pro', 'Claude Lite', 'Claude Plus', 'Claude Max']
+const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {}
 
 const FilterBlock = defineComponent({
   name: 'FilterBlock',
@@ -421,10 +394,11 @@ const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 
 const rawPricing = ref<PricingResponse>(FALLBACK_PRICING)
+const marketplaceItems = ref<MarketplaceItemResponse[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const selectedProvider = ref(DEFAULT_PROVIDER)
-const selectedGroup = ref(DEFAULT_GROUP)
+const selectedProvider = ref('')
+const selectedGroup = ref('')
 const selectedCapability = ref('')
 const viewMode = ref<ViewMode>('cards')
 const currencyMode = ref<CurrencyMode>('usd')
@@ -461,20 +435,19 @@ const viewItems = computed(() => [
   { value: 'table', label: t('availableChannels.view.table') }
 ])
 
-const marketplaceModels = computed<MarketplaceModel[]>(() => MARKETPLACE_MODEL_DEFS.flatMap((definition) => {
-  const configuredAliases = 'pricingAliases' in definition ? definition.pricingAliases : undefined
-  const pricingAliases = modelPricingAliases(definition.modelName, configuredAliases)
+const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.value.flatMap((definition) => {
+  const pricingAliases = modelPricingAliases(definition.model_name, definition.pricing_aliases)
   const pricingModel = rawPricing.value.data?.find((item) => pricingAliases.includes(item.model_name.toLowerCase()))
   const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
-  const description = pricingModel?.description || modelDescription(definition.modelName)
-  const prices = officialPricesFor(pricingAliases)
+  const description = definition.description || pricingModel?.description || modelDescription(definition.model_name)
+  const prices = normalizeOfficialPrices(definition.official_prices)
 
   return definition.groups.map((group) => {
     const groupMultiplier = groupMultiplierFor(group)
     return {
-      modelName: definition.modelName,
+      modelName: definition.model_name,
       pricingAliases,
-      vendorName: definition.vendorName,
+      vendorName: definition.vendor_name,
       group,
       groupMultiplier,
       capabilities,
@@ -482,7 +455,7 @@ const marketplaceModels = computed<MarketplaceModel[]>(() => MARKETPLACE_MODEL_D
       description,
       prices,
       requestPrice: null,
-      searchText: [definition.modelName, ...pricingAliases, definition.vendorName, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
+      searchText: [definition.model_name, ...pricingAliases, definition.vendor_name, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
     }
   })
 }))
@@ -491,10 +464,12 @@ const uniqueModelCount = computed(() => new Set(marketplaceModels.value.map((mod
 const pricedModelCount = computed(() => new Set(marketplaceModels.value.filter((model) => Object.values(model.prices).some((price) => price != null)).map((model) => model.modelName)).size)
 const totalProviderCount = computed(() => new Set(marketplaceModels.value.map((model) => model.vendorName)).size)
 const totalGroupCount = computed(() => new Set(marketplaceModels.value.map((model) => model.group)).size)
-const providerOptions = computed(() => toOptions(countUniqueModelsBy(marketplaceModels.value, (model) => model.vendorName), PROVIDER_ORDER))
+const providerOrder = computed(() => orderedUnique(marketplaceItems.value.map((item) => item.vendor_name)))
+const groupOrder = computed(() => orderedUnique(marketplaceItems.value.flatMap((item) => item.groups)))
+const providerOptions = computed(() => toOptions(countUniqueModelsBy(marketplaceModels.value, (model) => model.vendorName), providerOrder.value))
 const groupOptions = computed(() => {
   const models = selectedProvider.value ? marketplaceModels.value.filter((model) => model.vendorName === selectedProvider.value) : marketplaceModels.value
-  return toOptions(countUniqueModelsBy(models, (model) => model.group), GROUP_ORDER)
+  return toOptions(countUniqueModelsBy(models, (model) => model.group), groupOrder.value)
 })
 const capabilityOptions = computed(() => toOptions(countUniqueModelsBy(filterModelsByPrimarySelection(marketplaceModels.value), (model) => model.capabilities)))
 const activeFilterCount = computed(() => (selectedProvider.value ? 1 : 0) + (selectedGroup.value ? 1 : 0) + (selectedCapability.value ? 1 : 0))
@@ -519,6 +494,17 @@ function countUniqueModelsBy(models: MarketplaceModel[], keyFn: (model: Marketpl
     })
   })
   return new Map(Array.from(buckets.entries()).map(([key, models]) => [key, models.size]))
+}
+
+function orderedUnique(values: string[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  values.forEach((value) => {
+    if (!value || seen.has(value)) return
+    seen.add(value)
+    result.push(value)
+  })
+  return result
 }
 
 function filterModelsByPrimarySelection(models: MarketplaceModel[]): MarketplaceModel[] {
@@ -560,13 +546,13 @@ function selectCapability(value: string) {
 
 function resetFilters() {
   searchQuery.value = ''
-  selectedProvider.value = DEFAULT_PROVIDER
-  selectedGroup.value = DEFAULT_GROUP
+  selectedProvider.value = providerOptions.value[0]?.value || ''
+  selectedGroup.value = groupOptions.value[0]?.value || ''
   selectedCapability.value = ''
 }
 
-function parseCapabilities(tags: string, endpoints: string[]): string[] {
-  const tagItems = tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+function parseCapabilities(tags: string[], endpoints: string[]): string[] {
+  const tagItems = tags.map((tag) => tag.trim()).filter(Boolean)
   const endpointItems = endpoints.map((endpoint) => endpoint === 'openai' ? 'OpenAI API' : endpoint)
   return Array.from(new Set([...tagItems, ...endpointItems]))
 }
@@ -576,13 +562,23 @@ function modelPricingAliases(modelName: string, configuredAliases: readonly stri
   return Array.from(new Set(aliases.map((alias) => alias.toLowerCase())))
 }
 
-function officialPricesFor(aliases: string[]): Record<PriceKey, OfficialPrice> {
-  return aliases.map((alias) => OFFICIAL_MODEL_PRICES[alias]).find(Boolean) || {
-    input: null,
-    output: null,
-    cacheWrite: null,
-    cacheRead: null
+function normalizeOfficialPrices(raw: Partial<Record<PriceKey, OfficialPrice>> | undefined): Record<PriceKey, OfficialPrice> {
+  return {
+    input: normalizeOfficialPrice(raw?.input),
+    output: normalizeOfficialPrice(raw?.output),
+    cacheWrite: normalizeOfficialPrice(raw?.cacheWrite),
+    cacheRead: normalizeOfficialPrice(raw?.cacheRead)
   }
+}
+
+function normalizeOfficialPrice(raw: OfficialPrice | undefined): OfficialPrice {
+  if (raw == null) return null
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null
+  if (!Array.isArray(raw)) return null
+  const tiers = raw
+    .map((tier) => ({ label: String(tier.label || '').trim(), value: Number(tier.value) }))
+    .filter((tier) => tier.label && Number.isFinite(tier.value))
+  return tiers.length ? tiers : null
 }
 
 function modelDescription(modelName: string): string {
@@ -700,17 +696,46 @@ async function loadPricingConfig() {
   try {
     const [paymentConfig, pricing] = await Promise.all([
       loadMarketplacePaymentConfig(),
-      axios.get<PricingResponse>('/api/v1/public/model-pricing', { timeout: 12000 }).catch(() => ({ data: FALLBACK_PRICING }))
+      axios.get<PricingResponse>('/api/v1/public/model-pricing', { timeout: 12000 }).catch(() => ({ data: FALLBACK_PRICING })),
+      loadMarketplaceItems()
     ])
     const configuredRate = Number(paymentConfig?.usdt_cny_exchange_rate)
     if (Number.isFinite(configuredRate) && configuredRate > 0) usdToCnyRate.value = configuredRate
     marketplaceGroupMultipliers.value = normalizeMarketplaceGroupMultipliers(paymentConfig?.marketplace_group_multipliers)
     rawPricing.value = pricing.data?.data?.length ? pricing.data : FALLBACK_PRICING
+    syncDefaultSelections()
   } catch (error) {
     console.error('Failed to load model marketplace config:', error)
     rawPricing.value = FALLBACK_PRICING
+    marketplaceItems.value = []
   } finally {
     loading.value = false
+  }
+}
+
+async function loadMarketplaceItems(): Promise<void> {
+  const response = await axios.get('/api/v1/public/model-marketplace', { timeout: 12000 })
+  const payload = unwrapMarketplacePayload(response.data)
+  marketplaceItems.value = payload.items
+}
+
+function unwrapMarketplacePayload(payload: unknown): MarketplaceResponse {
+  if (!payload || typeof payload !== 'object') return { items: [] }
+  const record = payload as Record<string, unknown>
+  const data = record.data
+  if (data && typeof data === 'object') {
+    const dataRecord = data as Record<string, unknown>
+    return { items: Array.isArray(dataRecord.items) ? dataRecord.items as MarketplaceItemResponse[] : [] }
+  }
+  return { items: Array.isArray(record.items) ? record.items as MarketplaceItemResponse[] : [] }
+}
+
+function syncDefaultSelections() {
+  if (!providerOptions.value.some((option) => option.value === selectedProvider.value)) {
+    selectedProvider.value = providerOptions.value[0]?.value || ''
+  }
+  if (!groupOptions.value.some((option) => option.value === selectedGroup.value)) {
+    selectedGroup.value = groupOptions.value[0]?.value || ''
   }
 }
 
@@ -742,9 +767,10 @@ function unwrapPaymentConfig(payload: unknown): PaymentConfig | null {
 }
 
 function normalizeMarketplaceGroupMultipliers(raw: Record<string, number> | undefined): Record<string, number> {
-  return Object.keys(DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS).reduce<Record<string, number>>((acc, group) => {
+  const groupNames = groupOrder.value
+  return groupNames.reduce<Record<string, number>>((acc, group) => {
     const value = Number(raw?.[group])
-    acc[group] = Number.isFinite(value) && value > 0 ? value : DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS[group]
+    acc[group] = Number.isFinite(value) && value > 0 ? value : DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS[group] || 1
     return acc
   }, {})
 }

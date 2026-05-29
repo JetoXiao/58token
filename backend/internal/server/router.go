@@ -111,6 +111,9 @@ func registerRoutes(
 	if h.ModelPricing != nil {
 		v1.GET("/public/model-pricing", h.ModelPricing.GetPublicPricing)
 	}
+	if h.ModelMarketplace != nil {
+		v1.GET("/public/model-marketplace", h.ModelMarketplace.ListPublic)
+	}
 	routes.RegisterUserRoutes(v1, h, jwtAuth, settingService)
 	routes.RegisterAdminRoutes(v1, h, adminAuth)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg)
