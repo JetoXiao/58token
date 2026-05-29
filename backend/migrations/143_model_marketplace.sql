@@ -79,7 +79,7 @@ INSERT INTO model_marketplace_items (
     '["Codex Lite","Codex Pro"]'::jsonb,
     '["Reasoning","Tools","Files","Vision","1.1M"]'::jsonb,
     '["openai"]'::jsonb,
-    '{"input":[{"label":"<=272K","value":5},{"label":">272K","value":10}],"output":[{"label":"<=272K","value":30},{"label":">272K","value":45}],"cacheWrite":null,"cacheRead":[{"label":"<=272K","value":0.5},{"label":">272K","value":1}]}'::jsonb,
+    '{"input":5,"output":30,"cacheWrite":null,"cacheRead":0.5}'::jsonb,
     50,
     TRUE
 ),
@@ -90,7 +90,7 @@ INSERT INTO model_marketplace_items (
     '["Codex Lite","Codex Pro"]'::jsonb,
     '["Reasoning","Tools","Files","Vision","400K"]'::jsonb,
     '["openai"]'::jsonb,
-    '{"input":[{"label":"<=272K","value":2.5},{"label":">272K","value":5}],"output":[{"label":"<=272K","value":15},{"label":">272K","value":22.5}],"cacheWrite":null,"cacheRead":[{"label":"<=272K","value":0.25},{"label":">272K","value":0.5}]}'::jsonb,
+    '{"input":2.5,"output":15,"cacheWrite":null,"cacheRead":0.25}'::jsonb,
     60,
     TRUE
 ),
