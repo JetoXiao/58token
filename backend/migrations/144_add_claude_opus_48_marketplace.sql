@@ -14,10 +14,31 @@ INSERT INTO model_marketplace_items (
     '["claude-opus-4-8"]'::jsonb,
     'Anthropic',
     '["Claude Lite","Claude Plus","Claude Max"]'::jsonb,
-    '["Reasoning","Tools","Files","Vision","Computer Use","Adaptive Thinking","1M","128K"]'::jsonb,
+    '["Reasoning","Tools","Files","Vision","Computer Use","Adaptive Thinking","Fast Mode","1M","128K"]'::jsonb,
     '["anthropic","openai"]'::jsonb,
     'Claude Opus 4.8 is Anthropic''s latest Opus model for complex reasoning, agentic coding, tool use, computer use, vision/PDF input, prompt caching, and long-context workflows. It supports a 1M input context window and up to 128K output tokens.',
-    '{"input":5,"output":25,"cacheWrite":6.25,"cacheRead":0.5}'::jsonb,
+    '{
+        "input": [
+            {"label":"standard","value":5},
+            {"label":"fast","value":10},
+            {"label":"batch","value":2.5}
+        ],
+        "output": [
+            {"label":"standard","value":25},
+            {"label":"fast","value":50},
+            {"label":"batch","value":12.5}
+        ],
+        "cacheWrite": [
+            {"label":"standard 5m","value":6.25},
+            {"label":"standard 1h","value":10},
+            {"label":"fast 5m","value":12.5},
+            {"label":"fast 1h","value":20}
+        ],
+        "cacheRead": [
+            {"label":"standard","value":0.5},
+            {"label":"fast","value":1}
+        ]
+    }'::jsonb,
     5,
     TRUE
 )
@@ -32,15 +53,3 @@ ON CONFLICT (model_name) DO UPDATE SET
     sort_order = EXCLUDED.sort_order,
     enabled = EXCLUDED.enabled,
     updated_at = NOW();
-
-UPDATE model_marketplace_items
-SET
-    official_prices = '{"input":5,"output":30,"cacheWrite":null,"cacheRead":0.5}'::jsonb,
-    updated_at = NOW()
-WHERE model_name = 'gpt-5.5';
-
-UPDATE model_marketplace_items
-SET
-    official_prices = '{"input":2.5,"output":15,"cacheWrite":null,"cacheRead":0.25}'::jsonb,
-    updated_at = NOW()
-WHERE model_name = 'gpt-5.4';
