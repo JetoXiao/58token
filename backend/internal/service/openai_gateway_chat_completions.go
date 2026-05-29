@@ -234,8 +234,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 			Kind:               "request_error",
 			Message:            safeErr,
 		})
-		writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed")
-		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+		return nil, newOpenAIChatUpstreamRequestFailoverError()
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -806,4 +805,11 @@ func writeChatCompletionsError(c *gin.Context, statusCode int, errType, message 
 			"message": message,
 		},
 	})
+}
+
+func newOpenAIChatUpstreamRequestFailoverError() *UpstreamFailoverError {
+	return &UpstreamFailoverError{
+		StatusCode:   http.StatusBadGateway,
+		ResponseBody: []byte(`{"error":{"type":"upstream_error","message":"Upstream request failed"}}`),
+	}
 }

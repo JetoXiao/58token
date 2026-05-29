@@ -65,8 +65,8 @@
         <Select
           v-model="selectedModelId"
           :options="availableModels"
-          :disabled="status === 'connecting' || !canTest"
-          :placeholder="t('keys.testModal.selectModel')"
+          :disabled="status === 'connecting' || marketplaceLoading || !canTest || availableModels.length === 0"
+          :placeholder="marketplaceLoading ? t('common.loading') : t('keys.testModal.selectModel')"
         />
       </div>
 
@@ -200,6 +200,20 @@ type ModelOption = Record<string, unknown> & {
   label: string
 }
 
+interface MarketplaceItemResponse {
+  model_name: string
+  pricing_aliases?: string[]
+  vendor_name?: string
+  groups?: string[]
+  endpoints?: string[]
+  sort_order?: number
+  enabled?: boolean
+}
+
+interface MarketplaceResponse {
+  items: MarketplaceItemResponse[]
+}
+
 const props = defineProps<{
   show: boolean
   apiKey: ApiKey | null
@@ -218,47 +232,55 @@ const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
+const marketplaceItems = ref<MarketplaceItemResponse[]>([])
+const marketplaceLoading = ref(false)
 let abortController: AbortController | null = null
 
-const modelPresets: Record<GroupPlatform, ModelOption[]> = {
-  anthropic: [
-    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { value: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-    { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
-    { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' }
-  ],
-  openai: [
-    { value: 'gpt-5.5', label: 'GPT-5.5' },
-    { value: 'gpt-5.4', label: 'GPT-5.4' },
-    { value: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
-    { value: 'gpt-5.2', label: 'GPT-5.2' },
-    { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' }
-  ],
-  gemini: [
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-    { value: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview' }
-  ],
-  antigravity: [
-    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-    { value: 'claude-opus-4-7', label: 'Claude Opus 4.7' },
-    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }
-  ]
-}
-
 const platform = computed(() => props.apiKey?.group?.platform ?? null)
-const availableModels = computed(() => (platform.value ? modelPresets[platform.value] : []))
+const groupName = computed(() => props.apiKey?.group?.name ?? '')
 const canTest = computed(() => !!props.apiKey?.group && props.apiKey.status === 'active')
 const endpoint = computed(() => (platform.value === 'openai' || platform.value === 'gemini' ? '/v1/chat/completions' : '/v1/messages'))
 const endpointLabel = computed(() => `${t('keys.testModal.endpoint')}: ${endpoint.value}`)
+
+const marketplaceModelOptions = computed<ModelOption[]>(() => {
+  const enabledItems = marketplaceItems.value.filter((item) => item.enabled !== false && item.model_name)
+  if (enabledItems.length === 0) return []
+
+  const groupMatchedItems = groupName.value
+    ? enabledItems.filter((item) => includesNormalized(item.groups, groupName.value))
+    : []
+  const scopedItems = groupMatchedItems.length > 0
+    ? groupMatchedItems
+    : enabledItems.filter((item) => isMarketplaceItemForPlatform(item, platform.value))
+
+  const seen = new Set<string>()
+  return scopedItems
+    .slice()
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.model_name.localeCompare(b.model_name))
+    .flatMap((item) => {
+      const modelName = item.model_name.trim()
+      const requestModelName = marketplaceRequestModelName(item)
+      if (!modelName || !requestModelName || seen.has(requestModelName)) return []
+      seen.add(requestModelName)
+      return [{
+        value: requestModelName,
+        label: humanizeModelName(modelName),
+        marketplaceModelName: modelName,
+        vendorName: item.vendor_name,
+        pricingAliases: item.pricing_aliases ?? []
+      }]
+    })
+})
+
+const availableModels = computed(() => marketplaceModelOptions.value)
 
 watch(
   () => props.show,
   (visible) => {
     if (visible) {
       resetState()
-      selectDefaultModel()
+      selectedModelId.value = ''
+      loadMarketplaceModels()
     } else {
       abortStream()
     }
@@ -269,8 +291,90 @@ watch(platform, () => {
   selectDefaultModel()
 })
 
+watch(groupName, () => {
+  selectDefaultModel()
+})
+
+watch(availableModels, () => {
+  selectDefaultModel()
+})
+
 const selectDefaultModel = () => {
+  if (availableModels.value.some((option) => option.value === selectedModelId.value)) return
   selectedModelId.value = availableModels.value[0]?.value ?? ''
+}
+
+const loadMarketplaceModels = async () => {
+  marketplaceLoading.value = true
+  try {
+    const response = await fetch('/api/v1/public/model-marketplace', {
+      headers: { Accept: 'application/json' }
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const payload = unwrapMarketplacePayload(await response.json())
+    marketplaceItems.value = payload.items
+  } catch (error) {
+    console.error('Failed to load model marketplace items:', error)
+    marketplaceItems.value = []
+  } finally {
+    marketplaceLoading.value = false
+    selectDefaultModel()
+  }
+}
+
+const unwrapMarketplacePayload = (payload: unknown): MarketplaceResponse => {
+  if (!payload || typeof payload !== 'object') return { items: [] }
+  const record = payload as Record<string, unknown>
+  const data = record.data
+  if (data && typeof data === 'object') {
+    const dataRecord = data as Record<string, unknown>
+    return { items: Array.isArray(dataRecord.items) ? dataRecord.items as MarketplaceItemResponse[] : [] }
+  }
+  return { items: Array.isArray(record.items) ? record.items as MarketplaceItemResponse[] : [] }
+}
+
+const normalizeText = (value: string) => value.trim().toLowerCase()
+
+const includesNormalized = (values: string[] | undefined, target: string) => {
+  const normalizedTarget = normalizeText(target)
+  return !!normalizedTarget && (values ?? []).some((value) => normalizeText(value) === normalizedTarget)
+}
+
+const marketplaceRequestModelName = (item: MarketplaceItemResponse) => {
+  const aliases = Array.isArray(item.pricing_aliases) ? item.pricing_aliases : []
+  const alias = aliases.map((value) => value.trim()).find(Boolean)
+  return alias || item.model_name.trim()
+}
+
+const isMarketplaceItemForPlatform = (item: MarketplaceItemResponse, currentPlatform: GroupPlatform | null) => {
+  const vendorName = normalizeText(item.vendor_name ?? '')
+  switch (currentPlatform) {
+    case 'anthropic':
+      return vendorName === 'anthropic'
+    case 'openai':
+      return vendorName === 'openai'
+    case 'gemini':
+      return vendorName === 'google' || vendorName === 'gemini'
+    case 'antigravity':
+      return vendorName === 'anthropic' || vendorName === 'gemini' || vendorName === 'google'
+    default:
+      return false
+  }
+}
+
+const titleCaseWords = (value: string) => value.replace(/\b[a-z]/g, (char) => char.toUpperCase())
+
+const humanizeModelName = (modelName: string) => {
+  if (modelName.startsWith('claude-')) {
+    return `Claude ${titleCaseWords(modelName.slice('claude-'.length).replace(/-/g, ' '))}`
+  }
+  if (modelName.startsWith('gpt-')) {
+    return `GPT-${titleCaseWords(modelName.slice('gpt-'.length).replace(/-/g, ' '))}`
+  }
+  if (modelName.startsWith('gemini-')) {
+    return `Gemini ${titleCaseWords(modelName.slice('gemini-'.length).replace(/-/g, ' '))}`
+  }
+  return titleCaseWords(modelName.replace(/-/g, ' '))
 }
 
 const resetState = () => {
@@ -412,6 +516,7 @@ const handleStreamPayload = (payload: string) => {
   try {
     const event = JSON.parse(payload)
     const text =
+      (event.type === 'response.output_text.delta' && typeof event.delta === 'string' ? event.delta : '') ||
       event.delta?.text ||
       event.text ||
       event.choices?.[0]?.delta?.content ||
