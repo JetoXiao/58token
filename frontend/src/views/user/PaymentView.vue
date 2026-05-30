@@ -690,7 +690,7 @@ const usdtCnyExchangeRate = computed(() => {
   return Number.isFinite(rate) && rate > 0 ? rate : 7.2
 })
 const usdtCnyExchangeRateLabel = computed(() => `1 USDT = ${formatRateNumber(usdtCnyExchangeRate.value)} CNY`)
-const usdtPaymentAmount = computed(() => usdtPaymentForAmount(validAmount.value || 30))
+const usdtPaymentAmount = computed(() => usdtPaymentForAmount(validAmount.value))
 const usdtFeeAmount = computed(() =>
   feeRate.value > 0 && usdtPaymentAmount.value > 0
     ? Math.ceil(((usdtPaymentAmount.value * feeRate.value) / 100) * 10000) / 10000
