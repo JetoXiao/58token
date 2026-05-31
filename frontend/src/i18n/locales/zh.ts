@@ -1252,7 +1252,7 @@ export default {
         },
         {
           title: '模型 ID',
-          description: '请求中传入的精确模型字符串，例如 gpt-5.5 或 claude-opus-4.7。建议从模型广场复制，避免拼写错误。'
+          description: '请求中传入的精确模型字符串，例如 gpt-5.5 或 claude-opus-4-8。建议从模型广场复制，避免拼写错误。'
         },
         {
           title: '余额',
@@ -1317,7 +1317,7 @@ export default {
         },
         rows: [
           { client: 'Codex Desktop', field: 'config.toml baseurl', baseUrl: 'gatewayOrigin', reason: 'Codex 桌面端会自己拼接兼容 API 路径。' },
-          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'openAiSdkBaseUrl', reason: '自定义 OpenAI 兼容 provider 通常需要写到 /v1。' },
+          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'gatewayOrigin', reason: 'Codex CLI 的 Responses provider 使用网关域名，并由 CLI 自己拼接 API 路径。' },
           { client: 'Claude Code', field: 'ANTHROPIC_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Claude Code 会自己拼接 Anthropic 的 /v1/messages 路径。' },
           { client: 'Node.js / OpenAI SDK', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK 会基于 baseURL 继续拼接 /chat/completions。' },
           { client: 'OpenAI SDK', field: 'baseURL / base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK 方法会基于 baseURL 继续拼接 /chat/completions。' },
@@ -1349,8 +1349,8 @@ export default {
       codexCli: {
         title: 'Codex CLI',
         badge: 'OpenAI 兼容',
-        description: '用于 Codex CLI 的自定义 provider 配置。这里的 provider Base URL 应该包含 /v1。',
-        baseUrlNote: '如果最终请求路径已经是 /v1/chat/completions，就不要重复加 /v1；如果 Codex CLI 只拼 /chat/completions，则 base_url 需要保留 /v1。',
+        description: '用于 Codex CLI 的 Responses 自定义 provider 配置。这里的 provider Base URL 应该填写不带 /v1 的网关域名。',
+        baseUrlNote: '当 wire_api 为 "responses" 时，base_url 保持 https://useaifor.me，不要追加 /v1。API Key 放到 ~/.codex/auth.json 的 OPENAI_API_KEY 字段。',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
           { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
@@ -1358,9 +1358,9 @@ export default {
         ],
         blocks: {
           configTitle: 'config.toml provider 配置',
-          configDescription: '复制到 ~/.codex/config.toml，并把 API Key 环境变量替换成自己的。',
-          envTitle: 'API Key 环境变量',
-          envDescription: '设置生成的 API Key 后，重启终端生效。'
+          configDescription: '复制到 ~/.codex/config.toml。',
+          envTitle: 'auth.json API Key',
+          envDescription: '复制到 ~/.codex/auth.json，并把占位密钥替换成生成的 API Key。'
         }
       },
       claudeCode: {
@@ -1430,7 +1430,7 @@ export default {
           openaiTitle: 'OpenAI 兼容模式',
           openaiDescription: '用于 gpt-5.5、gpt-5.4、gpt-5.3-codex 等 OpenAI 分组模型。',
           anthropicTitle: 'Claude / Anthropic 兼容模式',
-          anthropicDescription: '用于 claude-opus-4.7、claude-sonnet-4.6 等 Claude 分组模型。'
+          anthropicDescription: '用于 claude-opus-4-8、claude-sonnet-4.6 等 Claude 分组模型。'
         }
       },
       openClaw: {
@@ -1576,7 +1576,7 @@ export default {
         },
         {
           title: 'Codex、Claude Code、Gemini CLI 分别该填哪个 Base URL？',
-          description: 'Codex Desktop 填 https://useaifor.me；Codex CLI 的 OpenAI 兼容 provider 填 https://useaifor.me/v1；Claude Code 的 ANTHROPIC_BASE_URL 填 https://useaifor.me；Gemini CLI 原生模式填 https://useaifor.me，OpenAI 兼容包装模式填 https://useaifor.me/v1。'
+          description: 'Codex Desktop 填 https://useaifor.me；Codex CLI 的 Responses provider 填 https://useaifor.me；Claude Code 的 ANTHROPIC_BASE_URL 填 https://useaifor.me；Gemini CLI 原生模式填 https://useaifor.me，OpenAI 兼容包装模式填 https://useaifor.me/v1。'
         },
         {
           title: '401 或 API 密钥无效',

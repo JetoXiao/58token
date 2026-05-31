@@ -465,30 +465,35 @@ const clientGuides = computed<ClientGuide[]>(() => [
     badge: t('integrationDocs.clients.codexCli.badge'),
     description: t('integrationDocs.clients.codexCli.description'),
     baseUrlLabel: t('integrationDocs.clients.baseUrlLabel'),
-    baseUrl: openAiSdkBaseUrl.value,
+    baseUrl: gatewayOrigin.value,
     baseUrlNote: t('integrationDocs.clients.codexCli.baseUrlNote'),
     osRows: localizedRows('integrationDocs.clients.codexCli.osRows'),
     configBlocks: [
       {
         title: t('integrationDocs.clients.codexCli.blocks.configTitle'),
         description: t('integrationDocs.clients.codexCli.blocks.configDescription'),
-        code: `model = "gpt-5.5"
-model_provider = "useaiforme"
+        code: `model_provider = "OpenAI"
+model = "gpt-5.5"
+review_model = "gpt-5.4"
+model_reasoning_effort = "medium"
+disable_response_storage = true
+network_access = "enabled"
+windows_wsl_setup_acknowledged = true
+model_context_window = 1000000
+model_auto_compact_token_limit = 900000
 
-[model_providers.useaiforme]
-name = "UseAiForMe"
-base_url = "${openAiSdkBaseUrl.value}"
-env_key = "USE_AIFORME_API_KEY"
-wire_api = "chat"`
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "${gatewayOrigin.value}"
+wire_api = "responses"
+requires_openai_auth = true`
       },
       {
         title: t('integrationDocs.clients.codexCli.blocks.envTitle'),
         description: t('integrationDocs.clients.codexCli.blocks.envDescription'),
-        code: `# Windows PowerShell
-[Environment]::SetEnvironmentVariable("USE_AIFORME_API_KEY", "sk-your-api-key", "User")
-
-# macOS / Linux
-export USE_AIFORME_API_KEY="sk-your-api-key"`
+        code: `{
+  "OPENAI_API_KEY": "sk-your-api-key"
+}`
       }
     ]
   },
@@ -506,12 +511,26 @@ export USE_AIFORME_API_KEY="sk-your-api-key"`
         title: t('integrationDocs.clients.claudeCode.blocks.settingsTitle'),
         description: t('integrationDocs.clients.claudeCode.blocks.settingsDescription'),
         code: `{
+  "enabledPlugins": {
+    "commit-commands@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
+  },
   "env": {
     "ANTHROPIC_BASE_URL": "${gatewayOrigin.value}",
     "ANTHROPIC_AUTH_TOKEN": "sk-your-api-key",
-    "ANTHROPIC_MODEL": "claude-opus-4-7",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-haiku-4-5"
-  }
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_MODEL": "claude-opus-4-8",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "includeCoAuthoredBy": false
 }`
       },
       {
@@ -520,12 +539,24 @@ export USE_AIFORME_API_KEY="sk-your-api-key"`
         code: `# Windows PowerShell
 [Environment]::SetEnvironmentVariable("ANTHROPIC_BASE_URL", "${gatewayOrigin.value}", "User")
 [Environment]::SetEnvironmentVariable("ANTHROPIC_AUTH_TOKEN", "sk-your-api-key", "User")
-[Environment]::SetEnvironmentVariable("ANTHROPIC_MODEL", "claude-opus-4-7", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_DEFAULT_HAIKU_MODEL", "claude-opus-4-8", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_DEFAULT_OPUS_MODEL", "claude-opus-4-8", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_DEFAULT_SONNET_MODEL", "claude-opus-4-8", "User")
+[Environment]::SetEnvironmentVariable("ANTHROPIC_MODEL", "claude-opus-4-8", "User")
+[Environment]::SetEnvironmentVariable("API_TIMEOUT_MS", "3000000", "User")
+[Environment]::SetEnvironmentVariable("CLAUDE_CODE_ATTRIBUTION_HEADER", "0", "User")
+[Environment]::SetEnvironmentVariable("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1", "User")
 
 # macOS / Linux
 export ANTHROPIC_BASE_URL="${gatewayOrigin.value}"
 export ANTHROPIC_AUTH_TOKEN="sk-your-api-key"
-export ANTHROPIC_MODEL="claude-opus-4-7"`
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="claude-opus-4-8"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="claude-opus-4-8"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="claude-opus-4-8"
+export ANTHROPIC_MODEL="claude-opus-4-8"
+export API_TIMEOUT_MS="3000000"
+export CLAUDE_CODE_ATTRIBUTION_HEADER="0"
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"`
       }
     ]
   },
@@ -629,7 +660,7 @@ console.log(response.choices[0]?.message?.content);`
   "provider": "anthropic-compatible",
   "baseURL": "${gatewayOrigin.value}",
   "apiKey": "sk-your-api-key",
-  "model": "claude-opus-4-7"
+  "model": "claude-opus-4-8"
 }`
       }
     ]
@@ -686,7 +717,7 @@ model: gpt-5.5`
         code: `provider: anthropic-compatible
 base_url: ${gatewayOrigin.value}
 api_key: sk-your-api-key
-model: claude-opus-4-7`
+model: claude-opus-4-8`
       }
     ]
   },
@@ -715,7 +746,7 @@ model: claude-opus-4-7`
   -H "x-api-key: sk-your-api-key" \\
   -H "anthropic-version: 2023-06-01" \\
   -H "Content-Type: application/json" \\
-  -d '{"model":"claude-opus-4-7","max_tokens":128,"messages":[{"role":"user","content":"ping"}]}'`
+  -d '{"model":"claude-opus-4-8","max_tokens":128,"messages":[{"role":"user","content":"ping"}]}'`
       }
     ]
   }
@@ -781,7 +812,7 @@ print(response.choices[0].message.content)`
   -H "anthropic-version: 2023-06-01" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "claude-opus-4-7",
+    "model": "claude-opus-4-8",
     "max_tokens": 512,
     "messages": [
       { "role": "user", "content": "Summarize the integration steps." }

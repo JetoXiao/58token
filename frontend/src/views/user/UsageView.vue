@@ -87,7 +87,7 @@
       </template>
 
       <template #filters>
-        <div class="card">
+        <div class="card relative z-30">
           <div class="px-6 py-4">
           <div class="flex flex-wrap items-end gap-4">
             <!-- API Key Filter -->

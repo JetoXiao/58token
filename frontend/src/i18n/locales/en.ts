@@ -1248,7 +1248,7 @@ export default {
         },
         {
           title: 'Model ID',
-          description: 'The exact model string sent in the request, such as gpt-5.5 or claude-opus-4.7. Copy it from Model Marketplace to avoid typos.'
+          description: 'The exact model string sent in the request, such as gpt-5.5 or claude-opus-4-8. Copy it from Model Marketplace to avoid typos.'
         },
         {
           title: 'Balance',
@@ -1313,7 +1313,7 @@ export default {
         },
         rows: [
           { client: 'Codex Desktop', field: 'config.toml baseurl', baseUrl: 'gatewayOrigin', reason: 'Codex Desktop appends the compatible API path itself.' },
-          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'Custom OpenAI-compatible providers expect a /v1 Base URL.' },
+          { client: 'Codex CLI', field: 'model_providers.*.base_url', baseUrl: 'gatewayOrigin', reason: 'Codex CLI Responses providers use the gateway origin and append the API path themselves.' },
           { client: 'Claude Code', field: 'ANTHROPIC_BASE_URL', baseUrl: 'gatewayOrigin', reason: 'Claude Code appends the Anthropic /v1/messages path itself.' },
           { client: 'Node.js / OpenAI SDK', field: 'baseURL', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK appends /chat/completions relative to baseURL.' },
           { client: 'OpenAI SDK', field: 'baseURL / base_url', baseUrl: 'openAiSdkBaseUrl', reason: 'OpenAI SDK methods append /chat/completions relative to baseURL.' },
@@ -1345,8 +1345,8 @@ export default {
       codexCli: {
         title: 'Codex CLI',
         badge: 'OpenAI-compatible',
-        description: 'Use this for Codex CLI custom provider configuration. Here the provider Base URL should include /v1.',
-        baseUrlNote: 'If the generated request path is /v1/chat/completions, do not add /v1 twice. If Codex CLI only appends /chat/completions, keep /v1 in base_url.',
+        description: 'Use this for Codex CLI custom provider configuration with the Responses API. The provider Base URL should be the gateway origin without /v1.',
+        baseUrlNote: 'When wire_api is "responses", keep base_url as https://useaifor.me without /v1. Put the API key in ~/.codex/auth.json as OPENAI_API_KEY.',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
           { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
@@ -1354,9 +1354,9 @@ export default {
         ],
         blocks: {
           configTitle: 'config.toml provider block',
-          configDescription: 'Copy this block to ~/.codex/config.toml and replace the API key environment variable.',
-          envTitle: 'API key environment variable',
-          envDescription: 'Set the generated API key once, then restart your terminal.'
+          configDescription: 'Copy this block to ~/.codex/config.toml.',
+          envTitle: 'auth.json API key',
+          envDescription: 'Copy this JSON to ~/.codex/auth.json and replace the placeholder key.'
         }
       },
       claudeCode: {
@@ -1426,7 +1426,7 @@ export default {
           openaiTitle: 'OpenAI-compatible mode',
           openaiDescription: 'Use this for OpenAI group models such as gpt-5.5, gpt-5.4, and gpt-5.3-codex.',
           anthropicTitle: 'Claude / Anthropic-compatible mode',
-          anthropicDescription: 'Use this for Claude group models such as claude-opus-4.7 and claude-sonnet-4.6.'
+          anthropicDescription: 'Use this for Claude group models such as claude-opus-4-8 and claude-sonnet-4.6.'
         }
       },
       openClaw: {
@@ -1572,7 +1572,7 @@ export default {
         },
         {
           title: 'Which Base URL should Codex, Claude Code, and Gemini CLI use?',
-          description: 'Codex Desktop uses https://useaifor.me. Codex CLI OpenAI-compatible providers use https://useaifor.me/v1. Claude Code ANTHROPIC_BASE_URL uses https://useaifor.me. Gemini CLI native mode uses https://useaifor.me, while OpenAI-compatible wrappers use https://useaifor.me/v1.'
+          description: 'Codex Desktop uses https://useaifor.me. Codex CLI Responses providers use https://useaifor.me. Claude Code ANTHROPIC_BASE_URL uses https://useaifor.me. Gemini CLI native mode uses https://useaifor.me, while OpenAI-compatible wrappers use https://useaifor.me/v1.'
         },
         {
           title: '401 or invalid API key',

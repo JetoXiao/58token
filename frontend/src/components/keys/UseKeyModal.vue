@@ -373,6 +373,22 @@ const operator = (value: string) => wrapToken('text-slate-400', value)
 const string = (value: string) => wrapToken('text-amber-200', value)
 const comment = (value: string) => wrapToken('text-slate-500', value)
 
+const CLAUDE_CODE_DEFAULT_MODEL = 'claude-opus-4-8'
+const CLAUDE_CODE_TIMEOUT_MS = '3000000'
+const CODEX_DEFAULT_MODEL = 'gpt-5.5'
+const CODEX_REVIEW_MODEL = 'gpt-5.4'
+const CODEX_REASONING_EFFORT = 'medium'
+const OPENCODE_TIMEOUT_MS = 3000000
+
+const claudeCodeEnabledPlugins = {
+  'commit-commands@claude-plugins-official': true,
+  'context7@claude-plugins-official': true,
+  'frontend-design@claude-plugins-official': true,
+  'playwright@claude-plugins-official': true,
+  'pyright-lsp@claude-plugins-official': true,
+  'superpowers@claude-plugins-official': true
+}
+
 // Syntax highlighting helpers
 // Generate file configs based on platform and active tab
 const currentFiles = computed((): FileConfig[] => {
@@ -436,25 +452,20 @@ const currentFiles = computed((): FileConfig[] => {
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
   let path: string
   let content: string
+  const env = buildClaudeCodeEnv(baseUrl, apiKey)
 
   switch (activeTab.value) {
     case 'unix':
       path = 'Terminal'
-      content = `export ANTHROPIC_BASE_URL="${baseUrl}"
-export ANTHROPIC_AUTH_TOKEN="${apiKey}"
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+      content = renderUnixEnv(env)
       break
     case 'cmd':
       path = 'Command Prompt'
-      content = `set ANTHROPIC_BASE_URL=${baseUrl}
-set ANTHROPIC_AUTH_TOKEN=${apiKey}
-set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+      content = renderCmdEnv(env)
       break
     case 'powershell':
       path = 'PowerShell'
-      content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
-$env:ANTHROPIC_AUTH_TOKEN="${apiKey}"
-$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
+      content = renderPowerShellEnv(env)
       break
     default:
       path = 'Terminal'
@@ -465,19 +476,64 @@ $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`
     ? '~/.claude/settings.json'
     : '%userprofile%\\.claude\\settings.json'
 
-  const vscodeContent = `{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${baseUrl}",
-    "ANTHROPIC_AUTH_TOKEN": "${apiKey}",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
-  }
-}`
+  const vscodeContent = JSON.stringify(
+    {
+      enabledPlugins: claudeCodeEnabledPlugins,
+      env,
+      includeCoAuthoredBy: false
+    },
+    null,
+    2
+  )
 
   return [
     { path, content },
     { path: vscodeSettingsPath, content: vscodeContent, hint: 'VSCode Claude Code' }
   ]
+}
+
+function buildClaudeCodeEnv(baseUrl: string, apiKey: string): Record<string, string> {
+  return {
+    ANTHROPIC_AUTH_TOKEN: apiKey,
+    ANTHROPIC_BASE_URL: baseUrl,
+    ANTHROPIC_DEFAULT_HAIKU_MODEL: CLAUDE_CODE_DEFAULT_MODEL,
+    ANTHROPIC_DEFAULT_OPUS_MODEL: CLAUDE_CODE_DEFAULT_MODEL,
+    ANTHROPIC_DEFAULT_SONNET_MODEL: CLAUDE_CODE_DEFAULT_MODEL,
+    ANTHROPIC_MODEL: CLAUDE_CODE_DEFAULT_MODEL,
+    API_TIMEOUT_MS: CLAUDE_CODE_TIMEOUT_MS,
+    CLAUDE_CODE_ATTRIBUTION_HEADER: '0',
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+  }
+}
+
+function renderUnixEnv(env: Record<string, string>): string {
+  return Object.entries(env)
+    .map(([key, value]) => `export ${key}="${escapeShellDoubleQuoted(value)}"`)
+    .join('\n')
+}
+
+function renderCmdEnv(env: Record<string, string>): string {
+  return Object.entries(env)
+    .map(([key, value]) => `set ${key}=${escapeCmdValue(value)}`)
+    .join('\n')
+}
+
+function renderPowerShellEnv(env: Record<string, string>): string {
+  return Object.entries(env)
+    .map(([key, value]) => `$env:${key}="${escapePowerShellDoubleQuoted(value)}"`)
+    .join('\n')
+}
+
+function escapeShellDoubleQuoted(value: string): string {
+  return value.replace(/(["\\$`])/g, '\\$1')
+}
+
+function escapeCmdValue(value: string): string {
+  return value.replace(/([&|<>^])/g, '^$1')
+}
+
+function escapePowerShellDoubleQuoted(value: string): string {
+  return value.replace(/`/g, '``').replace(/"/g, '`"')
 }
 
 function generateGeminiCliContent(baseUrl: string, apiKey: string): FileConfig {
@@ -531,9 +587,9 @@ function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
 
   // config.toml content
   const configContent = `model_provider = "OpenAI"
-model = "gpt-5.4"
-review_model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model = "${CODEX_DEFAULT_MODEL}"
+review_model = "${CODEX_REVIEW_MODEL}"
+model_reasoning_effort = "${CODEX_REASONING_EFFORT}"
 disable_response_storage = true
 network_access = "enabled"
 windows_wsl_setup_acknowledged = true
@@ -568,11 +624,11 @@ function generateOpenAIWsFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
-  // config.toml content with WebSocket v2
+  // config.toml content with Responses WebSocket support
   const configContent = `model_provider = "OpenAI"
-model = "gpt-5.4"
-review_model = "gpt-5.4"
-model_reasoning_effort = "xhigh"
+model = "${CODEX_DEFAULT_MODEL}"
+review_model = "${CODEX_REVIEW_MODEL}"
+model_reasoning_effort = "${CODEX_REASONING_EFFORT}"
 disable_response_storage = true
 network_access = "enabled"
 windows_wsl_setup_acknowledged = true
@@ -584,10 +640,7 @@ name = "OpenAI"
 base_url = "${baseUrl}"
 wire_api = "responses"
 supports_websockets = true
-requires_openai_auth = true
-
-[features]
-responses_websockets_v2 = true`
+requires_openai_auth = true`
 
   // auth.json content
   const authContent = `{
@@ -612,7 +665,10 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     [platform]: {
       options: {
         baseURL: baseUrl,
-        apiKey
+        apiKey,
+        timeout: OPENCODE_TIMEOUT_MS,
+        headerTimeout: OPENCODE_TIMEOUT_MS,
+        chunkTimeout: OPENCODE_TIMEOUT_MS
       }
     }
   }
@@ -966,6 +1022,23 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     }
   }
   const claudeModels = {
+    'claude-opus-4-8': {
+      name: 'Claude Opus 4.8',
+      limit: {
+        context: 200000,
+        output: 128000
+      },
+      modalities: {
+        input: ['text', 'image', 'pdf'],
+        output: ['text']
+      },
+      options: {
+        thinking: {
+          budgetTokens: 24576,
+          type: 'enabled'
+        }
+      }
+    },
     'claude-opus-4-6-thinking': {
       name: 'Claude 4.6 Opus (Thinking)',
       limit: {
@@ -1007,6 +1080,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     provider[platform].models = geminiModels
   } else if (platform === 'anthropic') {
     provider[platform].npm = '@ai-sdk/anthropic'
+    provider[platform].models = claudeModels
   } else if (platform === 'antigravity-claude') {
     provider[platform].npm = '@ai-sdk/anthropic'
     provider[platform].name = 'Antigravity (Claude)'
@@ -1034,9 +1108,12 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
           }
         }
       : undefined
+  const defaultModel = getOpenCodeDefaultModel(platform)
 
   const content = JSON.stringify(
     {
+      model: defaultModel.model,
+      small_model: defaultModel.smallModel,
       provider,
       ...(agent ? { agent } : {}),
       $schema: 'https://opencode.ai/config.json'
@@ -1049,6 +1126,41 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
     path: pathLabel ?? 'opencode.json',
     content,
     hint: t('keys.useKeyModal.opencode.hint')
+  }
+}
+
+function getOpenCodeDefaultModel(platform: string): { model: string; smallModel: string } {
+  switch (platform) {
+    case 'anthropic':
+      return {
+        model: 'anthropic/claude-opus-4-8',
+        smallModel: 'anthropic/claude-opus-4-8'
+      }
+    case 'openai':
+      return {
+        model: 'openai/gpt-5.5',
+        smallModel: 'openai/gpt-5.4-mini'
+      }
+    case 'gemini':
+      return {
+        model: 'gemini/gemini-2.5-flash',
+        smallModel: 'gemini/gemini-2.5-flash'
+      }
+    case 'antigravity-claude':
+      return {
+        model: 'antigravity-claude/claude-opus-4-8',
+        smallModel: 'antigravity-claude/claude-opus-4-8'
+      }
+    case 'antigravity-gemini':
+      return {
+        model: 'antigravity-gemini/gemini-2.5-flash',
+        smallModel: 'antigravity-gemini/gemini-2.5-flash'
+      }
+    default:
+      return {
+        model: 'openai/gpt-5.5',
+        smallModel: 'openai/gpt-5.4-mini'
+      }
   }
 }
 
