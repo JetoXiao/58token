@@ -388,8 +388,16 @@ func (r *oauthEmailAffiliateRepoStub) ListUsersWithCustomSettings(context.Contex
 	panic("unexpected ListUsersWithCustomSettings call")
 }
 
+func (r *oauthEmailAffiliateRepoStub) AdminAssignInviter(context.Context, int64, int64) (*service.AffiliateInviteAssignment, error) {
+	panic("unexpected AdminAssignInviter call")
+}
+
 func (r *oauthEmailAffiliateRepoStub) ListAffiliateInviteRecords(context.Context, service.AffiliateRecordFilter) ([]service.AffiliateInviteRecord, int64, error) {
 	panic("unexpected ListAffiliateInviteRecords call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) ListAffiliateUsageDailyRecords(context.Context, service.AffiliateUsageFilter) ([]service.AffiliateUsageDailyRecord, *service.AffiliateUsageSummary, int64, error) {
+	panic("unexpected ListAffiliateUsageDailyRecords call")
 }
 
 func (r *oauthEmailAffiliateRepoStub) ListAffiliateRebateRecords(context.Context, service.AffiliateRecordFilter) ([]service.AffiliateRebateRecord, int64, error) {

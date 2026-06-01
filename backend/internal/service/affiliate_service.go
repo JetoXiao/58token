@@ -16,11 +16,15 @@ var (
 	ErrAffiliateCodeInvalid     = infraerrors.BadRequest("AFFILIATE_CODE_INVALID", "invalid affiliate code")
 	ErrAffiliateCodeTaken       = infraerrors.Conflict("AFFILIATE_CODE_TAKEN", "affiliate code already in use")
 	ErrAffiliateAlreadyBound    = infraerrors.Conflict("AFFILIATE_ALREADY_BOUND", "affiliate inviter already bound")
+	ErrAffiliateSelfBinding     = infraerrors.BadRequest("AFFILIATE_SELF_BINDING", "invitee cannot be inviter")
 	ErrAffiliateQuotaEmpty      = infraerrors.BadRequest("AFFILIATE_QUOTA_EMPTY", "no affiliate quota available to transfer")
 )
 
 const (
 	affiliateInviteesLimit = 100
+	// AffiliateUsageCommissionRateDefault is the default percentage used by the
+	// admin usage-share report when an inviter has no per-user override.
+	AffiliateUsageCommissionRateDefault = 5.0
 	// AffiliateCodeMinLength / AffiliateCodeMaxLength bound both system-generated
 	// 12-char codes and admin-customized codes (e.g. "VIP2026").
 	AffiliateCodeMinLength = 4
@@ -110,7 +114,9 @@ type AffiliateRepository interface {
 	SetUserRebateRate(ctx context.Context, userID int64, ratePercent *float64) error
 	BatchSetUserRebateRate(ctx context.Context, userIDs []int64, ratePercent *float64) error
 	ListUsersWithCustomSettings(ctx context.Context, filter AffiliateAdminFilter) ([]AffiliateAdminEntry, int64, error)
+	AdminAssignInviter(ctx context.Context, inviteeID, inviterID int64) (*AffiliateInviteAssignment, error)
 	ListAffiliateInviteRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateInviteRecord, int64, error)
+	ListAffiliateUsageDailyRecords(ctx context.Context, filter AffiliateUsageFilter) ([]AffiliateUsageDailyRecord, *AffiliateUsageSummary, int64, error)
 	ListAffiliateRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error)
 	ListAffiliateTransferRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateTransferRecord, int64, error)
 	GetAffiliateUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error)
@@ -144,6 +150,27 @@ type AffiliateRecordFilter struct {
 	SortDesc bool
 }
 
+type AffiliateUsageFilter struct {
+	Search                   string
+	Page                     int
+	PageSize                 int
+	StartAt                  *time.Time
+	EndAt                    *time.Time
+	Timezone                 string
+	InviterID                int64
+	InviteeID                int64
+	View                     string
+	DefaultRebateRatePercent float64
+	SortBy                   string
+	SortDesc                 bool
+}
+
+type AffiliateInviteAssignment struct {
+	InviterID int64 `json:"inviter_id"`
+	InviteeID int64 `json:"invitee_id"`
+	Changed   bool  `json:"changed"`
+}
+
 type AffiliateInviteRecord struct {
 	InviterID       int64     `json:"inviter_id"`
 	InviterEmail    string    `json:"inviter_email"`
@@ -154,6 +181,32 @@ type AffiliateInviteRecord struct {
 	AffCode         string    `json:"aff_code"`
 	TotalRebate     float64   `json:"total_rebate"`
 	CreatedAt       time.Time `json:"created_at"`
+}
+
+type AffiliateUsageDailyRecord struct {
+	Date              string                      `json:"date,omitempty"`
+	InviterID         int64                       `json:"inviter_id"`
+	InviterEmail      string                      `json:"inviter_email"`
+	InviterUsername   string                      `json:"inviter_username"`
+	InviteeID         int64                       `json:"invitee_id"`
+	InviteeEmail      string                      `json:"invitee_email"`
+	InviteeUsername   string                      `json:"invitee_username"`
+	InviteeCount      int64                       `json:"invitee_count"`
+	Requests          int64                       `json:"requests"`
+	TotalTokens       int64                       `json:"total_tokens"`
+	ActualCost        float64                     `json:"actual_cost"`
+	RechargeAmount    float64                     `json:"recharge_amount"`
+	RebateRatePercent float64                     `json:"rebate_rate_percent"`
+	RebateAmount      float64                     `json:"rebate_amount"`
+	Unassigned        bool                        `json:"unassigned"`
+	Members           []AffiliateUsageDailyRecord `json:"members,omitempty"`
+}
+
+type AffiliateUsageSummary struct {
+	TotalRequests     int64   `json:"total_requests"`
+	TotalTokens       int64   `json:"total_tokens"`
+	TotalActualCost   float64 `json:"total_actual_cost"`
+	TotalRebateAmount float64 `json:"total_rebate_amount"`
 }
 
 type AffiliateRebateRecord struct {
@@ -574,6 +627,28 @@ func (s *AffiliateService) AdminListInviteRecords(ctx context.Context, filter Af
 	return s.repo.ListAffiliateInviteRecords(ctx, normalizeAffiliateRecordFilter(filter))
 }
 
+func (s *AffiliateService) AdminAssignInviter(ctx context.Context, inviteeID, inviterID int64) (*AffiliateInviteAssignment, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if inviteeID <= 0 || inviterID <= 0 {
+		return nil, infraerrors.BadRequest("INVALID_USER", "invalid user")
+	}
+	if inviteeID == inviterID {
+		return nil, ErrAffiliateSelfBinding
+	}
+	return s.repo.AdminAssignInviter(ctx, inviteeID, inviterID)
+}
+
+func (s *AffiliateService) AdminListUsageDailyRecords(ctx context.Context, filter AffiliateUsageFilter) ([]AffiliateUsageDailyRecord, *AffiliateUsageSummary, int64, error) {
+	if s == nil || s.repo == nil {
+		return nil, nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	filter = normalizeAffiliateUsageFilter(filter)
+	filter.DefaultRebateRatePercent = AffiliateUsageCommissionRateDefault
+	return s.repo.ListAffiliateUsageDailyRecords(ctx, filter)
+}
+
 func (s *AffiliateService) AdminListRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error) {
 	if s == nil || s.repo == nil {
 		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
@@ -620,5 +695,25 @@ func normalizeAffiliateRecordFilter(filter AffiliateRecordFilter) AffiliateRecor
 	}
 	filter.Search = strings.TrimSpace(filter.Search)
 	filter.SortBy = strings.TrimSpace(filter.SortBy)
+	return filter
+}
+
+func normalizeAffiliateUsageFilter(filter AffiliateUsageFilter) AffiliateUsageFilter {
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	filter.SortBy = strings.TrimSpace(filter.SortBy)
+	filter.Timezone = strings.TrimSpace(filter.Timezone)
+	filter.View = strings.TrimSpace(filter.View)
+	if filter.View != "groups" {
+		filter.View = "users"
+	}
 	return filter
 }

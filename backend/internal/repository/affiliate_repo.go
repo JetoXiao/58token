@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -21,6 +22,29 @@ const (
 )
 
 var affiliateCodeCharset = []byte("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+
+const affiliateUsageExchangeRateCTE = `exchange_rate AS (
+    SELECT COALESCE(
+        NULLIF((
+            SELECT CASE
+                WHEN value ~ '^[0-9]+(\.[0-9]+)?$' THEN value::double precision
+                ELSE NULL
+            END
+            FROM settings
+            WHERE key = 'USDT_CNY_EXCHANGE_RATE'
+            LIMIT 1
+        ), 0),
+        7
+    )::double precision AS usd_cny_rate
+)`
+
+const affiliateUsageRechargeAmountSQL = `CASE
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('usdt', 'infini')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('usdt', 'infini')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
+               THEN po.pay_amount * er.usd_cny_rate
+               ELSE po.pay_amount
+           END`
 
 const affiliateUserOverviewSQL = `
 SELECT ua.user_id,
@@ -460,6 +484,189 @@ LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	return items, total, nil
 }
 
+func (r *affiliateRepository) AdminAssignInviter(ctx context.Context, inviteeID, inviterID int64) (*service.AffiliateInviteAssignment, error) {
+	if inviteeID <= 0 || inviterID <= 0 {
+		return nil, service.ErrUserNotFound
+	}
+	if inviteeID == inviterID {
+		return nil, service.ErrAffiliateSelfBinding
+	}
+
+	assignment := &service.AffiliateInviteAssignment{
+		InviterID: inviterID,
+		InviteeID: inviteeID,
+		Changed:   false,
+	}
+
+	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		if _, err := ensureUserAffiliateWithClient(txCtx, txClient, inviteeID); err != nil {
+			return err
+		}
+		if _, err := ensureUserAffiliateWithClient(txCtx, txClient, inviterID); err != nil {
+			return err
+		}
+
+		rows, err := txClient.QueryContext(txCtx, `
+SELECT inviter_id
+FROM user_affiliates
+WHERE user_id = $1
+FOR UPDATE`, inviteeID)
+		if err != nil {
+			return fmt.Errorf("query current inviter: %w", err)
+		}
+		var currentInviter sql.NullInt64
+		if rows.Next() {
+			if err := rows.Scan(&currentInviter); err != nil {
+				_ = rows.Close()
+				return err
+			}
+		} else {
+			_ = rows.Close()
+			return service.ErrUserNotFound
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+
+		if currentInviter.Valid && currentInviter.Int64 == inviterID {
+			return nil
+		}
+
+		if currentInviter.Valid && currentInviter.Int64 > 0 {
+			if _, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET aff_count = GREATEST(aff_count - 1, 0),
+    updated_at = NOW()
+WHERE user_id = $1`, currentInviter.Int64); err != nil {
+				return fmt.Errorf("decrement previous inviter aff_count: %w", err)
+			}
+		}
+
+		if _, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET inviter_id = $1,
+    updated_at = NOW()
+WHERE user_id = $2`, inviterID, inviteeID); err != nil {
+			return fmt.Errorf("assign inviter: %w", err)
+		}
+
+		if _, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET aff_count = aff_count + 1,
+    updated_at = NOW()
+WHERE user_id = $1`, inviterID); err != nil {
+			return fmt.Errorf("increment inviter aff_count: %w", err)
+		}
+		assignment.Changed = true
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return assignment, nil
+}
+
+func (r *affiliateRepository) ListAffiliateUsageDailyRecords(ctx context.Context, filter service.AffiliateUsageFilter) ([]service.AffiliateUsageDailyRecord, *service.AffiliateUsageSummary, int64, error) {
+	client := clientFromContext(ctx, r.client)
+	cte, args := buildAffiliateUsageCTE(filter)
+
+	var total int64
+	summary := &service.AffiliateUsageSummary{}
+	rows, err := client.QueryContext(ctx, cte+`
+SELECT COUNT(*)::bigint,
+       COALESCE(SUM(requests), 0)::bigint,
+       COALESCE(SUM(total_tokens), 0)::bigint,
+       COALESCE(SUM(actual_cost), 0)::double precision,
+       COALESCE(SUM(rebate_amount), 0)::double precision
+FROM records`, args...)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	if rows.Next() {
+		if err := rows.Scan(&total, &summary.TotalRequests, &summary.TotalTokens, &summary.TotalActualCost, &summary.TotalRebateAmount); err != nil {
+			_ = rows.Close()
+			return nil, nil, 0, err
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, nil, 0, err
+	}
+
+	orderBy := buildAffiliateUsageOrderBy(filter)
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	args = append(args, pageSize, (page-1)*pageSize)
+	limitPlaceholder := "$" + fmt.Sprint(len(args)-1)
+	offsetPlaceholder := "$" + fmt.Sprint(len(args))
+
+	rows, err = client.QueryContext(ctx, cte+`
+SELECT usage_date,
+       inviter_id,
+       inviter_email,
+       inviter_username,
+       invitee_id,
+       invitee_email,
+       invitee_username,
+       invitee_count,
+       requests,
+       total_tokens,
+       actual_cost,
+       recharge_amount,
+       rebate_rate_percent,
+       rebate_amount,
+       unassigned,
+       members
+FROM records
+`+orderBy+`
+LIMIT `+limitPlaceholder+` OFFSET `+offsetPlaceholder, args...)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]service.AffiliateUsageDailyRecord, 0)
+	for rows.Next() {
+		var item service.AffiliateUsageDailyRecord
+		var membersRaw []byte
+		if err := rows.Scan(
+			&item.Date,
+			&item.InviterID,
+			&item.InviterEmail,
+			&item.InviterUsername,
+			&item.InviteeID,
+			&item.InviteeEmail,
+			&item.InviteeUsername,
+			&item.InviteeCount,
+			&item.Requests,
+			&item.TotalTokens,
+			&item.ActualCost,
+			&item.RechargeAmount,
+			&item.RebateRatePercent,
+			&item.RebateAmount,
+			&item.Unassigned,
+			&membersRaw,
+		); err != nil {
+			return nil, nil, 0, err
+		}
+		if len(membersRaw) > 0 {
+			if err := json.Unmarshal(membersRaw, &item.Members); err != nil {
+				return nil, nil, 0, fmt.Errorf("decode affiliate usage members: %w", err)
+			}
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, err
+	}
+	return items, summary, total, nil
+}
+
 func (r *affiliateRepository) ListAffiliateRebateRecords(ctx context.Context, filter service.AffiliateRecordFilter) ([]service.AffiliateRebateRecord, int64, error) {
 	client := clientFromContext(ctx, r.client)
 	where, args := buildAffiliateRecordWhere(filter, "ual.created_at", []string{
@@ -708,6 +915,300 @@ func buildAffiliateRecordOrderBy(filter service.AffiliateRecordFilter, sortColum
 		direction = "ASC"
 	}
 	return "ORDER BY " + column + " " + direction + " NULLS LAST"
+}
+
+func buildAffiliateUsageCTE(filter service.AffiliateUsageFilter) (string, []any) {
+	args := make([]any, 0, 6)
+	usageTimeClauses := make([]string, 0, 2)
+	startAtArg := 0
+	endAtArg := 0
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		startAtArg = len(args)
+		usageTimeClauses = append(usageTimeClauses, fmt.Sprintf("ul.created_at >= $%d", len(args)))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		endAtArg = len(args)
+		usageTimeClauses = append(usageTimeClauses, fmt.Sprintf("ul.created_at < $%d", len(args)))
+	}
+
+	paymentClauses := []string{
+		"po.status = 'COMPLETED'",
+		"po.order_type = 'balance'",
+		"po.paid_at IS NOT NULL",
+		`(
+            LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
+            OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
+            OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
+        )`,
+	}
+	if startAtArg > 0 {
+		paymentClauses = append(paymentClauses, fmt.Sprintf("po.paid_at >= $%d", startAtArg))
+	}
+	if endAtArg > 0 {
+		paymentClauses = append(paymentClauses, fmt.Sprintf("po.paid_at < $%d", endAtArg))
+	}
+	paymentWhere := strings.Join(paymentClauses, " AND ")
+
+	if filter.View == "groups" {
+		userClauses := []string{"u.deleted_at IS NULL"}
+		if filter.InviterID > 0 {
+			args = append(args, filter.InviterID)
+			userClauses = append(userClauses, fmt.Sprintf("ua.inviter_id = $%d", len(args)))
+		}
+		if filter.InviteeID > 0 {
+			args = append(args, filter.InviteeID)
+			userClauses = append(userClauses, fmt.Sprintf("u.id = $%d", len(args)))
+		}
+		search := strings.TrimSpace(filter.Search)
+		if search != "" {
+			args = append(args, "%"+search+"%")
+			searchArg := len(args)
+			userClauses = append(userClauses, fmt.Sprintf(`(
+inviter.email ILIKE $%[1]d OR inviter.username ILIKE $%[1]d OR inviter.id::text ILIKE $%[1]d OR
+u.email ILIKE $%[1]d OR u.username ILIKE $%[1]d OR u.id::text ILIKE $%[1]d OR
+inviter_aff.aff_code ILIKE $%[1]d OR
+CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
+)`, searchArg))
+		}
+		defaultRate := filter.DefaultRebateRatePercent
+		if defaultRate < service.AffiliateRebateRateMin {
+			defaultRate = service.AffiliateRebateRateMin
+		}
+		if defaultRate > service.AffiliateRebateRateMax {
+			defaultRate = service.AffiliateRebateRateMax
+		}
+		args = append(args, defaultRate)
+		ratePlaceholder := "$" + fmt.Sprint(len(args))
+		usageWhere := ""
+		if len(usageTimeClauses) > 0 {
+			usageWhere = "WHERE " + strings.Join(usageTimeClauses, " AND ")
+		}
+		userWhere := "WHERE " + strings.Join(userClauses, " AND ")
+		return fmt.Sprintf(`
+WITH usage_by_user AS (
+    SELECT ul.user_id,
+           COUNT(*)::bigint AS requests,
+           COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost
+    FROM usage_logs ul
+    %[2]s
+    GROUP BY ul.user_id
+),
+%[3]s,
+usage_user_records AS (
+    SELECT '' AS usage_date,
+           COALESCE(ua.inviter_id, 0)::bigint AS inviter_id,
+           CASE WHEN ua.inviter_id IS NULL THEN '' ELSE COALESCE(inviter.email, '') END AS inviter_email,
+           CASE WHEN ua.inviter_id IS NULL THEN '' ELSE COALESCE(inviter.username, '') END AS inviter_username,
+           u.id AS invitee_id,
+           COALESCE(u.email, '') AS invitee_email,
+           COALESCE(u.username, '') AS invitee_username,
+           COALESCE(ubu.requests, 0)::bigint AS requests,
+           COALESCE(ubu.total_tokens, 0)::bigint AS total_tokens,
+           COALESCE(ubu.actual_cost, 0)::double precision AS actual_cost,
+           CASE
+               WHEN ua.inviter_id IS NULL THEN 0::double precision
+               ELSE COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s)::double precision
+           END AS rebate_rate_percent,
+           CASE
+               WHEN ua.inviter_id IS NULL THEN 0::double precision
+               ELSE (COALESCE(ubu.actual_cost, 0) * COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s) / 100)::double precision
+           END AS rebate_amount,
+           (ua.inviter_id IS NULL) AS unassigned
+    FROM users u
+    LEFT JOIN usage_by_user ubu ON ubu.user_id = u.id
+    LEFT JOIN user_affiliates ua ON ua.user_id = u.id
+    LEFT JOIN users inviter ON inviter.id = ua.inviter_id
+    LEFT JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
+    %[4]s
+),
+recharge_by_user AS (
+    SELECT po.user_id,
+           COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount
+    FROM payment_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    CROSS JOIN exchange_rate er
+    WHERE %[6]s
+    GROUP BY po.user_id
+),
+records AS (
+    SELECT '' AS usage_date,
+           uur.inviter_id,
+           uur.inviter_email,
+           uur.inviter_username,
+           0::bigint AS invitee_id,
+           '' AS invitee_email,
+           '' AS invitee_username,
+           COUNT(*)::bigint AS invitee_count,
+           COALESCE(SUM(uur.requests), 0)::bigint AS requests,
+           COALESCE(SUM(uur.total_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(uur.actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(COALESCE(rb.recharge_amount, 0)), 0)::double precision AS recharge_amount,
+           uur.rebate_rate_percent,
+           COALESCE(SUM(uur.rebate_amount), 0)::double precision AS rebate_amount,
+           uur.unassigned,
+           COALESCE(jsonb_agg(jsonb_build_object(
+               'date', uur.usage_date,
+               'inviter_id', uur.inviter_id,
+               'inviter_email', uur.inviter_email,
+               'inviter_username', uur.inviter_username,
+               'invitee_id', uur.invitee_id,
+               'invitee_email', uur.invitee_email,
+               'invitee_username', uur.invitee_username,
+               'invitee_count', 1,
+               'requests', uur.requests,
+               'total_tokens', uur.total_tokens,
+               'actual_cost', uur.actual_cost,
+               'recharge_amount', COALESCE(rb.recharge_amount, 0),
+               'rebate_rate_percent', uur.rebate_rate_percent,
+               'rebate_amount', uur.rebate_amount,
+               'unassigned', uur.unassigned
+           ) ORDER BY uur.actual_cost DESC, COALESCE(rb.recharge_amount, 0) DESC, uur.invitee_id ASC), '[]'::jsonb) AS members
+    FROM usage_user_records uur
+    LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
+    GROUP BY uur.inviter_id, uur.inviter_email, uur.inviter_username, uur.rebate_rate_percent, uur.unassigned
+)
+`, ratePlaceholder, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountSQL, paymentWhere), args
+	}
+
+	userClauses := []string{"u.deleted_at IS NULL"}
+	if filter.InviterID > 0 {
+		args = append(args, filter.InviterID)
+		userClauses = append(userClauses, fmt.Sprintf("ua.inviter_id = $%d", len(args)))
+	}
+	if filter.InviteeID > 0 {
+		args = append(args, filter.InviteeID)
+		userClauses = append(userClauses, fmt.Sprintf("u.id = $%d", len(args)))
+	}
+	search := strings.TrimSpace(filter.Search)
+	if search != "" {
+		args = append(args, "%"+search+"%")
+		searchArg := len(args)
+		userClauses = append(userClauses, fmt.Sprintf(`(
+inviter.email ILIKE $%[1]d OR inviter.username ILIKE $%[1]d OR inviter.id::text ILIKE $%[1]d OR
+u.email ILIKE $%[1]d OR u.username ILIKE $%[1]d OR u.id::text ILIKE $%[1]d OR
+inviter_aff.aff_code ILIKE $%[1]d OR
+CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
+)`, searchArg))
+	}
+	defaultRate := filter.DefaultRebateRatePercent
+	if defaultRate < service.AffiliateRebateRateMin {
+		defaultRate = service.AffiliateRebateRateMin
+	}
+	if defaultRate > service.AffiliateRebateRateMax {
+		defaultRate = service.AffiliateRebateRateMax
+	}
+	args = append(args, defaultRate)
+	ratePlaceholder := "$" + fmt.Sprint(len(args))
+	usageWhere := ""
+	if len(usageTimeClauses) > 0 {
+		usageWhere = "WHERE " + strings.Join(usageTimeClauses, " AND ")
+	}
+	userWhere := "WHERE " + strings.Join(userClauses, " AND ")
+
+	return fmt.Sprintf(`
+WITH usage_by_user AS (
+    SELECT ul.user_id,
+           COUNT(*)::bigint AS requests,
+           COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost
+    FROM usage_logs ul
+    %[2]s
+    GROUP BY ul.user_id
+),
+%[3]s,
+usage_user_records AS (
+    SELECT '' AS usage_date,
+           COALESCE(ua.inviter_id, 0)::bigint AS inviter_id,
+           CASE WHEN ua.inviter_id IS NULL THEN '' ELSE COALESCE(inviter.email, '') END AS inviter_email,
+           CASE WHEN ua.inviter_id IS NULL THEN '' ELSE COALESCE(inviter.username, '') END AS inviter_username,
+           u.id AS invitee_id,
+           COALESCE(u.email, '') AS invitee_email,
+           COALESCE(u.username, '') AS invitee_username,
+           COALESCE(ubu.requests, 0)::bigint AS requests,
+           COALESCE(ubu.total_tokens, 0)::bigint AS total_tokens,
+           COALESCE(ubu.actual_cost, 0)::double precision AS actual_cost,
+           CASE
+               WHEN ua.inviter_id IS NULL THEN 0::double precision
+               ELSE COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s)::double precision
+           END AS rebate_rate_percent,
+           CASE
+               WHEN ua.inviter_id IS NULL THEN 0::double precision
+               ELSE (COALESCE(ubu.actual_cost, 0) * COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s) / 100)::double precision
+           END AS rebate_amount,
+           (ua.inviter_id IS NULL) AS unassigned
+    FROM users u
+    LEFT JOIN usage_by_user ubu ON ubu.user_id = u.id
+    LEFT JOIN user_affiliates ua ON ua.user_id = u.id
+    LEFT JOIN users inviter ON inviter.id = ua.inviter_id
+    LEFT JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
+    %[4]s
+),
+recharge_by_user AS (
+    SELECT po.user_id,
+           COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount
+    FROM payment_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    CROSS JOIN exchange_rate er
+    WHERE %[6]s
+    GROUP BY po.user_id
+),
+records AS (
+    SELECT uur.usage_date,
+           uur.inviter_id,
+           uur.inviter_email,
+           uur.inviter_username,
+           uur.invitee_id,
+           uur.invitee_email,
+           uur.invitee_username,
+           1::bigint AS invitee_count,
+           uur.requests,
+           uur.total_tokens,
+           uur.actual_cost,
+           COALESCE(rb.recharge_amount, 0)::double precision AS recharge_amount,
+           uur.rebate_rate_percent,
+           uur.rebate_amount,
+           uur.unassigned,
+           '[]'::jsonb AS members
+    FROM usage_user_records uur
+    LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
+)
+`, ratePlaceholder, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountSQL, paymentWhere), args
+}
+
+func affiliateUsageTimezone(tz string) string {
+	tz = strings.TrimSpace(tz)
+	if tz == "" {
+		return "UTC"
+	}
+	return tz
+}
+
+func buildAffiliateUsageOrderBy(filter service.AffiliateUsageFilter) string {
+	sortColumns := map[string]string{
+		"date":            "usage_date",
+		"inviter":         "inviter_email",
+		"invitee":         "invitee_email",
+		"user":            "invitee_email",
+		"invitee_count":   "invitee_count",
+		"requests":        "requests",
+		"total_tokens":    "total_tokens",
+		"actual_cost":     "actual_cost",
+		"recharge_amount": "recharge_amount",
+		"rebate_rate":     "rebate_rate_percent",
+		"rebate_amount":   "rebate_amount",
+	}
+	column := sortColumns[filter.SortBy]
+	if column == "" {
+		column = "actual_cost"
+	}
+	direction := "DESC"
+	if !filter.SortDesc {
+		direction = "ASC"
+	}
+	return "ORDER BY " + column + " " + direction + " NULLS LAST, inviter_id ASC, invitee_id ASC"
 }
 
 func queryAffiliateRecordCount(ctx context.Context, client affiliateQueryExecer, query string, args ...any) (int64, error) {

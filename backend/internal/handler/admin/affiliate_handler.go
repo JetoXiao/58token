@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -168,12 +169,14 @@ type AffiliateUserSummary struct {
 // LookupUsers searches users by email/username for the "add custom user" modal.
 // GET /api/v1/admin/affiliates/users/lookup?q=
 func (h *AffiliateHandler) LookupUsers(c *gin.Context) {
-	keyword := c.Query("q")
-	if keyword == "" {
-		response.Success(c, []AffiliateUserSummary{})
-		return
+	keyword := strings.TrimSpace(c.Query("q"))
+	sortBy := "id"
+	sortOrder := "desc"
+	if keyword != "" {
+		sortBy = "email"
+		sortOrder = "asc"
 	}
-	users, _, err := h.adminService.ListUsers(c.Request.Context(), 1, 20, service.UserListFilters{Search: keyword}, "email", "asc")
+	users, _, err := h.adminService.ListUsers(c.Request.Context(), 1, 20, service.UserListFilters{Search: keyword}, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -201,6 +204,27 @@ func (h *AffiliateHandler) GetUserOverview(c *gin.Context) {
 	response.Success(c, overview)
 }
 
+type AssignAffiliateInviterRequest struct {
+	InviterID int64 `json:"inviter_id" binding:"required"`
+	InviteeID int64 `json:"invitee_id" binding:"required"`
+}
+
+// AssignInviter manually assigns or reassigns an invitee to an inviter.
+// POST /api/v1/admin/affiliates/invites/assign
+func (h *AffiliateHandler) AssignInviter(c *gin.Context) {
+	var req AssignAffiliateInviterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	assignment, err := h.affiliateService.AdminAssignInviter(c.Request.Context(), req.InviteeID, req.InviterID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, assignment)
+}
+
 // ListInviteRecords returns all inviter-invitee relationships.
 // GET /api/v1/admin/affiliates/invites
 func (h *AffiliateHandler) ListInviteRecords(c *gin.Context) {
@@ -212,6 +236,26 @@ func (h *AffiliateHandler) ListInviteRecords(c *gin.Context) {
 		return
 	}
 	response.Paginated(c, items, total, filter.Page, filter.PageSize)
+}
+
+// ListUsageDailyRecords returns range usage grouped by user or inviter group.
+// GET /api/v1/admin/affiliates/usage
+func (h *AffiliateHandler) ListUsageDailyRecords(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	filter := parseAffiliateUsageFilter(c, page, pageSize)
+	items, summary, total, err := h.affiliateService.AdminListUsageDailyRecords(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{
+		"items":     items,
+		"total":     total,
+		"page":      filter.Page,
+		"page_size": filter.PageSize,
+		"pages":     affiliateUsagePages(total, filter.PageSize),
+		"summary":   summary,
+	})
 }
 
 // ListRebateRecords returns all order-level affiliate rebate records.
@@ -259,6 +303,99 @@ func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.Affi
 		filter.EndAt = t
 	}
 	return filter
+}
+
+func parseAffiliateUsageFilter(c *gin.Context, page, pageSize int) service.AffiliateUsageFilter {
+	userTZ := c.Query("timezone")
+	startAt := parseAffiliateRecordStartTime(c.Query("start_at"), userTZ)
+	endAt := parseAffiliateUsageEndTime(c.Query("end_at"), userTZ)
+	if startAt == nil || endAt == nil {
+		defaultStart, defaultEnd := defaultAffiliateUsageRange(userTZ)
+		if startAt == nil {
+			startAt = &defaultStart
+		}
+		if endAt == nil {
+			endAt = &defaultEnd
+		}
+	}
+	filter := service.AffiliateUsageFilter{
+		Search:    c.Query("search"),
+		Page:      page,
+		PageSize:  pageSize,
+		StartAt:   startAt,
+		EndAt:     endAt,
+		Timezone:  normalizeAffiliateUsageTimezone(userTZ),
+		InviterID: parseAffiliateInt64Query(c, "inviter_id"),
+		InviteeID: parseAffiliateInt64Query(c, "invitee_id"),
+		View:      c.Query("view"),
+		SortBy:    c.Query("sort_by"),
+		SortDesc:  c.Query("sort_order") != "asc",
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	return filter
+}
+
+func parseAffiliateInt64Query(c *gin.Context, name string) int64 {
+	raw := strings.TrimSpace(c.Query(name))
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || value <= 0 {
+		return 0
+	}
+	return value
+}
+
+func parseAffiliateUsageEndTime(raw string, userTZ string) *time.Time {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return &parsed
+	}
+	if parsed, err := timezone.ParseInUserLocation("2006-01-02", raw, userTZ); err == nil {
+		end := parsed.AddDate(0, 0, 1)
+		return &end
+	}
+	return nil
+}
+
+func defaultAffiliateUsageRange(userTZ string) (time.Time, time.Time) {
+	now := timezone.NowInUserLocation(userTZ)
+	start := timezone.StartOfDayInUserLocation(now.AddDate(0, 0, -29), userTZ)
+	end := timezone.StartOfDayInUserLocation(now.AddDate(0, 0, 1), userTZ)
+	return start, end
+}
+
+func normalizeAffiliateUsageTimezone(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw != "" {
+		if _, err := time.LoadLocation(raw); err == nil {
+			return raw
+		}
+	}
+	name := timezone.Name()
+	if name != "" && name != "Local" {
+		if _, err := time.LoadLocation(name); err == nil {
+			return name
+		}
+	}
+	return "UTC"
+}
+
+func affiliateUsagePages(total int64, pageSize int) int {
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	pages := int(math.Ceil(float64(total) / float64(pageSize)))
+	if pages < 1 {
+		return 1
+	}
+	return pages
 }
 
 func parseAffiliateRecordStartTime(raw string, userTZ string) *time.Time {

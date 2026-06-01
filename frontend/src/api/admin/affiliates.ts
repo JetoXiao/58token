@@ -34,6 +34,12 @@ export interface ListAffiliateRecordsParams {
   timezone?: string
 }
 
+export interface ListAffiliateUsageParams extends ListAffiliateRecordsParams {
+  inviter_id?: number
+  invitee_id?: number
+  view?: 'users' | 'groups'
+}
+
 export interface AffiliateInviteRecord {
   inviter_id: number
   inviter_email: string
@@ -44,6 +50,36 @@ export interface AffiliateInviteRecord {
   aff_code: string
   total_rebate: number
   created_at: string
+}
+
+export interface AffiliateUsageDailyRecord {
+  date?: string
+  inviter_id: number
+  inviter_email: string
+  inviter_username: string
+  invitee_id: number
+  invitee_email: string
+  invitee_username: string
+  invitee_count: number
+  requests: number
+  total_tokens: number
+  actual_cost: number
+  recharge_amount: number
+  rebate_rate_percent: number
+  rebate_amount: number
+  unassigned: boolean
+  members?: AffiliateUsageDailyRecord[]
+}
+
+export interface AffiliateUsageSummary {
+  total_requests: number
+  total_tokens: number
+  total_actual_cost: number
+  total_rebate_amount: number
+}
+
+export interface AffiliateUsageResponse extends PaginatedResponse<AffiliateUsageDailyRecord> {
+  summary: AffiliateUsageSummary
 }
 
 export interface AffiliateRebateRecord {
@@ -101,6 +137,17 @@ export interface BatchSetRateRequest {
   aff_rebate_rate_percent?: number | null
   /** Set true to clear rates instead of setting. */
   clear?: boolean
+}
+
+export interface AssignInviterRequest {
+  inviter_id: number
+  invitee_id: number
+}
+
+export interface AssignInviterResponse {
+  inviter_id: number
+  invitee_id: number
+  changed: boolean
 }
 
 export interface SimpleUser {
@@ -186,6 +233,33 @@ export async function listInviteRecords(
   return data
 }
 
+export async function assignInviter(
+  payload: AssignInviterRequest,
+): Promise<AssignInviterResponse> {
+  const { data } = await apiClient.post<AssignInviterResponse>(
+    '/admin/affiliates/invites/assign',
+    payload,
+  )
+  return data
+}
+
+export async function listUsageDailyRecords(
+  params: ListAffiliateUsageParams = {},
+): Promise<AffiliateUsageResponse> {
+  const { data } = await apiClient.get<AffiliateUsageResponse>(
+    '/admin/affiliates/usage',
+    {
+      params: {
+        ...recordParams(params),
+        inviter_id: params.inviter_id || undefined,
+        invitee_id: params.invitee_id || undefined,
+        view: params.view || undefined,
+      },
+    },
+  )
+  return data
+}
+
 export async function listRebateRecords(
   params: ListAffiliateRecordsParams = {},
 ): Promise<PaginatedResponse<AffiliateRebateRecord>> {
@@ -221,7 +295,9 @@ export const affiliatesAPI = {
   updateUserSettings,
   clearUserSettings,
   batchSetRate,
+  assignInviter,
   listInviteRecords,
+  listUsageDailyRecords,
   listRebateRecords,
   listTransferRecords,
   getUserOverview,
