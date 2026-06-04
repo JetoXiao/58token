@@ -4338,6 +4338,48 @@
                 </div>
               </div>
 
+              <div class="rounded-lg border border-gray-100 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/50">
+                <div>
+                  <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ localText("营销导航菜单", "Marketing Navigation") }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText("控制首页、模型广场、接入文档和合伙人页顶部展示哪些主要菜单入口。", "Control which primary menu entries appear in the top navigation on public marketing pages.") }}
+                  </p>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <button
+                    v-for="item in marketingNavOptions"
+                    :key="item.value"
+                    type="button"
+                    :data-testid="`marketing-nav-${item.value}`"
+                    class="flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-900"
+                    :class="isMarketingNavItemEnabled(item.value)
+                      ? 'border-primary-300 bg-primary-50/80 dark:border-primary-500/60 dark:bg-primary-900/20'
+                      : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-primary-50/40 dark:border-dark-600 dark:bg-dark-900/70 dark:hover:border-primary-500/40 dark:hover:bg-primary-900/10'"
+                    :aria-pressed="isMarketingNavItemEnabled(item.value)"
+                    @click="toggleMarketingNavItem(item.value)"
+                  >
+                    <span
+                      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition"
+                      :class="isMarketingNavItemEnabled(item.value)
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-gray-300 bg-white text-transparent dark:border-dark-500 dark:bg-dark-800'"
+                    >
+                      <Icon name="check" size="xs" :stroke-width="3" />
+                    </span>
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                        {{ item.label }}
+                      </span>
+                      <span class="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                        {{ item.description }}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <!-- API Base URL -->
               <div>
                 <label
@@ -5233,6 +5275,71 @@
                 />
                 <p class="mt-1 text-xs text-gray-400">
                   {{ t('admin.settings.features.affiliate.perInviteeCapDesc') }}
+                </p>
+              </div>
+
+              <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
+                <div class="mb-3">
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ t('admin.settings.features.affiliate.groupProfitRates.title') }}
+                  </h3>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.settings.features.affiliate.groupProfitRates.description') }}
+                  </p>
+                </div>
+
+                <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+                    <thead class="bg-gray-50 dark:bg-dark-800">
+                      <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                          {{ t('admin.settings.features.affiliate.groupProfitRates.group') }}
+                        </th>
+                        <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                          {{ t('admin.settings.features.affiliate.groupProfitRates.platform') }}
+                        </th>
+                        <th class="px-3 py-2 text-right text-xs font-medium uppercase text-gray-500">
+                          {{ t('admin.settings.features.affiliate.groupProfitRates.rate') }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
+                      <tr v-if="affiliateProfitGroups.length === 0">
+                        <td colspan="3" class="px-3 py-6 text-center text-sm text-gray-500 dark:text-dark-400">
+                          {{ t('admin.settings.features.affiliate.groupProfitRates.empty') }}
+                        </td>
+                      </tr>
+                      <tr v-for="group in affiliateProfitGroups" :key="group.id">
+                        <td class="px-3 py-2">
+                          <div class="font-medium text-gray-900 dark:text-white">{{ group.name }}</div>
+                          <div class="text-xs text-gray-500 dark:text-dark-400">#{{ group.id }}</div>
+                        </td>
+                        <td class="px-3 py-2 text-sm text-gray-600 dark:text-dark-300">
+                          {{ group.platform }}
+                        </td>
+                        <td class="px-3 py-2">
+                          <div class="ml-auto w-32">
+                            <div class="relative">
+                              <input
+                                v-model="affiliateGroupProfitRateInputs[String(group.id)]"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="100"
+                                class="input pr-8 text-right"
+                                placeholder="0"
+                                @blur="commitAffiliateGroupProfitRateInput(String(group.id))"
+                              />
+                              <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="mt-2 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.groupProfitRates.hint') }}
                 </p>
               </div>
 
@@ -6706,6 +6813,11 @@ import {
   normalizeRegistrationEmailSuffixDomains,
   parseRegistrationEmailSuffixWhitelistInput,
 } from "@/utils/registrationEmailPolicy";
+import {
+  DEFAULT_MARKETING_NAV_ITEMS,
+  normalizeMarketingNavItems,
+  type MarketingNavItem,
+} from "@/utils/marketingNav";
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
@@ -6715,6 +6827,31 @@ const isZhLocale = computed(() => locale.value.startsWith("zh"));
 function localText(zh: string, en: string): string {
   return isZhLocale.value ? zh : en;
 }
+
+const marketingNavOptions = computed<
+  Array<{ value: MarketingNavItem; label: string; description: string }>
+>(() => [
+  {
+    value: "models",
+    label: localText("模型广场", "Model Marketplace"),
+    description: localText("展示可用模型和平台价格入口。", "Show the available models and platform pricing entry."),
+  },
+  {
+    value: "docs",
+    label: localText("接入文档", "Integration Docs"),
+    description: localText("展示 API 接入指南入口。", "Show the API integration guide entry."),
+  },
+  {
+    value: "partner",
+    label: localText("合伙人", "Partners"),
+    description: localText("展示合伙人计划介绍入口。", "Show the partner program entry."),
+  },
+]);
+const marketingNavSelection = reactive<Record<MarketingNavItem, boolean>>({
+  models: true,
+  docs: true,
+  partner: true,
+});
 
 const paymentGuideHref = computed(() =>
   locale.value.startsWith("zh")
@@ -6760,6 +6897,7 @@ const marketplaceGroupMultiplierKeys = [
 ] as const;
 
 const marketplaceGroupMultiplierInputs = reactive<Record<string, string>>({});
+const affiliateGroupProfitRateInputs = reactive<Record<string, string>>({});
 
 const settingsTabKeyboardActions = {
   ArrowLeft: -1,
@@ -6838,6 +6976,79 @@ function parseMarketplaceGroupMultiplierInput(
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function normalizeAffiliateGroupProfitRates(
+  raw: Record<string, number> | null | undefined,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [groupId, rate] of Object.entries(raw ?? {})) {
+    const key = String(groupId).trim();
+    if (!/^\d+$/.test(key)) continue;
+    const normalized = normalizeAffiliateGroupProfitRate(rate);
+    if (normalized > 0) {
+      result[key] = normalized;
+    }
+  }
+  return result;
+}
+
+function normalizeAffiliateGroupProfitRate(
+  raw: string | number | null | undefined,
+): number {
+  const value = String(raw ?? "")
+    .trim()
+    .replace("，", ".")
+    .replace(",", ".")
+    .replace(/%$/, "")
+    .trim();
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.min(100, parsed);
+}
+
+function syncAffiliateGroupProfitRateInputs(
+  values: Record<string, number> | null | undefined,
+): void {
+  const normalized = normalizeAffiliateGroupProfitRates(values);
+  form.affiliate_group_profit_rates = normalized;
+  for (const group of affiliateGroups.value) {
+    const key = String(group.id);
+    affiliateGroupProfitRateInputs[key] =
+      normalized[key] != null ? String(normalized[key]) : "";
+  }
+}
+
+function commitAffiliateGroupProfitRateInput(groupId: string): void {
+  const normalized = normalizeAffiliateGroupProfitRate(
+    affiliateGroupProfitRateInputs[groupId],
+  );
+  if (normalized > 0) {
+    form.affiliate_group_profit_rates[groupId] = normalized;
+    affiliateGroupProfitRateInputs[groupId] = String(normalized);
+  } else {
+    delete form.affiliate_group_profit_rates[groupId];
+    affiliateGroupProfitRateInputs[groupId] = "";
+  }
+}
+
+function affiliateGroupProfitRatesPayload(): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const group of affiliateGroups.value) {
+    const groupId = String(group.id);
+    const normalized = normalizeAffiliateGroupProfitRate(
+      affiliateGroupProfitRateInputs[groupId] ??
+        form.affiliate_group_profit_rates[groupId],
+    );
+    if (normalized > 0) {
+      result[groupId] = normalized;
+      affiliateGroupProfitRateInputs[groupId] = String(normalized);
+    } else {
+      affiliateGroupProfitRateInputs[groupId] = "";
+    }
+  }
+  form.affiliate_group_profit_rates = result;
+  return result;
+}
+
 async function fetchPersistedMarketplaceGroupMultipliers(
   fallback?: Record<string, number> | null,
 ): Promise<Record<string, number>> {
@@ -6908,6 +7119,16 @@ const adminApiKeyMasked = ref("");
 const adminApiKeyOperating = ref(false);
 const newAdminApiKey = ref("");
 const subscriptionGroups = ref<AdminGroup[]>([]);
+const affiliateGroups = ref<AdminGroup[]>([]);
+const affiliateProfitGroups = computed(() =>
+  affiliateGroups.value
+    .filter((group) => group.status === "active")
+    .slice()
+    .sort((a, b) => {
+      const orderDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      return orderDiff !== 0 ? orderDiff : a.id - b.id;
+    }),
+);
 
 // Overload Cooldown (529) 状态
 const overloadCooldownLoading = ref(true);
@@ -7069,6 +7290,7 @@ const form = reactive<SettingsForm>({
   affiliate_rebate_freeze_hours: 0,
   affiliate_rebate_duration_days: 0,
   affiliate_rebate_per_invitee_cap: 0,
+  affiliate_group_profit_rates: {},
   default_concurrency: 1,
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
@@ -7116,6 +7338,7 @@ const form = reactive<SettingsForm>({
   payment_alipay_force_qrcode: false,
   table_default_page_size: tablePageSizeDefault,
   table_page_size_options: [10, 20, 50, 100],
+  marketing_nav_items: [...DEFAULT_MARKETING_NAV_ITEMS],
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -7779,6 +8002,27 @@ function moveMenuItem(index: number, direction: -1 | 1) {
   });
 }
 
+function isMarketingNavItemEnabled(item: MarketingNavItem): boolean {
+  return marketingNavSelection[item];
+}
+
+function toggleMarketingNavItem(item: MarketingNavItem) {
+  marketingNavSelection[item] = !marketingNavSelection[item];
+  form.marketing_nav_items = marketingNavItemsFromSelection();
+}
+
+function setMarketingNavItems(value: unknown) {
+  const selected = new Set(normalizeMarketingNavItems(value));
+  for (const item of DEFAULT_MARKETING_NAV_ITEMS) {
+    marketingNavSelection[item] = selected.has(item);
+  }
+  form.marketing_nav_items = marketingNavItemsFromSelection();
+}
+
+function marketingNavItemsFromSelection(): MarketingNavItem[] {
+  return DEFAULT_MARKETING_NAV_ITEMS.filter((item) => marketingNavSelection[item]);
+}
+
 // Custom endpoint management
 function addEndpoint() {
   form.custom_endpoints.push({ name: "", endpoint: "", description: "" });
@@ -7869,6 +8113,7 @@ async function loadSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    setMarketingNavItems(settings.marketing_nav_items);
     form.payment_marketplace_group_multipliers =
       await fetchPersistedMarketplaceGroupMultipliers(
         settings.payment_marketplace_group_multipliers,
@@ -7876,6 +8121,10 @@ async function loadSettings() {
     syncMarketplaceGroupMultiplierInputs(
       form.payment_marketplace_group_multipliers,
     );
+    form.affiliate_group_profit_rates = normalizeAffiliateGroupProfitRates(
+      settings.affiliate_group_profit_rates,
+    );
+    syncAffiliateGroupProfitRateInputs(form.affiliate_group_profit_rates);
     form.login_agreement_mode =
       settings.login_agreement_mode === "checkbox" ? "checkbox" : "modal";
     form.login_agreement_updated_at =
@@ -8000,11 +8249,14 @@ async function loadSettings() {
 async function loadSubscriptionGroups() {
   try {
     const groups = await adminAPI.groups.getAll();
+    affiliateGroups.value = groups;
     subscriptionGroups.value = groups.filter(
       (group) =>
         group.subscription_type === "subscription" && group.status === "active",
     );
+    syncAffiliateGroupProfitRateInputs(form.affiliate_group_profit_rates);
   } catch (_error: unknown) {
+    affiliateGroups.value = [];
     subscriptionGroups.value = [];
   }
 }
@@ -8204,6 +8456,7 @@ async function saveSettings() {
       form.wechat_connect_mobile_enabled,
       form.wechat_connect_mode,
     );
+    const requestedMarketingNavItems = marketingNavItemsFromSelection();
 
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
@@ -8228,6 +8481,7 @@ async function saveSettings() {
       affiliate_rebate_freeze_hours: Math.max(0, Math.min(720, Number(form.affiliate_rebate_freeze_hours) || 0)),
       affiliate_rebate_duration_days: Math.max(0, Math.min(3650, Math.floor(Number(form.affiliate_rebate_duration_days) || 0))),
       affiliate_rebate_per_invitee_cap: Math.max(0, Number(form.affiliate_rebate_per_invitee_cap) || 0),
+      affiliate_group_profit_rates: affiliateGroupProfitRatesPayload(),
       default_concurrency: form.default_concurrency,
       default_subscriptions: normalizedDefaultSubscriptions,
       force_email_on_third_party_signup: form.force_email_on_third_party_signup,
@@ -8244,6 +8498,7 @@ async function saveSettings() {
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,
+      marketing_nav_items: requestedMarketingNavItems,
       custom_endpoints: form.custom_endpoints,
       frontend_url: form.frontend_url,
       smtp_host: form.smtp_host,
@@ -8462,6 +8717,11 @@ async function saveSettings() {
         (form as Record<string, unknown>)[key] = value;
       }
     }
+    setMarketingNavItems(
+      Array.isArray(updated.marketing_nav_items)
+        ? updated.marketing_nav_items
+        : requestedMarketingNavItems,
+    );
     form.payment_marketplace_group_multipliers =
       await fetchPersistedMarketplaceGroupMultipliers(
         updated.payment_marketplace_group_multipliers ??
@@ -8470,6 +8730,10 @@ async function saveSettings() {
     syncMarketplaceGroupMultiplierInputs(
       form.payment_marketplace_group_multipliers,
     );
+    form.affiliate_group_profit_rates = normalizeAffiliateGroupProfitRates(
+      updated.affiliate_group_profit_rates,
+    );
+    syncAffiliateGroupProfitRateInputs(form.affiliate_group_profit_rates);
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(

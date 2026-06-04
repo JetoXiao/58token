@@ -147,6 +147,7 @@ interface Props {
   baseUrl: string
   platform: GroupPlatform | null
   allowMessagesDispatch?: boolean
+  allowImageGeneration?: boolean
 }
 
 interface Emits {
@@ -378,7 +379,13 @@ const CLAUDE_CODE_TIMEOUT_MS = '3000000'
 const CODEX_DEFAULT_MODEL = 'gpt-5.5'
 const CODEX_REVIEW_MODEL = 'gpt-5.4'
 const CODEX_REASONING_EFFORT = 'medium'
+const OPENAI_IMAGE_MODEL = 'gpt-image-2'
+const OPENAI_IMAGE_DEFAULT_SIZE = '1K'
 const OPENCODE_TIMEOUT_MS = 3000000
+
+const isOpenAIImageGenerationGroup = computed(() =>
+  props.platform === 'openai' && props.allowImageGeneration === true
+)
 
 const claudeCodeEnabledPlugins = {
   'commit-commands@claude-plugins-official': true,
@@ -415,7 +422,7 @@ const currentFiles = computed((): FileConfig[] => {
       case 'anthropic':
         return [generateOpenCodeConfig('anthropic', apiBase, apiKey)]
       case 'openai':
-        return [generateOpenCodeConfig('openai', apiBase, apiKey)]
+        return [generateOpenCodeConfig('openai', apiBase, apiKey, undefined, isOpenAIImageGenerationGroup.value)]
       case 'gemini':
         return [generateOpenCodeConfig('gemini', geminiBase, apiKey)]
       case 'antigravity':
@@ -434,7 +441,13 @@ const currentFiles = computed((): FileConfig[] => {
         return generateAnthropicFiles(baseUrl, apiKey)
       }
       if (activeClientTab.value === 'codex-ws') {
+        if (isOpenAIImageGenerationGroup.value) {
+          return generateOpenAIImageFiles(baseUrl, apiKey, { supportsWebsockets: true })
+        }
         return generateOpenAIWsFiles(baseUrl, apiKey)
+      }
+      if (isOpenAIImageGenerationGroup.value) {
+        return generateOpenAIImageFiles(baseUrl, apiKey)
       }
       return generateOpenAIFiles(baseUrl, apiKey)
     case 'gemini':
@@ -660,7 +673,69 @@ requires_openai_auth = true`
   ]
 }
 
-function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: string, pathLabel?: string): FileConfig {
+function generateOpenAIImageFiles(
+  baseUrl: string,
+  apiKey: string,
+  options: { supportsWebsockets?: boolean } = {}
+): FileConfig[] {
+  const isWindows = activeTab.value === 'windows'
+  const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
+  const websocketLine = options.supportsWebsockets
+    ? '\nsupports_websockets = true'
+    : ''
+
+  const configContent = `model_provider = "OpenAI"
+model = "${OPENAI_IMAGE_MODEL}"
+disable_response_storage = true
+network_access = "enabled"
+windows_wsl_setup_acknowledged = true
+
+[model_providers.OpenAI]
+name = "OpenAI"
+base_url = "${baseUrl}"
+wire_api = "responses"${websocketLine}
+requires_openai_auth = true`
+
+  const authContent = `{
+  "OPENAI_API_KEY": "${apiKey}"
+}`
+
+  const requestContent = JSON.stringify(
+    {
+      model: OPENAI_IMAGE_MODEL,
+      prompt: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',
+      n: 1,
+      size: OPENAI_IMAGE_DEFAULT_SIZE,
+      response_format: 'b64_json'
+    },
+    null,
+    2
+  )
+
+  return [
+    {
+      path: `${configDir}/config.toml`,
+      content: configContent,
+      hint: t('keys.useKeyModal.openai.configTomlHint')
+    },
+    {
+      path: `${configDir}/auth.json`,
+      content: authContent
+    },
+    {
+      path: 'image-generation-request.json',
+      content: requestContent
+    }
+  ]
+}
+
+function generateOpenCodeConfig(
+  platform: string,
+  baseUrl: string,
+  apiKey: string,
+  pathLabel?: string,
+  useOpenAIImageConfig = false
+): FileConfig {
   const provider: Record<string, any> = {
     [platform]: {
       options: {
@@ -672,7 +747,19 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
       }
     }
   }
-  const openaiModels = {
+  const openaiImageModels = {
+    [OPENAI_IMAGE_MODEL]: {
+      name: 'GPT Image 2',
+      modalities: {
+        input: ['text', 'image'],
+        output: ['image']
+      },
+      options: {
+        store: false
+      }
+    }
+  }
+  const openaiModels = useOpenAIImageConfig ? openaiImageModels : {
     'gpt-5.2': {
       name: 'GPT-5.2',
       limit: {
@@ -1108,7 +1195,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
           }
         }
       : undefined
-  const defaultModel = getOpenCodeDefaultModel(platform)
+  const defaultModel = getOpenCodeDefaultModel(platform, useOpenAIImageConfig)
 
   const content = JSON.stringify(
     {
@@ -1129,7 +1216,7 @@ function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: strin
   }
 }
 
-function getOpenCodeDefaultModel(platform: string): { model: string; smallModel: string } {
+function getOpenCodeDefaultModel(platform: string, useOpenAIImageConfig = false): { model: string; smallModel: string } {
   switch (platform) {
     case 'anthropic':
       return {
@@ -1137,6 +1224,12 @@ function getOpenCodeDefaultModel(platform: string): { model: string; smallModel:
         smallModel: 'anthropic/claude-opus-4-8'
       }
     case 'openai':
+      if (useOpenAIImageConfig) {
+        return {
+          model: `openai/${OPENAI_IMAGE_MODEL}`,
+          smallModel: `openai/${OPENAI_IMAGE_MODEL}`
+        }
+      }
       return {
         model: 'openai/gpt-5.5',
         smallModel: 'openai/gpt-5.4-mini'

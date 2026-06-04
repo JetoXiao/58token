@@ -652,7 +652,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, recharge_bonus_threshold: 100, recharge_bonus_amount: 10, usdt_cny_exchange_rate: 7.2, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, recharge_bonus_threshold: 100, recharge_bonus_amount: 10, usdt_cny_exchange_rate: 7, help_text: '', help_image_url: '', stripe_publishable_key: '',
 })
 
 const tabs = computed(() => {
@@ -687,7 +687,7 @@ const rechargeBonusAmount = computed(() => bonusForAmount(validAmount.value))
 const creditedAmount = computed(() => creditedForAmount(validAmount.value))
 const usdtCnyExchangeRate = computed(() => {
   const rate = Number(checkout.value.usdt_cny_exchange_rate)
-  return Number.isFinite(rate) && rate > 0 ? rate : 7.2
+  return Number.isFinite(rate) && rate > 0 ? rate : 7
 })
 const usdtCnyExchangeRateLabel = computed(() => `1 USDT = ${formatRateNumber(usdtCnyExchangeRate.value)} CNY`)
 const usdtPaymentAmount = computed(() => usdtPaymentForAmount(validAmount.value))

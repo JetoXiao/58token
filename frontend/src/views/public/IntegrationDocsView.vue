@@ -18,6 +18,9 @@
       :cta-label="isAuthenticated ? t('home.dashboard') : t('home.login')"
       model-marketplace-to="/available-channels"
       :model-marketplace-label="t('nav.availableChannels')"
+      partner-to="/partners"
+      :partner-label="t('gateway.common.partner')"
+      :visible-items="marketingNavItems"
     >
       <template #tools>
         <LocaleSwitcher />
@@ -399,6 +402,7 @@ const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appS
 const siteLogo = computed(() => BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))

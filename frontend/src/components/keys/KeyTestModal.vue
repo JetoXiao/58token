@@ -70,6 +70,42 @@
         />
       </div>
 
+      <div
+        v-if="selectedImageModelNeedsEnabled"
+        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+      >
+        {{ t('keys.testModal.imageGenerationDisabled') }}
+      </div>
+
+      <div
+        v-else-if="imageModelUnsupported"
+        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+      >
+        {{ t('keys.testModal.unsupportedImageModel') }}
+      </div>
+
+      <div v-if="supportsImageTest" class="space-y-4">
+        <TextArea
+          v-model="testPrompt"
+          :label="t('keys.testModal.imagePromptLabel')"
+          :placeholder="t('keys.testModal.imagePromptPlaceholder')"
+          :hint="t('keys.testModal.imageTestHint')"
+          :disabled="status === 'connecting'"
+          rows="3"
+        />
+
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('keys.testModal.imageSizeLabel') }}
+          </label>
+          <Select
+            v-model="selectedImageSizeTier"
+            :options="imageSizeOptions"
+            :disabled="status === 'connecting'"
+          />
+        </div>
+      </div>
+
       <div class="group relative">
         <div
           ref="terminalRef"
@@ -77,7 +113,7 @@
         >
           <div v-if="status === 'idle'" class="flex items-center gap-2 text-gray-500">
             <Icon name="play" size="sm" :stroke-width="2" />
-            <span>{{ t('keys.testModal.ready') }}</span>
+            <span>{{ supportsImageTest ? t('keys.testModal.imageReady') : t('keys.testModal.ready') }}</span>
           </div>
           <div v-else-if="status === 'connecting'" class="flex items-center gap-2 text-yellow-400">
             <Icon name="refresh" size="sm" class="animate-spin" :stroke-width="2" />
@@ -118,6 +154,50 @@
         </button>
       </div>
 
+      <div v-if="generatedImages.length > 0" class="space-y-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-300">
+          {{ t('keys.testModal.imagePreview') }}
+        </div>
+        <div class="flex flex-wrap justify-center gap-3">
+          <div
+            v-for="(image, index) in generatedImages"
+            :key="`${image.url}-${index}`"
+            class="group/img relative cursor-pointer overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-primary-300 hover:shadow-md dark:border-dark-500 dark:bg-dark-700"
+            @click="previewImageUrl = image.url"
+          >
+            <img :src="image.url" :alt="`key-test-image-${index + 1}`" class="max-h-[360px] w-full object-contain" />
+            <div class="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover/img:bg-black/20">
+              <Icon name="eye" size="lg" class="text-white opacity-0 drop-shadow-lg transition-opacity group-hover/img:opacity-100" :stroke-width="2" />
+            </div>
+            <div class="border-t border-gray-100 px-3 py-1.5 text-xs text-gray-500 dark:border-dark-500 dark:text-gray-300">
+              {{ image.mimeType || 'image/*' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Teleport to="body">
+        <Transition name="fade">
+          <div
+            v-if="previewImageUrl"
+            class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+            @click.self="previewImageUrl = ''"
+          >
+            <button
+              class="absolute right-4 top-4 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+              @click="previewImageUrl = ''"
+            >
+              <Icon name="x" size="lg" :stroke-width="2" />
+            </button>
+            <img
+              :src="previewImageUrl"
+              alt="preview"
+              class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            />
+          </div>
+        </Transition>
+      </Teleport>
+
       <div class="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-gray-500 dark:text-gray-400">
         <span class="flex items-center gap-1">
           <Icon name="grid" size="sm" :stroke-width="2" />
@@ -125,12 +205,16 @@
         </span>
         <span class="flex items-center gap-1">
           <Icon name="chat" size="sm" :stroke-width="2" />
-          {{ t('keys.testModal.testPrompt') }}
+          {{
+            supportsImageTest
+              ? t('keys.testModal.imageTestModeWithSize', { size: selectedImageSizeTier })
+              : t('keys.testModal.testPrompt')
+          }}
         </span>
       </div>
 
       <p class="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-        {{ t('keys.testModal.smallUsageHint') }}
+        {{ supportsImageTest ? t('keys.testModal.imageSmallUsageHint') : t('keys.testModal.smallUsageHint') }}
       </p>
     </div>
 
@@ -144,10 +228,10 @@
         </button>
         <button
           @click="startTest"
-          :disabled="status === 'connecting' || !selectedModelId || !canTest"
+          :disabled="status === 'connecting' || !canStartTest"
           :class="[
             'flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all',
-            status === 'connecting' || !selectedModelId || !canTest
+            status === 'connecting' || !canStartTest
               ? 'cursor-not-allowed bg-primary-400/70 text-white'
               : status === 'success'
                 ? 'bg-green-500 text-white hover:bg-green-600'
@@ -185,6 +269,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
+import TextArea from '@/components/common/TextArea.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { maskApiKey } from '@/utils/maskApiKey'
@@ -195,10 +280,17 @@ interface OutputLine {
   class: string
 }
 
+interface PreviewImage {
+  url: string
+  mimeType?: string
+}
+
 type ModelOption = Record<string, unknown> & {
   value: string
   label: string
 }
+
+type ImageSizeTier = '1K' | '2K' | '4K'
 
 interface MarketplaceItemResponse {
   model_name: string
@@ -234,13 +326,59 @@ const streamingContent = ref('')
 const errorMessage = ref('')
 const marketplaceItems = ref<MarketplaceItemResponse[]>([])
 const marketplaceLoading = ref(false)
+const testPrompt = ref('')
+const selectedImageSizeTier = ref<ImageSizeTier>('1K')
+const generatedImages = ref<PreviewImage[]>([])
+const previewImageUrl = ref('')
 let abortController: AbortController | null = null
 
 const platform = computed(() => props.apiKey?.group?.platform ?? null)
 const groupName = computed(() => props.apiKey?.group?.name ?? '')
 const canTest = computed(() => !!props.apiKey?.group && props.apiKey.status === 'active')
-const endpoint = computed(() => (platform.value === 'openai' || platform.value === 'gemini' ? '/v1/chat/completions' : '/v1/messages'))
+const normalizedSelectedModelId = computed(() => normalizeModelId(selectedModelId.value))
+const groupAllowsImageGeneration = computed(() => props.apiKey?.group?.allow_image_generation === true)
+const isOpenAIImageModel = computed(() => normalizedSelectedModelId.value.startsWith('gpt-image-'))
+const isGeminiImageModel = computed(() => normalizedSelectedModelId.value.startsWith('gemini-') && normalizedSelectedModelId.value.includes('image'))
+const isSelectedImageModel = computed(() => isOpenAIImageModel.value || isGeminiImageModel.value)
+const supportsOpenAIImageTest = computed(() => isOpenAIImageModel.value && platform.value === 'openai' && groupAllowsImageGeneration.value)
+const supportsGeminiImageTest = computed(() => isGeminiImageModel.value && (platform.value === 'gemini' || platform.value === 'antigravity') && groupAllowsImageGeneration.value)
+const supportsImageTest = computed(() => supportsOpenAIImageTest.value || supportsGeminiImageTest.value)
+const selectedImageModelNeedsEnabled = computed(() => !!props.apiKey?.group && isSelectedImageModel.value && !groupAllowsImageGeneration.value)
+const imageModelUnsupported = computed(() => isSelectedImageModel.value && groupAllowsImageGeneration.value && !supportsImageTest.value)
+const canStartTest = computed(() => !!selectedModelId.value && canTest.value && !selectedImageModelNeedsEnabled.value && !imageModelUnsupported.value)
+const textEndpoint = computed(() => (platform.value === 'openai' || platform.value === 'gemini' ? '/v1/chat/completions' : '/v1/messages'))
+const endpoint = computed(() => {
+  if (supportsOpenAIImageTest.value) return '/v1/images/generations'
+  if (supportsGeminiImageTest.value) return buildGeminiImageEndpoint()
+  return textEndpoint.value
+})
 const endpointLabel = computed(() => `${t('keys.testModal.endpoint')}: ${endpoint.value}`)
+const imageSizeOptions = computed(() => [
+  { value: '1K', label: t('keys.testModal.imageSize1k') },
+  { value: '2K', label: t('keys.testModal.imageSize2k') },
+  { value: '4K', label: t('keys.testModal.imageSize4k') }
+])
+const imageFallbackModelOptions = computed<ModelOption[]>(() => {
+  if (!groupAllowsImageGeneration.value) return []
+
+  switch (platform.value) {
+    case 'openai':
+      return [{
+        value: 'gpt-image-2',
+        label: 'GPT Image 2',
+        source: 'image-fallback'
+      }]
+    case 'gemini':
+    case 'antigravity':
+      return [{
+        value: 'gemini-2.5-flash-image',
+        label: 'Gemini 2.5 Flash Image',
+        source: 'image-fallback'
+      }]
+    default:
+      return []
+  }
+})
 
 const marketplaceModelOptions = computed<ModelOption[]>(() => {
   const enabledItems = marketplaceItems.value.filter((item) => item.enabled !== false && item.model_name)
@@ -272,7 +410,10 @@ const marketplaceModelOptions = computed<ModelOption[]>(() => {
     })
 })
 
-const availableModels = computed(() => marketplaceModelOptions.value)
+const availableModels = computed(() => mergeModelOptions([
+  ...imageFallbackModelOptions.value,
+  ...marketplaceModelOptions.value
+]))
 
 watch(
   () => props.show,
@@ -280,6 +421,8 @@ watch(
     if (visible) {
       resetState()
       selectedModelId.value = ''
+      testPrompt.value = ''
+      selectedImageSizeTier.value = '1K'
       loadMarketplaceModels()
     } else {
       abortStream()
@@ -297,6 +440,16 @@ watch(groupName, () => {
 
 watch(availableModels, () => {
   selectDefaultModel()
+})
+
+watch([selectedModelId, supportsImageTest], () => {
+  if (supportsImageTest.value && !testPrompt.value.trim()) {
+    testPrompt.value = t('keys.testModal.imagePromptDefault')
+  }
+  if (!supportsImageTest.value) {
+    generatedImages.value = []
+    previewImageUrl.value = ''
+  }
 })
 
 const selectDefaultModel = () => {
@@ -333,7 +486,13 @@ const unwrapMarketplacePayload = (payload: unknown): MarketplaceResponse => {
   return { items: Array.isArray(record.items) ? record.items as MarketplaceItemResponse[] : [] }
 }
 
-const normalizeText = (value: string) => value.trim().toLowerCase()
+function normalizeText(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function normalizeModelId(value: string) {
+  return normalizeText(value).replace(/^models\//, '')
+}
 
 const includesNormalized = (values: string[] | undefined, target: string) => {
   const normalizedTarget = normalizeText(target)
@@ -344,6 +503,16 @@ const marketplaceRequestModelName = (item: MarketplaceItemResponse) => {
   const aliases = Array.isArray(item.pricing_aliases) ? item.pricing_aliases : []
   const alias = aliases.map((value) => value.trim()).find(Boolean)
   return alias || item.model_name.trim()
+}
+
+function mergeModelOptions(options: ModelOption[]) {
+  const seen = new Set<string>()
+  return options.filter((option) => {
+    const value = option.value.trim()
+    if (!value || seen.has(value)) return false
+    seen.add(value)
+    return true
+  })
 }
 
 const isMarketplaceItemForPlatform = (item: MarketplaceItemResponse, currentPlatform: GroupPlatform | null) => {
@@ -382,6 +551,8 @@ const resetState = () => {
   outputLines.value = []
   streamingContent.value = ''
   errorMessage.value = ''
+  generatedImages.value = []
+  previewImageUrl.value = ''
 }
 
 const handleClose = () => {
@@ -408,8 +579,8 @@ const addLine = (text: string, className = 'text-gray-300') => {
   scrollToBottom()
 }
 
-const buildRequestBody = () => {
-  if (endpoint.value === '/v1/chat/completions') {
+const buildTextRequestBody = () => {
+  if (textEndpoint.value === '/v1/chat/completions') {
     return {
       model: selectedModelId.value,
       messages: [{ role: 'user', content: 'hi' }],
@@ -432,28 +603,45 @@ const buildRequestBody = () => {
 }
 
 const startTest = async () => {
-  if (!props.apiKey || !selectedModelId.value || !canTest.value) return
+  if (!props.apiKey || !canStartTest.value) return
+  if (supportsImageTest.value) {
+    await startImageTest()
+    return
+  }
+  await startTextTest()
+}
 
+const beginTest = (apiKey: ApiKey) => {
   resetState()
   status.value = 'connecting'
-  addLine(t('keys.testModal.starting', { name: props.apiKey.name }), 'text-blue-400')
-  addLine(t('keys.testModal.groupLine', { group: props.apiKey.group?.name || '-' }), 'text-gray-400')
+  addLine(t('keys.testModal.starting', { name: apiKey.name }), 'text-blue-400')
+  addLine(t('keys.testModal.groupLine', { group: apiKey.group?.name || '-' }), 'text-gray-400')
   addLine(t('keys.testModal.usingModel', { model: selectedModelId.value }), 'text-cyan-400')
+  if (supportsImageTest.value) {
+    addLine(t('keys.testModal.usingImageSize', { size: selectedImageSizeTier.value }), 'text-cyan-300')
+  }
   addLine('', 'text-gray-300')
 
   abortStream()
   abortController = new AbortController()
+}
+
+const startTextTest = async () => {
+  const apiKey = props.apiKey
+  if (!apiKey || !selectedModelId.value || !canTest.value) return
+
+  beginTest(apiKey)
 
   try {
-    const response = await fetch(endpoint.value, {
+    const response = await fetch(textEndpoint.value, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${props.apiKey.key}`,
+        Authorization: `Bearer ${apiKey.key}`,
         'Content-Type': 'application/json',
         'anthropic-version': '2023-06-01'
       },
-      body: JSON.stringify(buildRequestBody()),
-      signal: abortController.signal
+      body: JSON.stringify(buildTextRequestBody()),
+      signal: abortController?.signal
     })
 
     if (!response.ok) {
@@ -477,6 +665,95 @@ const startTest = async () => {
     errorMessage.value = message || t('keys.testModal.requestFailed')
     addLine(`Error: ${errorMessage.value}`, 'text-red-400')
   }
+}
+
+const startImageTest = async () => {
+  const apiKey = props.apiKey
+  if (!apiKey || !selectedModelId.value || !supportsImageTest.value) return
+
+  beginTest(apiKey)
+
+  try {
+    const response = await fetch(endpoint.value, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey.key}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(buildImageRequestBody()),
+      signal: abortController?.signal
+    })
+
+    if (!response.ok) {
+      throw new Error(await extractGatewayError(response))
+    }
+
+    addLine(t('keys.testModal.connected'), 'text-green-400')
+    addLine(t('keys.testModal.sendingImage'), 'text-gray-400')
+    addLine(t('keys.testModal.response'), 'text-yellow-400')
+
+    const payload = await response.json()
+    const images = supportsOpenAIImageTest.value
+      ? extractOpenAIImages(payload)
+      : extractGeminiImages(payload)
+
+    if (images.length === 0) {
+      throw new Error(t('keys.testModal.noImagesReturned'))
+    }
+
+    generatedImages.value = images
+    images.forEach((image, index) => {
+      addLine(t('keys.testModal.imageReceived', { count: index + 1 }), 'text-green-300')
+      addLine(image.mimeType || 'image/*', 'text-gray-400')
+    })
+    finalizeSuccess()
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      status.value = 'idle'
+      return
+    }
+
+    const message = error instanceof Error ? error.message : String(error)
+    status.value = 'error'
+    errorMessage.value = message || t('keys.testModal.requestFailed')
+    addLine(`Error: ${errorMessage.value}`, 'text-red-400')
+  }
+}
+
+const buildImageRequestBody = () => {
+  if (supportsOpenAIImageTest.value) {
+    return {
+      model: selectedModelId.value,
+      prompt: imagePromptText(),
+      n: 1,
+      size: selectedImageSizeTier.value,
+      response_format: 'b64_json'
+    }
+  }
+
+  return {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: imagePromptText() }]
+      }
+    ],
+    generationConfig: {
+      responseModalities: ['TEXT', 'IMAGE'],
+      imageConfig: {
+        aspectRatio: '1:1',
+        imageSize: selectedImageSizeTier.value
+      }
+    }
+  }
+}
+
+const imagePromptText = () => testPrompt.value.trim() || t('keys.testModal.imagePromptDefault')
+
+const buildGeminiImageEndpoint = () => {
+  const model = selectedModelId.value.trim().replace(/^models\//i, '')
+  const prefix = platform.value === 'antigravity' ? '/antigravity/v1beta' : '/v1beta'
+  return `${prefix}/models/${encodeURIComponent(model)}:generateContent`
 }
 
 const readStream = async (response: Response) => {
@@ -514,7 +791,7 @@ const readStream = async (response: Response) => {
 
 const handleStreamPayload = (payload: string) => {
   try {
-    const event = JSON.parse(payload)
+    const event = JSON.parse(payload) as Record<string, any>
     const text =
       (event.type === 'response.output_text.delta' && typeof event.delta === 'string' ? event.delta : '') ||
       event.delta?.text ||
@@ -537,6 +814,94 @@ const handleStreamPayload = (payload: string) => {
     throw error
   }
 }
+
+const extractOpenAIImages = (payload: unknown): PreviewImage[] => {
+  const root = asRecord(payload)
+  if (!root) return []
+
+  const images: PreviewImage[] = []
+  collectOpenAIImageItems(root.data, images)
+  collectOpenAIImageItems(root.output, images)
+
+  const directImage = imageFromRecord(root)
+  if (directImage) images.push(directImage)
+
+  return images
+}
+
+const collectOpenAIImageItems = (value: unknown, images: PreviewImage[]) => {
+  for (const item of asArray(value)) {
+    const record = asRecord(item)
+    if (!record) continue
+
+    const image = imageFromRecord(record)
+    if (image) {
+      images.push(image)
+      continue
+    }
+
+    collectOpenAIImageItems(record.content, images)
+  }
+}
+
+const imageFromRecord = (record: Record<string, unknown>): PreviewImage | null => {
+  const url = asString(record.url) || asString(record.image_url)
+  if (url) return { url, mimeType: asString(record.mime_type) || asString(record.mimeType) || undefined }
+
+  const base64 =
+    asString(record.b64_json) ||
+    asString(record.base64) ||
+    asString(record.image_base64) ||
+    asString(record.result)
+  if (!base64) return null
+
+  const outputFormat = asString(record.output_format)
+  const mimeType = asString(record.mime_type) || asString(record.mimeType) || (outputFormat ? `image/${outputFormat}` : 'image/png')
+  return { url: dataUrlFromBase64(base64, mimeType), mimeType }
+}
+
+const extractGeminiImages = (payload: unknown): PreviewImage[] => {
+  const root = asRecord(payload)
+  if (!root) return []
+
+  const data = asRecord(root.response) ?? root
+  const images: PreviewImage[] = []
+  const texts: string[] = []
+
+  for (const candidateValue of asArray(data.candidates)) {
+    const candidate = asRecord(candidateValue)
+    const content = asRecord(candidate?.content)
+    for (const partValue of asArray(content?.parts)) {
+      const part = asRecord(partValue)
+      if (!part) continue
+
+      const text = asString(part.text)
+      if (text) texts.push(text)
+
+      const inlineData = asRecord(part.inlineData) ?? asRecord(part.inline_data)
+      if (!inlineData) continue
+
+      const base64 = asString(inlineData.data)
+      if (!base64) continue
+
+      const mimeType = asString(inlineData.mimeType) || asString(inlineData.mime_type) || 'image/png'
+      images.push({ url: dataUrlFromBase64(base64, mimeType), mimeType })
+    }
+  }
+
+  texts.forEach((text) => addLine(text, 'text-green-300'))
+  return images
+}
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+
+const asArray = (value: unknown): unknown[] => Array.isArray(value) ? value : []
+
+const asString = (value: unknown): string => typeof value === 'string' ? value.trim() : ''
+
+const dataUrlFromBase64 = (base64: string, mimeType = 'image/png') =>
+  base64.startsWith('data:') ? base64 : `data:${mimeType};base64,${base64}`
 
 const appendContent = (text: string) => {
   streamingContent.value += text
@@ -573,3 +938,15 @@ const copyOutput = () => {
   copyToClipboard(text, t('keys.testModal.outputCopied'))
 }
 </script>
+
+<style>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

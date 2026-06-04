@@ -66,6 +66,19 @@ const buildCodexApiKey = () => ({
   }
 })
 
+const buildCodexImageApiKey = () => ({
+  id: 3,
+  name: 'Codex image key',
+  key: 'sk-image',
+  status: 'active',
+  group: {
+    id: 3,
+    name: 'Codex Image2',
+    platform: 'openai',
+    allow_image_generation: true
+  }
+})
+
 describe('KeyTestModal', () => {
   const originalFetch = global.fetch
 
@@ -210,6 +223,66 @@ describe('KeyTestModal', () => {
       messages: [{ role: 'user', content: 'hi' }],
       max_tokens: 32,
       stream: true
+    })
+  })
+
+  it('defaults image-enabled OpenAI groups to image generation test mode', async () => {
+    global.fetch = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            items: [
+              {
+                model_name: 'gpt-5.5',
+                vendor_name: 'OpenAI',
+                groups: ['Codex Pro'],
+                sort_order: 50,
+                enabled: true
+              }
+            ]
+          }
+        })
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: [{ b64_json: 'aGVsbG8=', revised_prompt: 'draw a cat' }]
+        })
+      } as any)
+
+    const wrapper = mount(KeyTestModal, {
+      props: {
+        show: false,
+        apiKey: buildCodexImageApiKey() as any
+      },
+      global: {
+        stubs: {
+          BaseDialog: BaseDialogStub,
+          Select: SelectStub,
+          Icon: true
+        }
+      }
+    })
+
+    await wrapper.setProps({ show: true })
+    await flushPromises()
+
+    const modelSelect = wrapper.find('select').element as HTMLSelectElement
+    expect(modelSelect.value).toBe('gpt-image-2')
+    expect(wrapper.text()).toContain('keys.testModal.imagePromptLabel')
+    expect(wrapper.text()).toContain('keys.testModal.imageSizeLabel')
+
+    await (wrapper.vm as any).startTest()
+    await flushPromises()
+
+    expect(global.fetch).toHaveBeenCalledTimes(2)
+    const [url, options] = (global.fetch as any).mock.calls[1]
+    expect(url).toBe('/v1/images/generations')
+    expect(JSON.parse(options.body)).toMatchObject({
+      model: 'gpt-image-2',
+      size: '1K',
+      response_format: 'b64_json'
     })
   })
 })

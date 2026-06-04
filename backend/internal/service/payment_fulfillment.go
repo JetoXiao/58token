@@ -514,10 +514,14 @@ func (s *PaymentService) hasAuditLog(ctx context.Context, orderID int64, action 
 }
 
 func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *dbent.PaymentOrder) error {
-	if o == nil || o.OrderType != payment.OrderTypeBalance || o.Amount <= 0 {
+	if o == nil || o.OrderType != payment.OrderTypeBalance {
 		return nil
 	}
 	if s.affiliateService == nil {
+		return nil
+	}
+	baseAmountUSD, baseCurrency, eligible := s.affiliateRebateBaseAmountUSD(ctx, o)
+	if !eligible || baseAmountUSD <= 0 {
 		return nil
 	}
 
@@ -531,7 +535,7 @@ func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *db
 	defer func() { _ = tx.Rollback() }()
 
 	txCtx := dbent.NewTxContext(ctx, tx)
-	claimed, err := s.tryClaimAffiliateRebateAudit(txCtx, tx.Client(), o.ID, o.Amount)
+	claimed, err := s.tryClaimAffiliateRebateAudit(txCtx, tx.Client(), o.ID, baseAmountUSD)
 	if err != nil {
 		s.writeAuditLog(ctx, o.ID, "AFFILIATE_REBATE_FAILED", "system", map[string]any{
 			"error": err.Error(),
@@ -543,7 +547,7 @@ func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *db
 	}
 
 	sourceOrderID := o.ID
-	rebateAmount, err := s.affiliateService.AccrueInviteRebateForOrder(txCtx, o.UserID, o.Amount, &sourceOrderID)
+	rebateAmount, err := s.affiliateService.AccrueInviteRebateForOrder(txCtx, o.UserID, baseAmountUSD, &sourceOrderID)
 	if err != nil {
 		s.writeAuditLog(ctx, o.ID, "AFFILIATE_REBATE_FAILED", "system", map[string]any{
 			"error": err.Error(),
@@ -553,8 +557,15 @@ func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *db
 
 	if rebateAmount <= 0 {
 		if err := s.updateClaimedAffiliateRebateAudit(txCtx, tx.Client(), o.ID, "AFFILIATE_REBATE_SKIPPED", map[string]any{
-			"baseAmount": o.Amount,
-			"reason":     "no inviter bound or rebate amount <= 0",
+			"baseAmount":         baseAmountUSD,
+			"baseCurrency":       baseCurrency,
+			"eligiblePaidAmount": affiliateEligiblePaidAmount(o),
+			"paidAmount":         o.PayAmount,
+			"orderAmount":        o.Amount,
+			"paymentType":        o.PaymentType,
+			"providerKey":        psStringValue(o.ProviderKey),
+			"paymentCurrency":    PaymentOrderCurrency(o),
+			"reason":             "no inviter bound or rebate amount <= 0",
 		}); err != nil {
 			s.writeAuditLog(ctx, o.ID, "AFFILIATE_REBATE_FAILED", "system", map[string]any{
 				"error": err.Error(),
@@ -571,8 +582,15 @@ func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *db
 	}
 
 	if err := s.updateClaimedAffiliateRebateAudit(txCtx, tx.Client(), o.ID, "AFFILIATE_REBATE_APPLIED", map[string]any{
-		"baseAmount":   o.Amount,
-		"rebateAmount": rebateAmount,
+		"baseAmount":         baseAmountUSD,
+		"baseCurrency":       baseCurrency,
+		"eligiblePaidAmount": affiliateEligiblePaidAmount(o),
+		"paidAmount":         o.PayAmount,
+		"orderAmount":        o.Amount,
+		"paymentType":        o.PaymentType,
+		"providerKey":        psStringValue(o.ProviderKey),
+		"paymentCurrency":    PaymentOrderCurrency(o),
+		"rebateAmount":       rebateAmount,
 	}); err != nil {
 		s.writeAuditLog(ctx, o.ID, "AFFILIATE_REBATE_FAILED", "system", map[string]any{
 			"error": err.Error(),
@@ -587,6 +605,65 @@ func (s *PaymentService) applyAffiliateRebateForOrder(ctx context.Context, o *db
 		return fmt.Errorf("commit affiliate rebate tx: %w", err)
 	}
 	return nil
+}
+
+func (s *PaymentService) affiliateRebateBaseAmountUSD(ctx context.Context, o *dbent.PaymentOrder) (float64, string, bool) {
+	if o == nil || o.PayAmount <= 0 || math.IsNaN(o.PayAmount) || math.IsInf(o.PayAmount, 0) {
+		return 0, "", false
+	}
+	eligiblePayAmount := affiliateEligiblePaidAmount(o)
+	if eligiblePayAmount <= 0 {
+		return 0, "", false
+	}
+	currency := PaymentOrderCurrency(o)
+	if paymentOrderIsUSDT(o) || strings.EqualFold(currency, payment.TypeUSDT) {
+		return roundTo(eligiblePayAmount, 8), "USD", true
+	}
+	if paymentOrderIsRMB(o) || strings.EqualFold(currency, payment.DefaultPaymentCurrency) {
+		return roundTo(eligiblePayAmount/s.affiliateRebateCNYPerUSD(ctx), 8), "USD", true
+	}
+	return 0, "", false
+}
+
+func affiliateEligiblePaidAmount(o *dbent.PaymentOrder) float64 {
+	if o == nil || o.PayAmount <= 0 {
+		return 0
+	}
+	feeRate := o.FeeRate
+	if math.IsNaN(feeRate) || math.IsInf(feeRate, 0) || feeRate <= 0 {
+		return o.PayAmount
+	}
+	return o.PayAmount / (1 + feeRate/100)
+}
+
+func (s *PaymentService) affiliateRebateCNYPerUSD(ctx context.Context) float64 {
+	if s != nil && s.configService != nil && s.configService.settingRepo != nil {
+		if raw, err := s.configService.settingRepo.GetValue(ctx, SettingUsdtCnyExchangeRate); err == nil && strings.TrimSpace(raw) != "" {
+			if rate, parseErr := strconv.ParseFloat(strings.TrimSpace(raw), 64); parseErr == nil {
+				if !math.IsNaN(rate) && !math.IsInf(rate, 0) && rate > 0 {
+					return rate
+				}
+			}
+		}
+	}
+	return 7
+}
+
+func paymentOrderIsRMB(o *dbent.PaymentOrder) bool {
+	if o == nil {
+		return false
+	}
+	switch payment.GetBasePaymentType(o.PaymentType) {
+	case payment.TypeAlipay, payment.TypeWxpay:
+		return true
+	}
+	if o.ProviderKey != nil {
+		switch payment.GetBasePaymentType(*o.ProviderKey) {
+		case payment.TypeAlipay, payment.TypeWxpay:
+			return true
+		}
+	}
+	return PaymentOrderCurrency(o) == payment.DefaultPaymentCurrency
 }
 
 func (s *PaymentService) tryClaimAffiliateRebateAudit(ctx context.Context, client *dbent.Client, orderID int64, baseAmount float64) (bool, error) {

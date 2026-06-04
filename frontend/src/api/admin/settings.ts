@@ -331,6 +331,7 @@ export interface SystemSettings {
   affiliate_rebate_freeze_hours: number;
   affiliate_rebate_duration_days: number;
   affiliate_rebate_per_invitee_cap: number;
+  affiliate_group_profit_rates: Record<string, number>;
   default_concurrency: number;
   default_user_rpm_limit: number;
   default_subscriptions: DefaultSubscriptionSetting[];
@@ -383,6 +384,7 @@ export interface SystemSettings {
   table_page_size_options: number[];
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
+  marketing_nav_items: string[];
   custom_endpoints: CustomEndpoint[];
   // SMTP settings
   smtp_host: string;
@@ -581,6 +583,7 @@ export interface UpdateSettingsRequest {
   affiliate_rebate_freeze_hours?: number;
   affiliate_rebate_duration_days?: number;
   affiliate_rebate_per_invitee_cap?: number;
+  affiliate_group_profit_rates?: Record<string, number>;
   default_concurrency?: number;
   default_user_rpm_limit?: number;
   default_subscriptions?: DefaultSubscriptionSetting[];
@@ -632,6 +635,7 @@ export interface UpdateSettingsRequest {
   table_page_size_options?: number[];
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
+  marketing_nav_items?: string[];
   custom_endpoints?: CustomEndpoint[];
   smtp_host?: string;
   smtp_port?: number;

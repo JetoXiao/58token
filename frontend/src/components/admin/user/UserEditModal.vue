@@ -34,6 +34,14 @@
         <textarea v-model="form.notes" rows="3" class="input"></textarea>
       </div>
       <div>
+        <label class="input-label">{{ t('admin.users.form.partnerLevel') }}</label>
+        <select v-model="form.partner_level" class="input">
+          <option v-for="level in partnerLevelOptions" :key="level" :value="level">
+            {{ t(`affiliate.partner.levels.${level}`) }}
+          </option>
+        </select>
+      </div>
+      <div>
         <label class="input-label">{{ t('admin.users.columns.concurrency') }}</label>
         <input v-model.number="form.concurrency" type="number" class="input" />
       </div>
@@ -68,7 +76,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, UserAttributeValuesMap } from '@/types'
+import type { AdminUser, AffiliatePartnerLevel, UserAttributeValuesMap } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -78,11 +86,12 @@ const emit = defineEmits(['close', 'success'])
 const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard } = useClipboard()
 
 const submitting = ref(false); const passwordCopied = ref(false)
-const form = reactive({ email: '', password: '', username: '', notes: '', concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const partnerLevelOptions: AffiliatePartnerLevel[] = ['none', 'spark', 'voyage', 'summit', 'cocreate']
+const form = reactive({ email: '', password: '', username: '', notes: '', partner_level: 'none' as AffiliatePartnerLevel, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
 
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', partner_level: u.affiliate?.partner_level || 'none', concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -112,6 +121,9 @@ const handleUpdateUser = async () => {
     const data: any = { email: form.email, username: form.username, notes: form.notes, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
     if (form.password.trim()) data.password = form.password.trim()
     await adminAPI.users.update(props.user.id, data)
+    if ((props.user.affiliate?.partner_level || 'none') !== form.partner_level) {
+      await adminAPI.affiliates.updateUserSettings(props.user.id, { partner_level: form.partner_level })
+    }
     if (Object.keys(form.customAttributes).length > 0) await adminAPI.userAttributes.updateUserAttributeValues(props.user.id, form.customAttributes)
     appStore.showSuccess(t('admin.users.userUpdated'))
     emit('success'); emit('close')

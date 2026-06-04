@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -38,13 +40,42 @@ const affiliateUsageExchangeRateCTE = `exchange_rate AS (
     )::double precision AS usd_cny_rate
 )`
 
+const affiliateEligiblePayAmountSQL = `(po.pay_amount / NULLIF(1 + (COALESCE(po.fee_rate, 0) / 100), 0))`
+
 const affiliateUsageRechargeAmountSQL = `CASE
                WHEN LOWER(COALESCE(po.payment_type, '')) IN ('usdt', 'infini')
                     OR LOWER(COALESCE(po.provider_key, '')) IN ('usdt', 'infini')
                     OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
-               THEN po.pay_amount * er.usd_cny_rate
-               ELSE po.pay_amount
+               THEN ` + affiliateEligiblePayAmountSQL + `
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'CNY'
+               THEN ` + affiliateEligiblePayAmountSQL + ` / er.usd_cny_rate
+               ELSE 0
            END`
+
+const affiliateUsageRechargeAmountCNYSQL = `CASE
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('usdt', 'infini')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('usdt', 'infini')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
+               THEN ` + affiliateEligiblePayAmountSQL + ` * er.usd_cny_rate
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'CNY'
+               THEN ` + affiliateEligiblePayAmountSQL + `
+               ELSE 0
+           END`
+
+const affiliatePartnerRateSQL = `COALESCE(
+    inviter_aff.aff_rebate_rate_percent,
+    CASE COALESCE(inviter_aff.partner_level, 'none')
+        WHEN 'spark' THEN 40
+        WHEN 'voyage' THEN 50
+        WHEN 'summit' THEN 60
+        WHEN 'cocreate' THEN 70
+        ELSE %[1]s
+    END
+)`
 
 const affiliateUserOverviewSQL = `
 SELECT ua.user_id,
@@ -53,6 +84,7 @@ SELECT ua.user_id,
        ua.aff_code,
        COALESCE(ua.aff_rebate_rate_percent, 0)::double precision,
        (ua.aff_rebate_rate_percent IS NOT NULL) AS has_custom_rate,
+       COALESCE(ua.partner_level, 'none'),
        ua.aff_count,
        COALESCE(rebated.rebated_invitee_count, 0),
        (ua.aff_quota + COALESCE(matured.matured_frozen_quota, 0))::double precision,
@@ -371,19 +403,53 @@ func (r *affiliateRepository) ListInvitees(ctx context.Context, inviterID int64,
 	}
 	client := clientFromContext(ctx, r.client)
 	rows, err := client.QueryContext(ctx, `
+WITH `+affiliateUsageExchangeRateCTE+`,
+recharge_by_user AS (
+    SELECT po.user_id,
+           COALESCE(SUM(`+affiliateUsageRechargeAmountSQL+`), 0)::double precision AS recharge_amount,
+           COALESCE(SUM(CASE
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'CNY'
+               THEN `+affiliateEligiblePayAmountSQL+`
+               ELSE 0
+           END), 0)::double precision AS recharge_amount_cny,
+           COALESCE(SUM(CASE
+               WHEN LOWER(COALESCE(po.payment_type, '')) IN ('usdt', 'infini')
+                    OR LOWER(COALESCE(po.provider_key, '')) IN ('usdt', 'infini')
+                    OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
+               THEN `+affiliateEligiblePayAmountSQL+`
+               ELSE 0
+           END), 0)::double precision AS recharge_amount_usdt
+    FROM payment_orders po
+    CROSS JOIN exchange_rate er
+    WHERE po.status = 'COMPLETED'
+      AND po.order_type = 'balance'
+      AND po.paid_at IS NOT NULL
+      AND (
+            LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
+            OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
+            OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) IN ('CNY', 'USDT')
+      )
+    GROUP BY po.user_id
+)
 SELECT ua.user_id,
        COALESCE(u.email, ''),
        COALESCE(u.username, ''),
        ua.created_at,
+       COALESCE(rb.recharge_amount, 0)::double precision AS recharge_amount,
+       COALESCE(rb.recharge_amount_cny, 0)::double precision AS recharge_amount_cny,
+       COALESCE(rb.recharge_amount_usdt, 0)::double precision AS recharge_amount_usdt,
        COALESCE(SUM(ual.amount), 0)::double precision AS total_rebate
 FROM user_affiliates ua
 LEFT JOIN users u ON u.id = ua.user_id
+LEFT JOIN recharge_by_user rb ON rb.user_id = ua.user_id
 LEFT JOIN user_affiliate_ledger ual
        ON ual.user_id = $1
       AND ual.source_user_id = ua.user_id
       AND ual.action = 'accrue'
 WHERE ua.inviter_id = $1
-GROUP BY ua.user_id, u.email, u.username, ua.created_at
+GROUP BY ua.user_id, u.email, u.username, ua.created_at, rb.recharge_amount, rb.recharge_amount_cny, rb.recharge_amount_usdt
 ORDER BY ua.created_at DESC
 LIMIT $2`, inviterID, limit)
 	if err != nil {
@@ -395,7 +461,7 @@ LIMIT $2`, inviterID, limit)
 	for rows.Next() {
 		var item service.AffiliateInvitee
 		var createdAt time.Time
-		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &createdAt, &item.TotalRebate); err != nil {
+		if err := rows.Scan(&item.UserID, &item.Email, &item.Username, &createdAt, &item.RechargeAmount, &item.RechargeAmountCNY, &item.RechargeAmountUSDT, &item.TotalRebate); err != nil {
 			return nil, err
 		}
 		item.CreatedAt = &createdAt
@@ -577,13 +643,15 @@ SELECT COUNT(*)::bigint,
        COALESCE(SUM(requests), 0)::bigint,
        COALESCE(SUM(total_tokens), 0)::bigint,
        COALESCE(SUM(actual_cost), 0)::double precision,
+       COALESCE(SUM(account_cost), 0)::double precision,
+       COALESCE(SUM(net_profit), 0)::double precision,
        COALESCE(SUM(rebate_amount), 0)::double precision
 FROM records`, args...)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 	if rows.Next() {
-		if err := rows.Scan(&total, &summary.TotalRequests, &summary.TotalTokens, &summary.TotalActualCost, &summary.TotalRebateAmount); err != nil {
+		if err := rows.Scan(&total, &summary.TotalRequests, &summary.TotalTokens, &summary.TotalActualCost, &summary.TotalAccountCost, &summary.TotalNetProfit, &summary.TotalRebateAmount); err != nil {
 			_ = rows.Close()
 			return nil, nil, 0, err
 		}
@@ -617,10 +685,13 @@ SELECT usage_date,
        requests,
        total_tokens,
        actual_cost,
+       account_cost,
+       net_profit,
        recharge_amount,
        rebate_rate_percent,
        rebate_amount,
        unassigned,
+       profit_details,
        members
 FROM records
 `+orderBy+`
@@ -633,6 +704,7 @@ LIMIT `+limitPlaceholder+` OFFSET `+offsetPlaceholder, args...)
 	items := make([]service.AffiliateUsageDailyRecord, 0)
 	for rows.Next() {
 		var item service.AffiliateUsageDailyRecord
+		var profitDetailsRaw []byte
 		var membersRaw []byte
 		if err := rows.Scan(
 			&item.Date,
@@ -646,13 +718,21 @@ LIMIT `+limitPlaceholder+` OFFSET `+offsetPlaceholder, args...)
 			&item.Requests,
 			&item.TotalTokens,
 			&item.ActualCost,
+			&item.AccountCost,
+			&item.NetProfit,
 			&item.RechargeAmount,
 			&item.RebateRatePercent,
 			&item.RebateAmount,
 			&item.Unassigned,
+			&profitDetailsRaw,
 			&membersRaw,
 		); err != nil {
 			return nil, nil, 0, err
+		}
+		if len(profitDetailsRaw) > 0 {
+			if err := json.Unmarshal(profitDetailsRaw, &item.ProfitDetails); err != nil {
+				return nil, nil, 0, fmt.Errorf("decode affiliate usage profit details: %w", err)
+			}
 		}
 		if len(membersRaw) > 0 {
 			if err := json.Unmarshal(membersRaw, &item.Members); err != nil {
@@ -865,6 +945,7 @@ func (r *affiliateRepository) GetAffiliateUserOverview(ctx context.Context, user
 		&overview.AffCode,
 		&customRate,
 		&hasCustomRate,
+		&overview.PartnerLevel,
 		&overview.InvitedCount,
 		&overview.RebatedInviteeCount,
 		&overview.AvailableQuota,
@@ -940,7 +1021,7 @@ func buildAffiliateUsageCTE(filter service.AffiliateUsageFilter) (string, []any)
 		`(
             LOWER(COALESCE(po.payment_type, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
             OR LOWER(COALESCE(po.provider_key, '')) IN ('alipay', 'wxpay', 'alipay_direct', 'wxpay_direct', 'easypay', 'usdt', 'infini')
-            OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) = 'USDT'
+            OR UPPER(COALESCE(po.provider_snapshot->>'currency', '')) IN ('CNY', 'USDT')
         )`,
 	}
 	if startAtArg > 0 {
@@ -950,6 +1031,7 @@ func buildAffiliateUsageCTE(filter service.AffiliateUsageFilter) (string, []any)
 		paymentClauses = append(paymentClauses, fmt.Sprintf("po.paid_at < $%d", endAtArg))
 	}
 	paymentWhere := strings.Join(paymentClauses, " AND ")
+	groupProfitRatesCTE := buildAffiliateGroupProfitRatesCTE(&args, filter.GroupProfitRates)
 
 	if filter.View == "groups" {
 		userClauses := []string{"u.deleted_at IS NULL"}
@@ -981,22 +1063,46 @@ CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
 		}
 		args = append(args, defaultRate)
 		ratePlaceholder := "$" + fmt.Sprint(len(args))
+		rateExpr := fmt.Sprintf(affiliatePartnerRateSQL, ratePlaceholder)
 		usageWhere := ""
 		if len(usageTimeClauses) > 0 {
 			usageWhere = "WHERE " + strings.Join(usageTimeClauses, " AND ")
 		}
 		userWhere := "WHERE " + strings.Join(userClauses, " AND ")
 		return fmt.Sprintf(`
-WITH usage_by_user AS (
+WITH %[7]s,
+%[3]s,
+usage_by_user_detail AS (
     SELECT ul.user_id,
+           COALESCE(ul.group_id, 0)::bigint AS group_id,
+           COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END) AS group_name,
+           COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-') AS model,
            COUNT(*)::bigint AS requests,
            COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
-           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost
+           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0)::double precision AS account_cost,
+           COALESCE(agpr.profit_rate_percent, 0)::double precision AS profit_rate_percent,
+           COALESCE(SUM(GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit
     FROM usage_logs ul
+    LEFT JOIN groups g ON g.id = ul.group_id
+    LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = ul.group_id
     %[2]s
-    GROUP BY ul.user_id
+    GROUP BY ul.user_id,
+             COALESCE(ul.group_id, 0),
+             COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END),
+             COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-'),
+             COALESCE(agpr.profit_rate_percent, 0)
 ),
-%[3]s,
+usage_by_user AS (
+    SELECT user_id,
+           COALESCE(SUM(requests), 0)::bigint AS requests,
+           COALESCE(SUM(total_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(account_cost), 0)::double precision AS account_cost,
+           COALESCE(SUM(net_profit), 0)::double precision AS net_profit
+    FROM usage_by_user_detail
+    GROUP BY user_id
+),
 usage_user_records AS (
     SELECT '' AS usage_date,
            COALESCE(ua.inviter_id, 0)::bigint AS inviter_id,
@@ -1008,15 +1114,32 @@ usage_user_records AS (
            COALESCE(ubu.requests, 0)::bigint AS requests,
            COALESCE(ubu.total_tokens, 0)::bigint AS total_tokens,
            COALESCE(ubu.actual_cost, 0)::double precision AS actual_cost,
+           COALESCE(ubu.account_cost, 0)::double precision AS account_cost,
+           COALESCE(ubu.net_profit, 0)::double precision AS net_profit,
            CASE
                WHEN ua.inviter_id IS NULL THEN 0::double precision
-               ELSE COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s)::double precision
+               ELSE %[1]s::double precision
            END AS rebate_rate_percent,
            CASE
                WHEN ua.inviter_id IS NULL THEN 0::double precision
-               ELSE (COALESCE(ubu.actual_cost, 0) * COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s) / 100)::double precision
+               ELSE (COALESCE(ubu.net_profit, 0) * %[1]s / 100)::double precision
            END AS rebate_amount,
-           (ua.inviter_id IS NULL) AS unassigned
+           (ua.inviter_id IS NULL) AS unassigned,
+           COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                   'group_id', detail.group_id,
+                   'group_name', detail.group_name,
+                   'model', detail.model,
+                   'requests', detail.requests,
+                   'total_tokens', detail.total_tokens,
+                   'actual_cost', detail.actual_cost,
+                   'profit_rate_percent', detail.profit_rate_percent,
+                   'net_profit', detail.net_profit,
+                   'rebate_amount', CASE WHEN ua.inviter_id IS NULL THEN 0::double precision ELSE detail.net_profit * %[1]s / 100 END
+               ) ORDER BY detail.net_profit DESC, detail.actual_cost DESC, detail.group_name ASC, detail.model ASC)
+               FROM usage_by_user_detail detail
+               WHERE detail.user_id = u.id
+           ), '[]'::jsonb) AS profit_details
     FROM users u
     LEFT JOIN usage_by_user ubu ON ubu.user_id = u.id
     LEFT JOIN user_affiliates ua ON ua.user_id = u.id
@@ -1033,6 +1156,49 @@ recharge_by_user AS (
     WHERE %[6]s
     GROUP BY po.user_id
 ),
+group_profit_detail_rows AS (
+    SELECT uur.inviter_id,
+           uur.rebate_rate_percent,
+           uur.unassigned,
+           detail.group_id,
+           detail.group_name,
+           detail.model,
+           COALESCE(SUM(detail.requests), 0)::bigint AS requests,
+           COALESCE(SUM(detail.total_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(detail.actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(MAX(detail.profit_rate_percent), 0)::double precision AS profit_rate_percent,
+           COALESCE(SUM(detail.net_profit), 0)::double precision AS net_profit,
+           CASE
+               WHEN uur.unassigned THEN 0::double precision
+               ELSE (COALESCE(SUM(detail.net_profit), 0) * uur.rebate_rate_percent / 100)::double precision
+           END AS rebate_amount
+    FROM usage_user_records uur
+    JOIN usage_by_user_detail detail ON detail.user_id = uur.invitee_id
+    GROUP BY uur.inviter_id,
+             uur.rebate_rate_percent,
+             uur.unassigned,
+             detail.group_id,
+             detail.group_name,
+             detail.model
+),
+group_profit_details AS (
+    SELECT inviter_id,
+           rebate_rate_percent,
+           unassigned,
+           COALESCE(jsonb_agg(jsonb_build_object(
+               'group_id', group_id,
+               'group_name', group_name,
+               'model', model,
+               'requests', requests,
+               'total_tokens', total_tokens,
+               'actual_cost', actual_cost,
+               'profit_rate_percent', profit_rate_percent,
+               'net_profit', net_profit,
+               'rebate_amount', rebate_amount
+           ) ORDER BY net_profit DESC, actual_cost DESC, group_name ASC, model ASC), '[]'::jsonb) AS profit_details
+    FROM group_profit_detail_rows
+    GROUP BY inviter_id, rebate_rate_percent, unassigned
+),
 records AS (
     SELECT '' AS usage_date,
            uur.inviter_id,
@@ -1045,10 +1211,13 @@ records AS (
            COALESCE(SUM(uur.requests), 0)::bigint AS requests,
            COALESCE(SUM(uur.total_tokens), 0)::bigint AS total_tokens,
            COALESCE(SUM(uur.actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(uur.account_cost), 0)::double precision AS account_cost,
+           COALESCE(SUM(uur.net_profit), 0)::double precision AS net_profit,
            COALESCE(SUM(COALESCE(rb.recharge_amount, 0)), 0)::double precision AS recharge_amount,
            uur.rebate_rate_percent,
            COALESCE(SUM(uur.rebate_amount), 0)::double precision AS rebate_amount,
            uur.unassigned,
+           COALESCE(gpd.profit_details, '[]'::jsonb) AS profit_details,
            COALESCE(jsonb_agg(jsonb_build_object(
                'date', uur.usage_date,
                'inviter_id', uur.inviter_id,
@@ -1061,16 +1230,22 @@ records AS (
                'requests', uur.requests,
                'total_tokens', uur.total_tokens,
                'actual_cost', uur.actual_cost,
+               'account_cost', uur.account_cost,
+               'net_profit', uur.net_profit,
                'recharge_amount', COALESCE(rb.recharge_amount, 0),
                'rebate_rate_percent', uur.rebate_rate_percent,
                'rebate_amount', uur.rebate_amount,
-               'unassigned', uur.unassigned
-           ) ORDER BY uur.actual_cost DESC, COALESCE(rb.recharge_amount, 0) DESC, uur.invitee_id ASC), '[]'::jsonb) AS members
+               'unassigned', uur.unassigned,
+               'profit_details', uur.profit_details
+            ) ORDER BY uur.actual_cost DESC, COALESCE(rb.recharge_amount, 0) DESC, uur.invitee_id ASC), '[]'::jsonb) AS members
     FROM usage_user_records uur
     LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
-    GROUP BY uur.inviter_id, uur.inviter_email, uur.inviter_username, uur.rebate_rate_percent, uur.unassigned
+    LEFT JOIN group_profit_details gpd ON gpd.inviter_id = uur.inviter_id
+        AND gpd.rebate_rate_percent = uur.rebate_rate_percent
+        AND gpd.unassigned = uur.unassigned
+    GROUP BY uur.inviter_id, uur.inviter_email, uur.inviter_username, uur.rebate_rate_percent, uur.unassigned, gpd.profit_details
 )
-`, ratePlaceholder, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountSQL, paymentWhere), args
+`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE), args
 	}
 
 	userClauses := []string{"u.deleted_at IS NULL"}
@@ -1102,6 +1277,7 @@ CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
 	}
 	args = append(args, defaultRate)
 	ratePlaceholder := "$" + fmt.Sprint(len(args))
+	rateExpr := fmt.Sprintf(affiliatePartnerRateSQL, ratePlaceholder)
 	usageWhere := ""
 	if len(usageTimeClauses) > 0 {
 		usageWhere = "WHERE " + strings.Join(usageTimeClauses, " AND ")
@@ -1109,16 +1285,39 @@ CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
 	userWhere := "WHERE " + strings.Join(userClauses, " AND ")
 
 	return fmt.Sprintf(`
-WITH usage_by_user AS (
+WITH %[7]s,
+%[3]s,
+usage_by_user_detail AS (
     SELECT ul.user_id,
+           COALESCE(ul.group_id, 0)::bigint AS group_id,
+           COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END) AS group_name,
+           COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-') AS model,
            COUNT(*)::bigint AS requests,
            COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
-           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost
+           COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0)::double precision AS account_cost,
+           COALESCE(agpr.profit_rate_percent, 0)::double precision AS profit_rate_percent,
+           COALESCE(SUM(GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit
     FROM usage_logs ul
+    LEFT JOIN groups g ON g.id = ul.group_id
+    LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = ul.group_id
     %[2]s
-    GROUP BY ul.user_id
+    GROUP BY ul.user_id,
+             COALESCE(ul.group_id, 0),
+             COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END),
+             COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-'),
+             COALESCE(agpr.profit_rate_percent, 0)
 ),
-%[3]s,
+usage_by_user AS (
+    SELECT user_id,
+           COALESCE(SUM(requests), 0)::bigint AS requests,
+           COALESCE(SUM(total_tokens), 0)::bigint AS total_tokens,
+           COALESCE(SUM(actual_cost), 0)::double precision AS actual_cost,
+           COALESCE(SUM(account_cost), 0)::double precision AS account_cost,
+           COALESCE(SUM(net_profit), 0)::double precision AS net_profit
+    FROM usage_by_user_detail
+    GROUP BY user_id
+),
 usage_user_records AS (
     SELECT '' AS usage_date,
            COALESCE(ua.inviter_id, 0)::bigint AS inviter_id,
@@ -1130,15 +1329,32 @@ usage_user_records AS (
            COALESCE(ubu.requests, 0)::bigint AS requests,
            COALESCE(ubu.total_tokens, 0)::bigint AS total_tokens,
            COALESCE(ubu.actual_cost, 0)::double precision AS actual_cost,
+           COALESCE(ubu.account_cost, 0)::double precision AS account_cost,
+           COALESCE(ubu.net_profit, 0)::double precision AS net_profit,
            CASE
                WHEN ua.inviter_id IS NULL THEN 0::double precision
-               ELSE COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s)::double precision
+               ELSE %[1]s::double precision
            END AS rebate_rate_percent,
            CASE
                WHEN ua.inviter_id IS NULL THEN 0::double precision
-               ELSE (COALESCE(ubu.actual_cost, 0) * COALESCE(inviter_aff.aff_rebate_rate_percent, %[1]s) / 100)::double precision
+               ELSE (COALESCE(ubu.net_profit, 0) * %[1]s / 100)::double precision
            END AS rebate_amount,
-           (ua.inviter_id IS NULL) AS unassigned
+           (ua.inviter_id IS NULL) AS unassigned,
+           COALESCE((
+               SELECT jsonb_agg(jsonb_build_object(
+                   'group_id', detail.group_id,
+                   'group_name', detail.group_name,
+                   'model', detail.model,
+                   'requests', detail.requests,
+                   'total_tokens', detail.total_tokens,
+                   'actual_cost', detail.actual_cost,
+                   'profit_rate_percent', detail.profit_rate_percent,
+                   'net_profit', detail.net_profit,
+                   'rebate_amount', CASE WHEN ua.inviter_id IS NULL THEN 0::double precision ELSE detail.net_profit * %[1]s / 100 END
+               ) ORDER BY detail.net_profit DESC, detail.actual_cost DESC, detail.group_name ASC, detail.model ASC)
+               FROM usage_by_user_detail detail
+               WHERE detail.user_id = u.id
+           ), '[]'::jsonb) AS profit_details
     FROM users u
     LEFT JOIN usage_by_user ubu ON ubu.user_id = u.id
     LEFT JOIN user_affiliates ua ON ua.user_id = u.id
@@ -1167,15 +1383,46 @@ records AS (
            uur.requests,
            uur.total_tokens,
            uur.actual_cost,
+           uur.account_cost,
+           uur.net_profit,
            COALESCE(rb.recharge_amount, 0)::double precision AS recharge_amount,
            uur.rebate_rate_percent,
            uur.rebate_amount,
            uur.unassigned,
+           uur.profit_details,
            '[]'::jsonb AS members
     FROM usage_user_records uur
     LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
 )
-`, ratePlaceholder, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountSQL, paymentWhere), args
+`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE), args
+}
+
+func buildAffiliateGroupProfitRatesCTE(args *[]any, rates map[int64]float64) string {
+	if len(rates) == 0 {
+		return "affiliate_group_profit_rates AS (SELECT NULL::bigint AS group_id, 0::double precision AS profit_rate_percent WHERE false)"
+	}
+	groupIDs := make([]int64, 0, len(rates))
+	for groupID := range rates {
+		groupIDs = append(groupIDs, groupID)
+	}
+	sort.Slice(groupIDs, func(i, j int) bool { return groupIDs[i] < groupIDs[j] })
+
+	values := make([]string, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		rate := rates[groupID]
+		if groupID <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) || rate < 0 {
+			continue
+		}
+		if rate > service.AffiliateRebateRateMax {
+			rate = service.AffiliateRebateRateMax
+		}
+		*args = append(*args, groupID, rate)
+		values = append(values, fmt.Sprintf("($%d::bigint, $%d::double precision)", len(*args)-1, len(*args)))
+	}
+	if len(values) == 0 {
+		return "affiliate_group_profit_rates AS (SELECT NULL::bigint AS group_id, 0::double precision AS profit_rate_percent WHERE false)"
+	}
+	return "affiliate_group_profit_rates(group_id, profit_rate_percent) AS (VALUES " + strings.Join(values, ", ") + ")"
 }
 
 func affiliateUsageTimezone(tz string) string {
@@ -1196,6 +1443,8 @@ func buildAffiliateUsageOrderBy(filter service.AffiliateUsageFilter) string {
 		"requests":        "requests",
 		"total_tokens":    "total_tokens",
 		"actual_cost":     "actual_cost",
+		"account_cost":    "account_cost",
+		"net_profit":      "net_profit",
 		"recharge_amount": "recharge_amount",
 		"rebate_rate":     "rebate_rate_percent",
 		"rebate_amount":   "rebate_amount",
@@ -1285,6 +1534,7 @@ SELECT user_id,
        aff_code,
        aff_code_custom,
        aff_rebate_rate_percent,
+       COALESCE(partner_level, 'none'),
        inviter_id,
        aff_count,
        aff_quota::double precision,
@@ -1313,6 +1563,7 @@ WHERE user_id = $1`, userID)
 		&out.AffCode,
 		&out.AffCodeCustom,
 		&rebateRate,
+		&out.PartnerLevel,
 		&inviterID,
 		&out.AffCount,
 		&out.AffQuota,
@@ -1339,6 +1590,7 @@ SELECT user_id,
        aff_code,
        aff_code_custom,
        aff_rebate_rate_percent,
+       COALESCE(partner_level, 'none'),
        inviter_id,
        aff_count,
        aff_quota::double precision,
@@ -1369,6 +1621,7 @@ LIMIT 1`, strings.ToUpper(strings.TrimSpace(code)))
 		&out.AffCode,
 		&out.AffCodeCustom,
 		&rebateRate,
+		&out.PartnerLevel,
 		&inviterID,
 		&out.AffCount,
 		&out.AffQuota,
@@ -1608,6 +1861,328 @@ WHERE user_id = ANY($2)`, nullableArg(ratePercent), pq.Array(userIDs))
 	})
 }
 
+func (r *affiliateRepository) SetUserPartnerLevel(ctx context.Context, userID int64, level string) error {
+	if userID <= 0 {
+		return service.ErrUserNotFound
+	}
+	level = service.NormalizeAffiliatePartnerLevel(level)
+	if service.AffiliatePartnerLevelRank(level) < 0 {
+		return service.ErrAffiliatePartnerLevelInvalid
+	}
+	return r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		if _, err := ensureUserAffiliateWithClient(txCtx, txClient, userID); err != nil {
+			return err
+		}
+		res, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET partner_level = $1,
+    updated_at = NOW()
+WHERE user_id = $2`, level, userID)
+		if err != nil {
+			return fmt.Errorf("set partner_level: %w", err)
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			return service.ErrUserNotFound
+		}
+		return nil
+	})
+}
+
+func (r *affiliateRepository) PromotePartnerLevelForInviteCount(ctx context.Context, userID int64) (*service.AffiliatePartnerTier, bool, error) {
+	if userID <= 0 {
+		return nil, false, service.ErrUserNotFound
+	}
+	var promotedTier *service.AffiliatePartnerTier
+	var changed bool
+	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		summary, err := ensureUserAffiliateWithClient(txCtx, txClient, userID)
+		if err != nil {
+			return err
+		}
+		nextTier, ok := service.AffiliatePartnerTierByInviteCount(summary.AffCount)
+		if !ok {
+			return nil
+		}
+		currentRank := service.AffiliatePartnerLevelRank(summary.PartnerLevel)
+		nextRank := service.AffiliatePartnerLevelRank(nextTier.Level)
+		if nextRank <= currentRank {
+			return nil
+		}
+		res, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET partner_level = $1,
+    updated_at = NOW()
+WHERE user_id = $2`, nextTier.Level, userID)
+		if err != nil {
+			return fmt.Errorf("promote partner level: %w", err)
+		}
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+			return service.ErrUserNotFound
+		}
+		changed = true
+		promotedTier = &nextTier
+		return nil
+	})
+	return promotedTier, changed, err
+}
+
+func (r *affiliateRepository) GetPartnerSummariesByUserIDs(ctx context.Context, userIDs []int64) (map[int64]service.AffiliatePartnerSummary, error) {
+	result := make(map[int64]service.AffiliatePartnerSummary, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+	client := clientFromContext(ctx, r.client)
+	rows, err := client.QueryContext(ctx, `
+SELECT ua.user_id,
+       ua.aff_code,
+       ua.aff_code_custom,
+       ua.aff_rebate_rate_percent,
+       COALESCE(ua.partner_level, 'none'),
+       ua.aff_count
+FROM user_affiliates ua
+WHERE ua.user_id = ANY($1)`, pq.Array(userIDs))
+	if err != nil {
+		return nil, fmt.Errorf("list partner summaries: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var item service.AffiliatePartnerSummary
+		var rebate sql.NullFloat64
+		if err := rows.Scan(
+			&item.UserID,
+			&item.AffCode,
+			&item.AffCodeCustom,
+			&rebate,
+			&item.PartnerLevel,
+			&item.AffCount,
+		); err != nil {
+			return nil, err
+		}
+		if rebate.Valid {
+			v := rebate.Float64
+			item.AffRebateRatePercent = &v
+		}
+		result[item.UserID] = item
+	}
+	return result, rows.Err()
+}
+
+func (r *affiliateRepository) CreatePartnerApplication(ctx context.Context, userID int64, input service.AffiliatePartnerApplicationInput) (*service.AffiliatePartnerApplication, error) {
+	if userID <= 0 {
+		return nil, service.ErrUserNotFound
+	}
+	var applicationID int64
+	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		if _, err := ensureUserAffiliateWithClient(txCtx, txClient, userID); err != nil {
+			return err
+		}
+		rows, err := txClient.QueryContext(txCtx, `
+INSERT INTO user_affiliate_partner_applications (
+    user_id,
+    requested_level,
+    source,
+    strengths,
+    portal_url,
+    status,
+    created_at,
+    updated_at
+)
+VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW())
+RETURNING id`, userID, input.RequestedLevel, input.Source, input.Strengths, input.PortalURL)
+		if err != nil {
+			if isAffiliateUniqueViolation(err) {
+				return service.ErrAffiliatePartnerApplicationPending
+			}
+			return fmt.Errorf("create partner application: %w", err)
+		}
+		defer func() { _ = rows.Close() }()
+		if !rows.Next() {
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			return service.ErrAffiliatePartnerApplicationNotFound
+		}
+		if err := rows.Scan(&applicationID); err != nil {
+			return err
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.GetLatestPartnerApplication(ctx, userID)
+}
+
+func (r *affiliateRepository) GetLatestPartnerApplication(ctx context.Context, userID int64) (*service.AffiliatePartnerApplication, error) {
+	if userID <= 0 {
+		return nil, service.ErrUserNotFound
+	}
+	client := clientFromContext(ctx, r.client)
+	rows, err := client.QueryContext(ctx, partnerApplicationSelectSQL()+`
+WHERE app.user_id = $1
+ORDER BY app.created_at DESC
+LIMIT 1`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get latest partner application: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, service.ErrAffiliatePartnerApplicationNotFound
+	}
+	app, err := scanPartnerApplication(rows)
+	if err != nil {
+		return nil, err
+	}
+	return app, rows.Err()
+}
+
+func (r *affiliateRepository) ListPartnerApplications(ctx context.Context, filter service.AffiliatePartnerApplicationFilter) ([]service.AffiliatePartnerApplication, int64, error) {
+	page := filter.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 20
+	}
+	whereParts := []string{"1=1"}
+	args := make([]any, 0, 4)
+	if filter.Status != "" {
+		args = append(args, filter.Status)
+		whereParts = append(whereParts, fmt.Sprintf("app.status = $%d", len(args)))
+	}
+	if strings.TrimSpace(filter.Search) != "" {
+		args = append(args, "%"+strings.TrimSpace(filter.Search)+"%")
+		searchArg := len(args)
+		whereParts = append(whereParts, fmt.Sprintf(`(
+u.email ILIKE $%[1]d OR u.username ILIKE $%[1]d OR u.id::text ILIKE $%[1]d OR
+app.source ILIKE $%[1]d OR app.portal_url ILIKE $%[1]d OR app.requested_level ILIKE $%[1]d
+)`, searchArg))
+	}
+	where := "WHERE " + strings.Join(whereParts, " AND ")
+	client := clientFromContext(ctx, r.client)
+	total, err := scanInt64(ctx, client, `
+SELECT COUNT(*)
+FROM user_affiliate_partner_applications app
+JOIN users u ON u.id = app.user_id
+LEFT JOIN user_affiliates ua ON ua.user_id = app.user_id
+`+where, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("count partner applications: %w", err)
+	}
+	listArgs := append(args, pageSize, (page-1)*pageSize)
+	rows, err := client.QueryContext(ctx, partnerApplicationSelectSQL()+`
+`+where+`
+ORDER BY app.created_at DESC
+LIMIT $`+fmt.Sprint(len(listArgs)-1)+` OFFSET $`+fmt.Sprint(len(listArgs)), listArgs...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list partner applications: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	items := make([]service.AffiliatePartnerApplication, 0)
+	for rows.Next() {
+		item, err := scanPartnerApplication(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, *item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
+func (r *affiliateRepository) ReviewPartnerApplication(ctx context.Context, applicationID, reviewerID int64, input service.AffiliatePartnerApplicationReviewInput) (*service.AffiliatePartnerApplication, error) {
+	if applicationID <= 0 {
+		return nil, service.ErrAffiliatePartnerApplicationNotFound
+	}
+	var userID int64
+	err := r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
+		rows, err := txClient.QueryContext(txCtx, `
+SELECT user_id, status
+FROM user_affiliate_partner_applications
+WHERE id = $1
+FOR UPDATE`, applicationID)
+		if err != nil {
+			return fmt.Errorf("lock partner application: %w", err)
+		}
+		var status string
+		if rows.Next() {
+			if err := rows.Scan(&userID, &status); err != nil {
+				_ = rows.Close()
+				return err
+			}
+		} else {
+			_ = rows.Close()
+			return service.ErrAffiliatePartnerApplicationNotFound
+		}
+		if err := rows.Close(); err != nil {
+			return err
+		}
+		if status != service.AffiliatePartnerApplicationStatusPending {
+			return service.ErrAffiliatePartnerApplicationFinalized
+		}
+
+		grantedLevel := sql.NullString{}
+		if input.Status == service.AffiliatePartnerApplicationStatusApproved {
+			grantedLevel.Valid = true
+			grantedLevel.String = input.GrantedLevel
+		}
+		if _, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliate_partner_applications
+SET status = $1,
+    granted_level = $2,
+    review_note = $3,
+    reviewer_id = $4,
+    reviewed_at = NOW(),
+    updated_at = NOW()
+WHERE id = $5`, input.Status, grantedLevel, input.ReviewNote, nullableReviewerID(reviewerID), applicationID); err != nil {
+			return fmt.Errorf("review partner application: %w", err)
+		}
+		if grantedLevel.Valid {
+			if _, err := ensureUserAffiliateWithClient(txCtx, txClient, userID); err != nil {
+				return err
+			}
+			if _, err := txClient.ExecContext(txCtx, `
+UPDATE user_affiliates
+SET partner_level = $1,
+    updated_at = NOW()
+WHERE user_id = $2`, grantedLevel.String, userID); err != nil {
+				return fmt.Errorf("grant partner level: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	client := clientFromContext(ctx, r.client)
+	rows, err := client.QueryContext(ctx, partnerApplicationSelectSQL()+`
+WHERE app.id = $1
+LIMIT 1`, applicationID)
+	if err != nil {
+		return nil, fmt.Errorf("get reviewed partner application: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, service.ErrAffiliatePartnerApplicationNotFound
+	}
+	app, err := scanPartnerApplication(rows)
+	if err != nil {
+		return nil, err
+	}
+	return app, rows.Err()
+}
+
 // nullableArg unwraps a *float64 into an interface{} suitable for SQL parameter
 // binding: nil pointer → SQL NULL, non-nil → the float value.
 func nullableArg(v *float64) any {
@@ -1622,6 +2197,87 @@ func nullableInt64Arg(v *int64) any {
 		return nil
 	}
 	return *v
+}
+
+func nullableReviewerID(v int64) any {
+	if v <= 0 {
+		return nil
+	}
+	return v
+}
+
+func partnerApplicationSelectSQL() string {
+	return `
+SELECT app.id,
+       app.user_id,
+       COALESCE(u.email, ''),
+       COALESCE(u.username, ''),
+       app.requested_level,
+       COALESCE(ua.partner_level, 'none') AS current_level,
+       app.source,
+       app.strengths,
+       app.portal_url,
+       app.status,
+       COALESCE(app.granted_level, ''),
+       COALESCE(app.review_note, ''),
+       app.reviewer_id,
+       app.reviewed_at,
+       app.created_at,
+       app.updated_at
+FROM user_affiliate_partner_applications app
+JOIN users u ON u.id = app.user_id
+LEFT JOIN user_affiliates ua ON ua.user_id = app.user_id
+`
+}
+
+func scanPartnerApplication(rows *sql.Rows) (*service.AffiliatePartnerApplication, error) {
+	var app service.AffiliatePartnerApplication
+	var reviewerID sql.NullInt64
+	var reviewedAt sql.NullTime
+	if err := rows.Scan(
+		&app.ID,
+		&app.UserID,
+		&app.Email,
+		&app.Username,
+		&app.RequestedLevel,
+		&app.CurrentLevel,
+		&app.Source,
+		&app.Strengths,
+		&app.PortalURL,
+		&app.Status,
+		&app.GrantedLevel,
+		&app.ReviewNote,
+		&reviewerID,
+		&reviewedAt,
+		&app.CreatedAt,
+		&app.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+	app.RequestedLevel = service.NormalizeAffiliatePartnerLevel(app.RequestedLevel)
+	app.RequestedTier = affiliatePartnerTierPtr(app.RequestedLevel)
+	app.CurrentLevel = service.NormalizeAffiliatePartnerLevel(app.CurrentLevel)
+	app.CurrentTier = affiliatePartnerTierPtr(app.CurrentLevel)
+	app.GrantedLevel = strings.TrimSpace(app.GrantedLevel)
+	if app.GrantedLevel != "" {
+		app.GrantedLevel = service.NormalizeAffiliatePartnerLevel(app.GrantedLevel)
+		app.GrantedTier = affiliatePartnerTierPtr(app.GrantedLevel)
+	}
+	if reviewerID.Valid {
+		app.ReviewerID = &reviewerID.Int64
+	}
+	if reviewedAt.Valid {
+		app.ReviewedAt = &reviewedAt.Time
+	}
+	return &app, nil
+}
+
+func affiliatePartnerTierPtr(level string) *service.AffiliatePartnerTier {
+	tier, ok := service.AffiliatePartnerTierByLevel(level)
+	if !ok {
+		return nil
+	}
+	return &tier
 }
 
 // ListUsersWithCustomSettings 列出有专属配置（自定义码或专属比例）的用户。
@@ -1644,7 +2300,7 @@ func (r *affiliateRepository) ListUsersWithCustomSettings(ctx context.Context, f
 	const baseFrom = `
 FROM user_affiliates ua
 JOIN users u ON u.id = ua.user_id
-WHERE (ua.aff_code_custom = true OR ua.aff_rebate_rate_percent IS NOT NULL)
+WHERE (ua.aff_code_custom = true OR ua.aff_rebate_rate_percent IS NOT NULL OR COALESCE(ua.partner_level, 'none') <> 'none')
   AND (u.email ILIKE $1 OR u.username ILIKE $1)`
 
 	client := clientFromContext(ctx, r.client)
@@ -1661,6 +2317,7 @@ SELECT ua.user_id,
        ua.aff_code,
        ua.aff_code_custom,
        ua.aff_rebate_rate_percent,
+       COALESCE(ua.partner_level, 'none'),
        ua.aff_count` + baseFrom + `
 ORDER BY ua.updated_at DESC
 LIMIT $2 OFFSET $3`
@@ -1676,7 +2333,7 @@ LIMIT $2 OFFSET $3`
 		var e service.AffiliateAdminEntry
 		var rebate sql.NullFloat64
 		if err := rows.Scan(&e.UserID, &e.Email, &e.Username, &e.AffCode,
-			&e.AffCodeCustom, &rebate, &e.AffCount); err != nil {
+			&e.AffCodeCustom, &rebate, &e.PartnerLevel, &e.AffCount); err != nil {
 			return nil, 0, err
 		}
 		if rebate.Valid {

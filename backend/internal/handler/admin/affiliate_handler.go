@@ -8,6 +8,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -54,6 +55,7 @@ func (h *AffiliateHandler) ListUsers(c *gin.Context) {
 type UpdateAffiliateUserRequest struct {
 	AffCode              *string  `json:"aff_code"`
 	AffRebateRatePercent *float64 `json:"aff_rebate_rate_percent"`
+	PartnerLevel         *string  `json:"partner_level"`
 	// ClearRebateRate explicitly clears the per-user rate (sets it to NULL).
 	// Used to disambiguate from "field not provided".
 	ClearRebateRate bool `json:"clear_rebate_rate"`
@@ -91,6 +93,13 @@ func (h *AffiliateHandler) UpdateUserSettings(c *gin.Context) {
 		}
 	}
 
+	if req.PartnerLevel != nil {
+		if err := h.affiliateService.AdminSetUserPartnerLevel(c.Request.Context(), userID, *req.PartnerLevel); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+	}
+
 	response.Success(c, gin.H{"user_id": userID})
 }
 
@@ -111,11 +120,76 @@ func (h *AffiliateHandler) ClearUserSettings(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	if err := h.affiliateService.AdminSetUserPartnerLevel(c.Request.Context(), userID, service.AffiliatePartnerLevelNone); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 	if _, err := h.affiliateService.AdminResetUserAffCode(c.Request.Context(), userID); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Success(c, gin.H{"user_id": userID})
+}
+
+// ListPartnerTiers returns available partner levels.
+// GET /api/v1/admin/affiliates/partner-tiers
+func (h *AffiliateHandler) ListPartnerTiers(c *gin.Context) {
+	response.Success(c, service.AffiliatePartnerTiers())
+}
+
+type ReviewAffiliatePartnerApplicationRequest struct {
+	Status       string `json:"status" binding:"required"`
+	GrantedLevel string `json:"granted_level"`
+	ReviewNote   string `json:"review_note"`
+}
+
+// ListPartnerApplications returns partner program applications for review.
+// GET /api/v1/admin/affiliates/partner-applications
+func (h *AffiliateHandler) ListPartnerApplications(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	items, total, err := h.affiliateService.AdminListPartnerApplications(c.Request.Context(), service.AffiliatePartnerApplicationFilter{
+		Search:   c.Query("search"),
+		Status:   c.Query("status"),
+		Page:     page,
+		PageSize: pageSize,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, items, total, page, pageSize)
+}
+
+// ReviewPartnerApplication approves or rejects a partner program application.
+// PUT /api/v1/admin/affiliates/partner-applications/:id/review
+func (h *AffiliateHandler) ReviewPartnerApplication(c *gin.Context) {
+	applicationID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || applicationID <= 0 {
+		response.BadRequest(c, "Invalid application id")
+		return
+	}
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		response.Unauthorized(c, "Admin not authenticated")
+		return
+	}
+
+	var req ReviewAffiliatePartnerApplicationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	application, err := h.affiliateService.AdminReviewPartnerApplication(c.Request.Context(), applicationID, subject.UserID, service.AffiliatePartnerApplicationReviewInput{
+		Status:       req.Status,
+		GrantedLevel: req.GrantedLevel,
+		ReviewNote:   req.ReviewNote,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, application)
 }
 
 // BatchSetRate applies the same rebate rate (or clears it) to multiple users.

@@ -114,6 +114,9 @@ func registerRoutes(
 	if h.ModelMarketplace != nil {
 		v1.GET("/public/model-marketplace", h.ModelMarketplace.ListPublic)
 	}
+	if h.User != nil {
+		v1.GET("/public/affiliate/partner-tiers", h.User.ListPublicAffiliatePartnerTiers)
+	}
 	routes.RegisterUserRoutes(v1, h, jwtAuth, settingService)
 	routes.RegisterAdminRoutes(v1, h, adminAuth)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, cfg)

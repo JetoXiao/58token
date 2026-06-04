@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -43,6 +44,11 @@ type ModelMarketplaceService struct {
 	repo ModelMarketplaceRepository
 }
 
+var retiredMarketplaceModels = map[string]struct{}{
+	"gpt-5.2":       {},
+	"gpt-5.3-codex": {},
+}
+
 func NewModelMarketplaceService(repo ModelMarketplaceRepository) *ModelMarketplaceService {
 	return &ModelMarketplaceService{repo: repo}
 }
@@ -51,5 +57,21 @@ func (s *ModelMarketplaceService) ListEnabled(ctx context.Context) ([]ModelMarke
 	if s == nil || s.repo == nil {
 		return nil, fmt.Errorf("model marketplace repository is not configured")
 	}
-	return s.repo.ListEnabled(ctx)
+	items, err := s.repo.ListEnabled(ctx)
+	if err != nil {
+		return nil, err
+	}
+	filtered := items[:0]
+	for _, item := range items {
+		if IsRetiredMarketplaceModel(item.ModelName) {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered, nil
+}
+
+func IsRetiredMarketplaceModel(modelName string) bool {
+	_, ok := retiredMarketplaceModels[strings.ToLower(strings.TrimSpace(modelName))]
+	return ok
 }

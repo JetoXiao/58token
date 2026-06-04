@@ -415,6 +415,7 @@ export default {
     affiliate: 'Affiliate Rebates',
     affiliateManagement: 'Affiliate Rebates',
     affiliateUsage: 'Usage Stats',
+    affiliateApplications: 'Partner Applications',
     affiliateInviteRecords: 'Invite Records',
     affiliateRebateRecords: 'Rebate Records',
     affiliateTransferRecords: 'Transfer Records',
@@ -449,7 +450,7 @@ export default {
     channelPricing: 'Channel Pricing',
     channelMonitor: 'Channel Monitor',
     channelStatus: 'Channel Status',
-    integrationDocs: 'Docs',
+    integrationDocs: 'Integration Docs',
     riskControl: 'Risk Control',
   },
 
@@ -812,7 +813,25 @@ export default {
       noGroup: 'Assign this API key to a group before testing.',
       inactive: 'Enable this API key before testing.',
       smallUsageHint: 'The test sends a short request and may generate a tiny usage record.',
-      requestFailed: 'Connection test failed'
+      requestFailed: 'Connection test failed',
+      imagePromptLabel: 'Image prompt',
+      imagePromptPlaceholder: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',
+      imagePromptDefault: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',
+      imageTestHint: 'This sends a real image generation request and previews the returned image below.',
+      imageSizeLabel: 'Image size',
+      imageSize1k: '1K',
+      imageSize2k: '2K',
+      imageSize4k: '4K',
+      imageReady: 'Ready. Click "Start Test" to send an image generation request.',
+      sendingImage: 'Sending image generation request...',
+      imagePreview: 'Generated images:',
+      imageReceived: 'Received test image #{count}',
+      imageTestModeWithSize: 'Mode: Image test - {size}',
+      imageSmallUsageHint: 'The test sends a real image request and may generate an image usage record.',
+      imageGenerationDisabled: 'This group has not enabled image generation. Enable image generation for the group before testing image models.',
+      unsupportedImageModel: 'This image model is not supported by the selected group platform.',
+      noImagesReturned: 'No images returned from the gateway.',
+      usingImageSize: 'Image size: {size}'
     },
     useKeyModal: {
       title: 'Use API Key',
@@ -1138,10 +1157,25 @@ export default {
       cny: 'CNY'
     },
     modelDescriptions: {
+      claudeOpus48: 'Claude Opus 4.8 is Anthropic\'s latest Opus model for complex reasoning, agentic coding, tool use, computer use, vision/PDF input, prompt caching, and long-context workflows. It supports a 1M input context window and up to 128K output tokens.',
       openai: 'OpenAI-compatible model for reasoning, tools, coding, and multimodal workloads.',
       anthropic: 'Claude-family model with strong long-context reasoning, coding, and tool use.',
       image: 'Image generation model priced per request.',
       default: 'Available model exposed through the unified API gateway.'
+    },
+    capabilityLabels: {
+      reasoning: 'Reasoning',
+      tools: 'Tools',
+      files: 'Files',
+      vision: 'Vision',
+      computerUse: 'Computer Use',
+      adaptiveThinking: 'Adaptive Thinking',
+      fastMode: 'Fast Mode',
+      context1m: '1M Context',
+      output128k: '128K Output',
+      openaiApi: 'OpenAI API',
+      anthropic: 'Anthropic',
+      openai: 'OpenAI'
     },
     dataVersion: 'Version: {version}',
     table: {
@@ -1601,7 +1635,8 @@ export default {
 
   affiliate: {
     title: 'Affiliate Rebates',
-    description: 'Invite new users and convert your rebate quota into account balance',
+    description: 'Invite new users and convert regular user rebate quota into account balance',
+    partnerInviteDescription: 'Invite new users and grow partner commission through their actual usage spend',
     yourCode: 'Your Affiliate Code',
     inviteLink: 'Invite Link',
     copyCode: 'Copy Code',
@@ -1611,18 +1646,72 @@ export default {
     loadFailed: 'Failed to load affiliate data',
     transferFailed: 'Failed to transfer affiliate quota',
     stats: {
+      partnerLevel: 'Partner Level',
       rebateRate: 'My Rebate Rate',
-      rebateRateHint: 'What you earn each time an invitee recharges',
+      rebateRateHint: 'Regular users earn from eligible RMB or USDT recharge payments',
+      partnerRebateRateHint: 'Partners earn from invitees’ actual usage spend and settle separately with the platform',
       invitedUsers: 'Invited Users',
       availableQuota: 'Available Rebate Quota',
       frozenQuota: 'Frozen',
       frozenQuotaHint: 'Recently earned rebates pending release',
       totalQuota: 'Historical Rebate Quota'
     },
+    partner: {
+      badge: 'Partner Program',
+      title: 'Grow with UseAiForMe',
+      description: 'Apply to become a partner, share your community reach, and unlock higher commission tiers as your invited users grow.',
+      normalRate: 'Regular user rebate',
+      currentRate: '{rate} partner commission',
+      nextHint: '{count} more invites to {level}',
+      progress: 'Upgrade Progress',
+      progressHint: 'Reach {count} invited users to unlock {level}',
+      maxLevelHint: 'You are at the highest partner level',
+      tierRequirement: '{count}+ invited users',
+      applyTitle: 'Apply as a Partner',
+      applyDescription: 'Tell us where you learned about us and why your audience is a good fit.',
+      pendingDescription: 'Your application is pending review.',
+      approvedDescription: 'Approved as {level}. You can still reapply for a higher level.',
+      rejectedDescription: 'Your previous application was not approved. You can update the details and apply again.',
+      requestedLevel: 'Requested Level',
+      source: 'Where did you hear about us?',
+      portalUrl: 'Profile or community URL',
+      strengths: 'Your strengths',
+      strengthsPlaceholder: 'Tell us about your audience, community, content style, or promotion plan.',
+      submitButton: 'Submit Application',
+      reapplyButton: 'Submit New Application',
+      pendingButton: 'Review Pending',
+      submitting: 'Submitting...',
+      formRequired: 'Please complete the URL and strengths fields',
+      submitSuccess: 'Application submitted',
+      submitFailed: 'Failed to submit application',
+      reviewNote: 'Review note',
+      levels: {
+        none: 'Regular User',
+        spark: 'Spark Partner',
+        voyage: 'Voyage Partner',
+        summit: 'Summit Partner',
+        cocreate: 'Co-create Partner'
+      },
+      status: {
+        pending: 'Pending',
+        approved: 'Approved',
+        rejected: 'Rejected'
+      },
+      sources: {
+        twitter: 'Twitter / X',
+        discord: 'Discord',
+        telegram: 'Telegram',
+        community: 'Other Community',
+        other: 'Other'
+      }
+    },
     transfer: {
       title: 'Transfer Rebate Quota',
-      description: 'Move available rebate quota into your account balance',
+      description: 'Regular users can move available rebate quota into account balance',
+      partnerDescription: 'Partner commission is settled separately by the platform and cannot be moved into account balance',
       button: 'Transfer to Balance',
+      partnerBadge: 'Separate settlement',
+      partnerHint: 'Your partner commission will be reconciled by the platform based on eligible invited-user usage.',
       transferring: 'Transferring...',
       empty: 'No available rebate quota',
       success: '{amount} has been transferred to your balance'
@@ -1633,6 +1722,7 @@ export default {
       columns: {
         email: 'Email',
         username: 'Username',
+        recharge: 'Eligible Recharge',
         rebate: 'Rebate',
         joinedAt: 'Joined At'
       }
@@ -1640,8 +1730,10 @@ export default {
     tips: {
       title: 'How It Works',
       line1: 'Share your affiliate code or invite link with new users.',
-      line2: 'When invitees recharge, you receive {rate} of the recharge as rebate quota.',
-      line3: 'Transfer rebate quota to balance at any time.',
+      line2: 'For regular users, eligible RMB or USDT recharge payments generate {rate} rebate quota. Redeem-code balance is excluded.',
+      partnerLine2: 'Partners earn {rate} commission on invitees’ actual usage spend, settled separately by the platform.',
+      line3: 'Regular users can transfer available rebate quota to account balance.',
+      partnerLine3: 'Partners are settled separately by the platform and cannot transfer rebates into account balance.',
       line4: 'Newly earned rebates may have a waiting period before they can be transferred.'
     }
   },
@@ -2264,7 +2356,8 @@ export default {
     },
 
     affiliates: {
-      usageDescription: 'Track range-level actual spend, token usage, and inviter cashback',
+      usageDescription: 'Track actual spend, net profit, and inviter cashback by date range',
+      applicationsDescription: 'Review partner applications and grant partner levels',
       invitesDescription: 'View site-wide inviter and invitee relationships',
       rebatesDescription: 'View recharge orders that generated affiliate rebates',
       transfersDescription: 'View affiliate quota transfers into account balance',
@@ -2300,11 +2393,14 @@ export default {
         date: 'Date',
         requests: 'Requests',
         totalTokens: 'Total Tokens',
-        actualCost: 'Actual Spend',
-        rechargeAmount: 'Recharge Amount',
+        actualCost: 'Actual Spend (USD)',
+        accountCost: 'Upstream Cost',
+        netProfit: 'Net Profit',
+        rechargeAmount: 'Eligible Recharge (CNY)',
         summaryRequests: 'Range Requests',
         summaryTokens: 'Range Tokens',
-        summaryCost: 'Range Actual Spend',
+        summaryCost: 'Range Actual Spend (USD)',
+        summaryNetProfit: 'Range Net Profit (USD)',
         summaryRebate: 'Range Cashback',
         viewUsers: 'Users',
         viewGroups: 'Inviter Groups',
@@ -2323,7 +2419,13 @@ export default {
         assignSuccess: 'Invite relationship updated',
         assignNoChange: 'Invite relationship already matches',
         selfAssignError: 'Inviter and invitee cannot be the same user',
-        userSearchPlaceholder: 'Search by email, username, or user ID'
+        userSearchPlaceholder: 'Search by email, username, or user ID',
+        profitDetailsTitle: 'Net Profit Details',
+        profitDetailsSubject: 'Subject',
+        profitDetailsEmpty: 'No net profit details',
+        profitDetailGroup: 'Group',
+        profitDetailModel: 'Model',
+        profitDetailRate: 'Profit Rate'
       },
       overview: {
         title: 'Affiliate User Overview',
@@ -2333,6 +2435,24 @@ export default {
         rebatedInviteeCount: 'Rebated Invitees',
         availableQuota: 'Available Quota',
         historyQuota: 'Historical Rebate'
+      },
+      applications: {
+        searchPlaceholder: 'Search email, username, user ID, source, or URL',
+        allStatus: 'All Status',
+        requestedLevel: 'Requested Level',
+        currentLevel: 'Current Level',
+        source: 'Source',
+        strengths: 'Strengths',
+        status: 'Status',
+        createdAt: 'Applied At',
+        actions: 'Actions',
+        review: 'Review',
+        reviewTitle: 'Review Partner Application',
+        reviewResult: 'Review Result',
+        grantedLevel: 'Grant Level',
+        reviewNote: 'Review Note',
+        reviewSuccess: 'Application reviewed',
+        reviewFailed: 'Failed to review application'
       }
     },
 
@@ -2368,6 +2488,7 @@ export default {
       creating: 'Creating...',
       updating: 'Updating...',
       form: {
+        partnerLevel: 'Partner Level',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
@@ -2379,6 +2500,7 @@ export default {
         username: 'Username',
         notes: 'Notes',
         role: 'Role',
+        partnerLevel: 'Partner Level',
         groups: 'Groups',
         subscriptions: 'Subscriptions',
         balance: 'Balance',
@@ -2956,17 +3078,17 @@ export default {
         mappingCount: 'mappings',
         pricingEntry: 'Pricing Entry',
         noModels: 'No models added',
-        applyPricingToAccountStats: 'Apply Pricing to Account Stats',
-        applyPricingToAccountStatsDesc: 'When enabled, requests not matched by custom rules will use standard model pricing for account stats calculation',
-        accountStatsPricingRules: 'Custom Account Stats Pricing Rules',
+        applyPricingToAccountStats: 'Use Model Pricing as Upstream Cost Fallback',
+        applyPricingToAccountStatsDesc: 'When enabled, requests not matched by upstream cost rules use standard model pricing as upstream cost for partner cashback net-profit stats.',
+        accountStatsPricingRules: 'Upstream Cost Configuration',
         addRule: 'Add Rule',
-        noRulesConfigured: 'No custom rules configured. Channel model pricing above will be used.',
+        noRulesConfigured: 'No upstream cost rules configured. Channel model pricing above will be used as the cost fallback.',
         ruleName: 'Rule name (optional)',
         ruleGroups: 'Groups',
         ruleAccounts: 'Accounts',
         searchAccountPlaceholder: 'Search accounts...',
         ruleAccountsHint: 'Leave empty to match all accounts',
-        ruleModelPricing: 'Model Pricing',
+        ruleModelPricing: 'Upstream Cost Pricing',
          noGroupsInChannel: 'No groups selected in platform tabs above',
          unnamed: 'Unnamed',
          syncLatestModels: 'Sync Latest Models',
@@ -5842,9 +5964,18 @@ export default {
           durationDaysDesc: 'Rebate relationship expires after this many days since invitee registration. 0 = permanent.',
           perInviteeCap: 'Per-Invitee Rebate Cap',
           perInviteeCapDesc: 'Maximum total rebate from a single invitee. 0 = no limit.',
+          groupProfitRates: {
+            title: 'Group Profit Rates',
+            description: 'Configure platform profit rate per model group. Usage net profit is calculated from each group\'s actual spend.',
+            group: 'Group',
+            platform: 'Platform',
+            rate: 'Profit Rate',
+            empty: 'No configurable groups yet',
+            hint: 'Groups left blank or set to 0 do not contribute net profit. Rebate amount = net profit × rebate rate.',
+          },
           customUsers: {
             title: 'Per-User Overrides',
-            description: 'Set a custom invite code or exclusive rebate rate for specific users. Lists only users that have an override applied.',
+            description: 'Set a custom invite code, exclusive rebate rate, or partner level for specific users. Lists only users that have an override applied.',
             addButton: 'Add Custom User',
             searchPlaceholder: 'Search by email or username',
             batchButton: 'Batch Set Rate ({count} selected)',
@@ -5852,12 +5983,13 @@ export default {
             customBadge: 'custom',
             useGlobal: 'use global',
             resetTitle: 'Reset Custom Settings',
-            resetMessage: 'Reset all custom settings for {email}?\n• The exclusive rebate rate will be cleared (fall back to the global rate)\n• The invite code will be regenerated as a new system code (previously shared links will stop working)',
+            resetMessage: 'Reset all custom settings for {email}?\n• The exclusive rebate rate will be cleared (fall back to the global rate)\n• The partner level will return to Regular User\n• The invite code will be regenerated as a new system code (previously shared links will stop working)',
             totalLabel: '{total} total',
             col: {
               email: 'Email',
               username: 'Username',
               code: 'Invite Code',
+              partnerLevel: 'Partner Level',
               rate: 'Custom Rate',
               actions: 'Actions',
             },
@@ -5874,8 +6006,9 @@ export default {
             rateLabel: 'Exclusive Rebate Rate (optional)',
             ratePlaceholder: 'e.g. 30',
             rateHint: '0-100. Leave empty (in edit mode) to clear and fall back to the global rate.',
+            partnerLevelLabel: 'Partner Level',
             errorBadRate: 'Please enter a number between 0 and 100',
-            errorEmpty: 'Fill at least one: custom invite code or exclusive rebate rate',
+            errorEmpty: 'Fill at least one: custom invite code, exclusive rebate rate, or partner level',
           },
           batchModal: {
             title: 'Batch Set Rate ({count} users selected)',
@@ -7567,6 +7700,192 @@ export default {
         revoked: 'Revoked',
       },
     },
+  },
+
+  gateway: {
+    common: {
+      navSubtitle: 'AI API Gateway',
+      models: 'Model Marketplace',
+      pricing: 'Pricing',
+      docs: 'Integration Docs',
+      status: 'Status',
+      partner: 'Partner',
+      dashboard: 'Dashboard',
+      login: 'Login'
+    },
+    home: {
+      hero: {
+        eyebrow: 'AI API Gateway · OpenAI-Compatible',
+        title: 'One API. Every Frontier Model.',
+        subtitle: 'Access GPT, Claude, Gemini, DeepSeek and other leading models through one unified OpenAI-compatible API.',
+        primary: 'Start building',
+        secondary: 'Explore models'
+      },
+      routeVisual: {
+        ingress: 'Request ingress',
+        latency: 'p95 182ms',
+        policy: 'Policy routing',
+        failover: 'Auto failover'
+      },
+      metrics: {
+        availability: 'availability',
+        models: 'frontier models',
+        compatible: 'compatible API',
+        paygo: 'usage-based billing'
+      },
+      features: {
+        key: { title: 'Unified API Key', copy: 'Issue one key and connect applications to every enabled provider without vendor-specific rewrites.' },
+        routing: { title: 'Intelligent Model Routing', copy: 'Route requests across GPT, Claude, Gemini and DeepSeek with provider-aware controls.' },
+        analytics: { title: 'Usage Analytics', copy: 'Track tokens, spend, latency and model mix from an infrastructure-grade dashboard.' },
+        failover: { title: 'Failover and Retry', copy: 'Keep production traffic moving with retry strategies and resilient gateway behavior.' }
+      },
+      sdk: {
+        eyebrow: 'Developer Experience',
+        title: 'Seamlessly compatible with the OpenAI SDK',
+        copy: 'Keep the client you already use. Change the base URL, provide your key, and route requests through the gateway.'
+      },
+      dashboard: {
+        eyebrow: 'Control Plane',
+        title: 'Observe API traffic without turning the product into an admin panel',
+        copy: 'A clean infrastructure dashboard for token usage, spend, requests, error rate, top models and API keys.',
+        tokens: 'Tokens',
+        spend: 'Today spend',
+        requests: 'Requests',
+        errorRate: 'Error rate',
+        traffic: 'Gateway traffic',
+        models: 'Top models'
+      },
+      pricing: {
+        eyebrow: 'Pay As You Go',
+        title: 'Usage-based pricing. No provider lock-in.',
+        copy: 'Simple, transparent billing for teams that want one gateway for many models instead of many vendor integrations.',
+        simple: 'Simple',
+        transparent: 'Transparent',
+        noLockin: 'No vendor lock-in'
+      },
+      cta: {
+        title: 'Connect every leading model today',
+        copy: 'Use one API to access the global frontier model ecosystem.',
+        button: 'Create API Key'
+      }
+    },
+    models: {
+      eyebrow: 'Model Marketplace',
+      title: 'Route to the right model for every workload.',
+      subtitle: 'Compare GPT, Claude, Gemini, DeepSeek and other frontier models by provider, capability, group and usage price.',
+      modelCount: '{count} models',
+      providers: {
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        google: 'Google',
+        gemini: 'Gemini',
+        deepseek: 'DeepSeek',
+        claude: 'Claude'
+      },
+      groups: {
+        openai: 'OpenAI Group',
+        anthropic: 'Anthropic Group',
+        claude: 'Claude Group',
+        google: 'Google Group',
+        gemini: 'Gemini Group',
+        deepseek: 'DeepSeek Group',
+        default: 'Default Group',
+        public: 'Public Group',
+        vip: 'VIP Group',
+        standard: 'Standard Group',
+        premium: 'Premium Group',
+        codex: 'Codex Group'
+      },
+      capabilities: {
+        openai_api: 'OpenAI API',
+        chat: 'Chat',
+        messages: 'Messages',
+        responses: 'Responses',
+        tools: 'Tool Calling',
+        tool: 'Tool Calling',
+        vision: 'Vision',
+        image: 'Image',
+        image_generation: 'Image Generation',
+        code: 'Code',
+        coding: 'Coding',
+        reasoning: 'Reasoning',
+        long_context: 'Long Context',
+        embedding: 'Embeddings',
+        embeddings: 'Embeddings',
+        audio: 'Audio',
+        realtime: 'Realtime'
+      },
+      priceTiers: {
+        input: 'Input',
+        output: 'Output',
+        cache_write: 'Cache write',
+        cache_read: 'Cache read',
+        prompt: 'Prompt',
+        completion: 'Completion'
+      }
+    },
+    partner: {
+      pageTitle: 'Partner Program',
+      eyebrow: 'Partner Program',
+      title: 'Earn more by bringing builders to UseAiForMe.',
+      subtitle: 'Turn your community, content, or client network into recurring partner income. Invite teams that need reliable model access, and earn from their real usage spend.',
+      primaryCta: 'Apply or get your link',
+      secondaryCta: 'View integration docs',
+      rateCard: {
+        eyebrow: 'High-commission partner plan',
+        rate: 'Up to 70%',
+        ratePrefix: 'Up to {rate}',
+        copy: 'Partner rewards are designed for people who can bring serious AI usage. More qualified usage means higher long-term upside.'
+      },
+      stats: {
+        settlement: 'Usage-based settlement',
+        settlementValue: 'Real spend',
+        lifetime: 'Long-term upside',
+        lifetimeValue: 'Recurring'
+      },
+      valueProps: {
+        highRate: {
+          title: 'Higher rewards for serious partners',
+          copy: 'The partner plan focuses on meaningful usage, so strong promoters can earn materially more than a one-time signup reward.'
+        },
+        realUsage: {
+          title: 'Aligned with actual AI consumption',
+          copy: 'Rewards are tied to invited-user usage spend, helping you grow with the customers who keep building on the platform.'
+        },
+        easyShare: {
+          title: 'Simple story to share',
+          copy: 'One OpenAI-compatible API, many frontier models, transparent usage pricing, and a clear reason for your audience to try it.'
+        }
+      },
+      tiers: {
+        eyebrow: 'Partner tiers',
+        title: 'Grow into better rates as your reach proves itself.',
+        copy: 'Start with an application, invite qualified users, and unlock stronger rates as your referred users grow.',
+        items: {
+          spark: { name: 'Spark Partner', rate: '40%', copy: 'For early promoters and small communities starting to validate demand.' },
+          voyage: { name: 'Voyage Partner', rate: '50%', copy: 'For active channels bringing steady signups and usage.' },
+          summit: { name: 'Summit Partner', rate: '60%', copy: 'For proven partners with repeat traffic and strong conversion.' },
+          cocreate: { name: 'Co-create Partner', rate: '70%', copy: 'For strategic partners who can bring sustained high-value usage.' }
+        }
+      },
+      flow: {
+        eyebrow: 'How it works',
+        title: 'A simple path from audience to revenue.',
+        steps: {
+          apply: { title: 'Apply as a partner', copy: 'Tell us about your audience, channel, community, or client network.' },
+          invite: { title: 'Share your invite link', copy: 'Send builders to a practical AI gateway that gives them one API for many models.' },
+          settle: { title: 'Earn from qualified usage', copy: 'As invited users spend on actual model usage, your partner commission grows with them.' }
+        }
+      },
+      calculator: {
+        eyebrow: 'Example upside',
+        title: 'Usage compounds better than a one-off signup bonus.',
+        invitees: 'Invited users',
+        usage: 'Daily usage',
+        reward: 'Example reward',
+        copy: 'Example only: cashback is up to {rate} after platform costs are deducted. Actual rewards depend on approved partner level, qualified usage, platform rules, and settlement review.'
+      }
+    }
   },
 
 }

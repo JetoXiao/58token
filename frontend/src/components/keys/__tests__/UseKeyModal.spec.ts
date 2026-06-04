@@ -190,6 +190,72 @@ describe('UseKeyModal', () => {
     })
   })
 
+  it('renders gpt-image-2 configs for image-enabled OpenAI groups across Codex and OpenCode tabs', async () => {
+    const wrapper = mount(UseKeyModal, {
+      props: {
+        show: true,
+        apiKey: 'sk-image',
+        baseUrl: 'https://example.com',
+        platform: 'openai',
+        allowImageGeneration: true
+      },
+      global: {
+        stubs: {
+          BaseDialog: {
+            template: '<div><slot /><slot name="footer" /></div>'
+          },
+          Icon: {
+            template: '<span />'
+          }
+        }
+      }
+    })
+
+    const codexBlocks = wrapper.findAll('pre code')
+    const codexConfigToml = codexBlocks[0].text()
+    const codexRequest = JSON.parse(codexBlocks[2].text())
+
+    expect(codexConfigToml).toContain('model = "gpt-image-2"')
+    expect(codexConfigToml).not.toContain('model = "gpt-5.5"')
+    expect(codexConfigToml).not.toContain('review_model = "gpt-5.4"')
+    expect(codexRequest).toMatchObject({
+      model: 'gpt-image-2',
+      size: '1K',
+      response_format: 'b64_json'
+    })
+
+    const websocketTab = wrapper.findAll('button').find((button) =>
+      button.text().includes('keys.useKeyModal.cliTabs.codexCliWs')
+    )
+    expect(websocketTab).toBeDefined()
+    await websocketTab!.trigger('click')
+    await nextTick()
+
+    const websocketConfigToml = wrapper.findAll('pre code')[0].text()
+    expect(websocketConfigToml).toContain('model = "gpt-image-2"')
+    expect(websocketConfigToml).toContain('supports_websockets = true')
+    expect(websocketConfigToml).not.toContain('model = "gpt-5.5"')
+
+    const opencodeTab = wrapper.findAll('button').find((button) =>
+      button.text().includes('keys.useKeyModal.cliTabs.opencode')
+    )
+    expect(opencodeTab).toBeDefined()
+    await opencodeTab!.trigger('click')
+    await nextTick()
+
+    const opencodeConfig = JSON.parse(wrapper.find('pre code').text())
+    expect(opencodeConfig.model).toBe('openai/gpt-image-2')
+    expect(opencodeConfig.small_model).toBe('openai/gpt-image-2')
+    expect(opencodeConfig.provider.openai.models['gpt-image-2']).toMatchObject({
+      name: 'GPT Image 2',
+      modalities: {
+        input: ['text', 'image'],
+        output: ['image']
+      }
+    })
+    expect(opencodeConfig.provider.openai.models).not.toHaveProperty('gpt-5.5')
+  })
+
   it('renders OpenCode Anthropic config with explicit Claude default model', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {

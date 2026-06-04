@@ -589,20 +589,6 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 	if err != nil {
 		return nil, 0, err
 	}
-	if len(users) > 0 {
-		userIDs := make([]int64, 0, len(users))
-		for i := range users {
-			userIDs = append(userIDs, users[i].ID)
-		}
-		lastUsedByUserID, latestErr := s.userRepo.GetLatestUsedAtByUserIDs(ctx, userIDs)
-		if latestErr != nil {
-			logger.LegacyPrintf("service.admin", "failed to load user last_used_at in batch: err=%v", latestErr)
-		} else {
-			for i := range users {
-				users[i].LastUsedAt = lastUsedByUserID[users[i].ID]
-			}
-		}
-	}
 	// 批量加载用户专属分组倍率
 	if s.userGroupRateRepo != nil && len(users) > 0 {
 		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {

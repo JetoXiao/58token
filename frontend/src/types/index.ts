@@ -107,6 +107,7 @@ export interface AdminUser extends User {
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
+  affiliate?: AffiliatePartnerSummary | null
 }
 
 export interface LoginRequest {
@@ -125,11 +126,58 @@ export interface RegisterRequest {
   aff_code?: string
 }
 
+export type AffiliatePartnerLevel = 'none' | 'spark' | 'voyage' | 'summit' | 'cocreate'
+export type AffiliatePartnerApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface AffiliatePartnerTier {
+  level: AffiliatePartnerLevel
+  name: string
+  rebate_rate_percent: number
+  required_invitees: number
+  next_required_invitees?: number | null
+}
+
+export interface AffiliatePartnerSummary {
+  user_id: number
+  aff_code?: string
+  aff_code_custom?: boolean
+  aff_rebate_rate_percent?: number | null
+  partner_level: AffiliatePartnerLevel
+  partner_tier?: AffiliatePartnerTier | null
+  aff_count?: number
+  effective_rebate_rate_percent: number
+}
+
+export interface AffiliatePartnerApplication {
+  id: number
+  user_id: number
+  email?: string
+  username?: string
+  requested_level: AffiliatePartnerLevel
+  requested_tier?: AffiliatePartnerTier | null
+  current_level?: AffiliatePartnerLevel
+  current_tier?: AffiliatePartnerTier | null
+  granted_level?: AffiliatePartnerLevel | ''
+  granted_tier?: AffiliatePartnerTier | null
+  source: string
+  strengths: string
+  portal_url: string
+  status: AffiliatePartnerApplicationStatus
+  review_note?: string
+  reviewer_id?: number | null
+  reviewed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface AffiliateInvitee {
   user_id: number
   email: string
   username: string
   created_at?: string
+  recharge_amount: number
+  recharge_amount_cny?: number
+  recharge_amount_usdt?: number
   total_rebate: number
 }
 
@@ -141,6 +189,10 @@ export interface UserAffiliateDetail {
   aff_quota: number
   aff_frozen_quota: number
   aff_history_quota: number
+  partner_level: AffiliatePartnerLevel
+  partner_tier?: AffiliatePartnerTier | null
+  partner_tiers: AffiliatePartnerTier[]
+  partner_application?: AffiliatePartnerApplication | null
   /** 当前用户作为邀请人时实际生效的返利比例（专属覆盖全局）。0-100。 */
   effective_rebate_rate_percent: number
   invitees: AffiliateInvitee[]
@@ -213,6 +265,7 @@ export interface PublicSettings {
   table_default_page_size: number
   table_page_size_options: number[]
   custom_menu_items: CustomMenuItem[]
+  marketing_nav_items: string[]
   custom_endpoints: CustomEndpoint[]
   linuxdo_oauth_enabled: boolean
   dingtalk_oauth_enabled?: boolean

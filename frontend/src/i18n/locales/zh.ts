@@ -415,6 +415,7 @@ export default {
     affiliate: '邀请返利',
     affiliateManagement: '邀请返利',
     affiliateUsage: '用量统计',
+    affiliateApplications: '合伙人申请',
     affiliateInviteRecords: '邀请记录',
     affiliateRebateRecords: '返利记录',
     affiliateTransferRecords: '提取记录',
@@ -811,7 +812,25 @@ export default {
       noGroup: '请先给这个 API 密钥绑定分组后再测试。',
       inactive: '请先启用这个 API 密钥后再测试。',
       smallUsageHint: '测试会发送一条短请求，可能产生极少量用量记录。',
-      requestFailed: '连接测试失败'
+      requestFailed: '连接测试失败',
+      imagePromptLabel: '生图提示词',
+      imagePromptPlaceholder: '生成一只戴宇航员头盔的橘猫贴纸，干净的浅色背景。',
+      imagePromptDefault: 'Generate a cute orange cat astronaut sticker on a clean pastel background.',
+      imageTestHint: '这会发送一次真实生图请求，并在下方预览返回图片。',
+      imageSizeLabel: '图片尺寸',
+      imageSize1k: '1K',
+      imageSize2k: '2K',
+      imageSize4k: '4K',
+      imageReady: '准备测试。点击“开始测试”发送一条生图请求。',
+      sendingImage: '正在发送生图请求...',
+      imagePreview: '生成结果：',
+      imageReceived: '已收到第 {count} 张测试图片',
+      imageTestModeWithSize: '模式：生图测试 - {size}',
+      imageSmallUsageHint: '测试会发送一次真实生图请求，可能产生图片用量记录。',
+      imageGenerationDisabled: '当前分组尚未开启生图权限，请先在分组配置中开启后再测试图片模型。',
+      unsupportedImageModel: '所选图片模型不支持当前分组平台。',
+      noImagesReturned: '网关未返回图片。',
+      usingImageSize: '图片尺寸：{size}'
     },
     useKeyModal: {
       title: '使用 API 密钥',
@@ -1142,10 +1161,25 @@ export default {
       cny: '人民币'
     },
     modelDescriptions: {
+      claudeOpus48: 'Claude Opus 4.8 是 Anthropic 最新的 Opus 模型，适合复杂推理、智能体编码、工具调用、电脑操作、视觉/PDF 输入、提示词缓存和长上下文工作流。支持 1M 输入上下文窗口，最高 128K 输出 Token。',
       openai: '兼容 OpenAI 接口的模型，适合推理、工具调用、代码与多模态任务。',
       anthropic: 'Claude 系列模型，适合长上下文推理、代码生成与工具调用。',
       image: '图片生成模型，按请求计费。',
       default: '通过统一 API 网关开放的可用模型。'
+    },
+    capabilityLabels: {
+      reasoning: '推理',
+      tools: '工具',
+      files: '文件',
+      vision: '视觉',
+      computerUse: '电脑操作',
+      adaptiveThinking: '自适应思考',
+      fastMode: '快速模式',
+      context1m: '1M 上下文',
+      output128k: '128K 输出',
+      openaiApi: 'OpenAI API',
+      anthropic: 'Anthropic',
+      openai: 'OpenAI'
     },
     dataVersion: '版本：{version}',
     table: {
@@ -1605,7 +1639,8 @@ export default {
 
   affiliate: {
     title: '邀请返利',
-    description: '邀请新用户注册，并将返利额度转入账户余额',
+    description: '邀请新用户注册，普通用户返利额度可转入账户余额',
+    partnerInviteDescription: '邀请新用户注册，合伙人按被邀请用户实际消费金额参与返佣结算',
     yourCode: '我的邀请码',
     inviteLink: '邀请链接',
     copyCode: '复制邀请码',
@@ -1615,18 +1650,72 @@ export default {
     loadFailed: '加载邀请返利数据失败',
     transferFailed: '转入余额失败',
     stats: {
+      partnerLevel: '合伙人等级',
       rebateRate: '我的返利比例',
-      rebateRateHint: '被邀请用户每次充值后你可获得的返利比例',
+      rebateRateHint: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得返利',
+      partnerRebateRateHint: '合伙人按被邀请用户实际产生的消费金额返佣，并由平台单独结算',
       invitedUsers: '邀请人数',
       availableQuota: '可转返利额度',
       frozenQuota: '冻结中',
       frozenQuotaHint: '新产生的返利正在冻结期中',
       totalQuota: '历史返利额度'
     },
+    partner: {
+      badge: '合伙人计划',
+      title: '一起推广 UseAiForMe',
+      description: '申请成为合伙人，告诉我们你的社群触达和推广优势；邀请人数增长后，系统会自动升级合伙人等级。',
+      normalRate: '普通用户返利',
+      currentRate: '{rate} 合伙人返佣',
+      nextHint: '再邀请 {count} 人升级到 {level}',
+      progress: '升级进度',
+      progressHint: '累计邀请 {count} 人可升级为 {level}',
+      maxLevelHint: '你已达到最高合伙人等级',
+      tierRequirement: '邀请 {count}+ 人',
+      applyTitle: '申请成为合伙人',
+      applyDescription: '告诉我们你从哪里了解到我们，以及你适合推广的优势。',
+      pendingDescription: '你的申请正在等待审核。',
+      approvedDescription: '已通过为 {level}。你仍然可以继续申请更高等级。',
+      rejectedDescription: '上一次申请未通过，你可以补充资料后重新申请。',
+      requestedLevel: '申请等级',
+      source: '从哪里了解到我们',
+      portalUrl: '主页或社群地址',
+      strengths: '你的优势',
+      strengthsPlaceholder: '介绍你的受众、社群、内容风格或推广计划。',
+      submitButton: '提交申请',
+      reapplyButton: '提交新申请',
+      pendingButton: '审核中',
+      submitting: '提交中...',
+      formRequired: '请填写主页地址和优势说明',
+      submitSuccess: '申请已提交',
+      submitFailed: '提交申请失败',
+      reviewNote: '审核备注',
+      levels: {
+        none: '普通用户',
+        spark: '星火合伙人',
+        voyage: '远航合伙人',
+        summit: '峰芒合伙人',
+        cocreate: '共创合伙人'
+      },
+      status: {
+        pending: '待审核',
+        approved: '已通过',
+        rejected: '已拒绝'
+      },
+      sources: {
+        twitter: 'Twitter / X',
+        discord: 'Discord',
+        telegram: 'Telegram',
+        community: '其他社群',
+        other: '其他'
+      }
+    },
     transfer: {
       title: '返利额度转余额',
-      description: '将当前可用返利额度一键转入账户余额',
+      description: '普通用户可将当前可用返利额度一键转入账户余额',
+      partnerDescription: '合伙人返佣由平台单独对接结算，不支持转入账户余额',
       button: '转入余额',
+      partnerBadge: '单独结算',
+      partnerHint: '平台会根据被邀请用户的有效消费数据与合伙人对接结算。',
       transferring: '转入中...',
       empty: '当前没有可转入额度',
       success: '已转入余额：{amount}'
@@ -1637,6 +1726,7 @@ export default {
       columns: {
         email: '邮箱',
         username: '用户名',
+        recharge: '实际充值金额',
         rebate: '返利明细',
         joinedAt: '注册时间'
       }
@@ -1644,8 +1734,10 @@ export default {
     tips: {
       title: '使用说明',
       line1: '将邀请码或邀请链接分享给新用户。',
-      line2: '被邀请用户充值后，你可获得 {rate} 的返利额度。',
-      line3: '返利额度可随时转入账户余额。',
+      line2: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得 {rate} 返利额度，充值卡金额不参与计算。',
+      partnerLine2: '合伙人按被邀请用户实际产生的消费金额获得 {rate} 返佣，平台会单独对接结算。',
+      line3: '普通用户可将返利额度转入账户余额。',
+      partnerLine3: '合伙人返佣不支持转入余额，平台会单独对接结算。',
       line4: '新产生的返利需要经过冻结期后才能提现。'
     }
   },
@@ -2285,7 +2377,8 @@ export default {
     },
 
     affiliates: {
-      usageDescription: '按时间段汇总用户实际消费、Token 用量和邀请人返现金额',
+      usageDescription: '按时间段汇总用户实际消费、净利润和邀请人应返现金额',
+      applicationsDescription: '审核合伙人申请并授予合伙人等级',
       invitesDescription: '查看全站邀请关系和被邀请用户累计返利',
       rebatesDescription: '查看每一笔产生返利的充值订单',
       transfersDescription: '查看返利额度转入账户余额的提取流水',
@@ -2321,11 +2414,14 @@ export default {
         date: '日期',
         requests: '请求数',
         totalTokens: '总 Token',
-        actualCost: '实际消费',
-        rechargeAmount: '充值金额',
+        actualCost: '实际消费 (USD)',
+        accountCost: '上游成本',
+        netProfit: '净利润',
+        rechargeAmount: '有效充值金额 (人民币)',
         summaryRequests: '区间请求数',
         summaryTokens: '区间 Token',
-        summaryCost: '区间实际消费',
+        summaryCost: '区间实际消费 (USD)',
+        summaryNetProfit: '区间净利润 (USD)',
         summaryRebate: '区间应返现',
         viewUsers: '用户列表',
         viewGroups: '邀请人分组',
@@ -2344,7 +2440,13 @@ export default {
         assignSuccess: '邀请关系已更新',
         assignNoChange: '邀请关系无需变更',
         selfAssignError: '邀请人和被邀请人不能是同一个用户',
-        userSearchPlaceholder: '输入邮箱、用户名或用户 ID 搜索'
+        userSearchPlaceholder: '输入邮箱、用户名或用户 ID 搜索',
+        profitDetailsTitle: '净利润明细',
+        profitDetailsSubject: '对象',
+        profitDetailsEmpty: '暂无净利润明细',
+        profitDetailGroup: '分组',
+        profitDetailModel: '模型',
+        profitDetailRate: '利润率'
       },
       overview: {
         title: '用户返利概览',
@@ -2354,6 +2456,24 @@ export default {
         rebatedInviteeCount: '已产生返利人数',
         availableQuota: '可提余额',
         historyQuota: '历史返利'
+      },
+      applications: {
+        searchPlaceholder: '搜索邮箱、用户名、用户 ID、来源或地址',
+        allStatus: '全部状态',
+        requestedLevel: '申请等级',
+        currentLevel: '当前等级',
+        source: '来源',
+        strengths: '优势',
+        status: '状态',
+        createdAt: '申请时间',
+        actions: '操作',
+        review: '审核',
+        reviewTitle: '审核合伙人申请',
+        reviewResult: '审核结果',
+        grantedLevel: '授予等级',
+        reviewNote: '审核备注',
+        reviewSuccess: '申请已审核',
+        reviewFailed: '审核申请失败'
       }
     },
 
@@ -2400,6 +2520,7 @@ export default {
         username: '用户名',
         notes: '备注',
         role: '角色',
+        partnerLevel: '合伙人等级',
         groups: '分组',
         subscriptions: '订阅分组',
         balance: '余额',
@@ -2473,6 +2594,7 @@ export default {
         concurrencyLabel: '并发数',
         statusLabel: '状态',
         selectStatus: '选择状态',
+        partnerLevel: '合伙人等级',
         rpmLimit: '每分钟请求数 (RPM)',
         rpmLimitPlaceholder: '0 表示不限制',
         rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效'
@@ -3033,17 +3155,17 @@ export default {
         mappingCount: '条映射',
         pricingEntry: '定价配置',
         noModels: '未添加模型',
-        applyPricingToAccountStats: '应用模型定价到账号统计',
-        applyPricingToAccountStatsDesc: '启用后，未被自定义规则匹配的请求将使用模型定价文件中的标准价格计算账号统计费用',
-        accountStatsPricingRules: '自定义账号统计定价规则',
+        applyPricingToAccountStats: '使用模型定价作为上游成本兜底',
+        applyPricingToAccountStatsDesc: '启用后，未被上游成本配置匹配的请求将使用模型定价文件中的标准价格计算上游成本，用于合伙人返现净利润统计。',
+        accountStatsPricingRules: '上游成本配置',
         addRule: '添加规则',
-        noRulesConfigured: '未配置自定义规则，将使用上方的模型定价。',
+        noRulesConfigured: '未配置上游成本规则，将使用上方的模型定价作为成本兜底。',
         ruleName: '规则名称（可选）',
         ruleGroups: '分组',
         ruleAccounts: '账号',
         searchAccountPlaceholder: '搜索账号...',
         ruleAccountsHint: '留空表示匹配所有账号',
-        ruleModelPricing: '模型定价',
+        ruleModelPricing: '上游成本定价',
         noGroupsInChannel: '上方平台标签页中未选择分组',
         unnamed: '未命名',
         syncLatestModels: '同步最新模型',
@@ -6005,9 +6127,18 @@ export default {
           durationDaysDesc: '被邀请用户注册后多少天内的充值产生返利。0 = 永久有效。',
           perInviteeCap: '单人返利上限',
           perInviteeCapDesc: '每个被邀请用户最多产生的返利总额。0 = 无上限。',
+          groupProfitRates: {
+            title: '分组利润率',
+            description: '按模型分组配置平台利润率，用量统计里的净利润会按每个分组的实际消费加权计算。',
+            group: '分组',
+            platform: '平台',
+            rate: '利润率',
+            empty: '暂无可配置分组',
+            hint: '未配置或填 0 的分组不计入净利润；返佣金额 = 净利润 × 返佣比例。',
+          },
           customUsers: {
             title: '专属用户配置',
-            description: '为指定用户设置专属邀请码或专属返利比例。仅展示已设置过专属配置的用户。',
+            description: '为指定用户设置专属邀请码、专属返利比例或合伙人等级。仅展示已设置过专属配置的用户。',
             addButton: '添加专属用户',
             searchPlaceholder: '搜索邮箱或用户名',
             batchButton: '批量设置比例（已选 {count}）',
@@ -6015,12 +6146,13 @@ export default {
             customBadge: '自定义',
             useGlobal: '沿用全局',
             resetTitle: '重置该用户的专属配置',
-            resetMessage: '确认将 {email} 的专属配置全部重置为默认？\n• 专属返利比例将清除（沿用全局）\n• 邀请码将重新生成为系统随机码（已分发的旧邀请链接将失效）',
+            resetMessage: '确认将 {email} 的专属配置全部重置为默认？\n• 专属返利比例将清除（沿用全局）\n• 合伙人等级将恢复为普通用户\n• 邀请码将重新生成为系统随机码（已分发的旧邀请链接将失效）',
             totalLabel: '共 {total} 条',
             col: {
               email: '邮箱',
               username: '用户名',
               code: '邀请码',
+              partnerLevel: '合伙人等级',
               rate: '专属比例',
               actions: '操作',
             },
@@ -6037,8 +6169,9 @@ export default {
             rateLabel: '专属返利比例（可选）',
             ratePlaceholder: '例如 30',
             rateHint: '0-100%；留空（编辑模式下）表示清除专属比例并沿用全局。',
+            partnerLevelLabel: '合伙人等级',
             errorBadRate: '请输入 0-100 之间的比例',
-            errorEmpty: '至少填写一项：专属邀请码或专属返利比例',
+            errorEmpty: '至少填写一项：专属邀请码、专属返利比例或合伙人等级',
           },
           batchModal: {
             title: '批量设置专属比例（已选 {count} 个用户）',
@@ -7749,6 +7882,192 @@ export default {
         revoked: '已撤销',
       },
     },
+  },
+
+  gateway: {
+    common: {
+      navSubtitle: 'AI API 网关',
+      models: '模型广场',
+      pricing: '定价',
+      docs: '接入文档',
+      status: '状态',
+      partner: '合伙人',
+      dashboard: '控制台',
+      login: '登录'
+    },
+    home: {
+      hero: {
+        eyebrow: 'AI API Gateway · OpenAI-Compatible',
+        title: '一个 API，连接所有顶级模型',
+        subtitle: '通过统一 OpenAI-Compatible API，快速接入 GPT、Claude、Gemini、DeepSeek 等全球主流 AI 模型。',
+        primary: '开始接入',
+        secondary: '查看模型'
+      },
+      routeVisual: {
+        ingress: '请求入口',
+        latency: 'p95 182ms',
+        policy: '策略路由',
+        failover: '自动故障切换'
+      },
+      metrics: {
+        availability: '可用性',
+        models: '顶级模型',
+        compatible: '兼容 API',
+        paygo: '按量计费'
+      },
+      features: {
+        key: { title: '统一 API Key', copy: '一个密钥接入所有已启用供应商，业务侧无需为不同模型反复改造。' },
+        routing: { title: '智能模型路由', copy: '在 GPT、Claude、Gemini、DeepSeek 等模型之间进行统一调度与策略控制。' },
+        analytics: { title: '使用分析', copy: '用基础设施级仪表盘查看 Token、消费、延迟、模型分布与请求趋势。' },
+        failover: { title: '故障切换与重试', copy: '通过重试和网关级容错能力，让生产请求在异常时保持连续。' }
+      },
+      sdk: {
+        eyebrow: 'Developer Experience',
+        title: '无缝兼容 OpenAI SDK',
+        copy: '继续使用熟悉的客户端。只需替换 baseURL，配置 API Key，即可将请求路由到统一网关。'
+      },
+      dashboard: {
+        eyebrow: 'Control Plane',
+        title: '观察 API 流量，而不是进入后台管理系统',
+        copy: '面向基础设施团队的清爽控制台，聚焦 Token 用量、今日消费、请求数、错误率、热门模型和 API Keys。',
+        tokens: 'Token 用量',
+        spend: '今日消费',
+        requests: '请求数',
+        errorRate: '错误率',
+        traffic: '网关流量',
+        models: '热门模型'
+      },
+      pricing: {
+        eyebrow: 'Pay As You Go',
+        title: '按量计费，无需绑定单一供应商',
+        copy: '简单、透明、开发者友好的计费方式。用一个网关连接多个模型供应商，而不是维护多套接入。',
+        simple: '简单',
+        transparent: '透明',
+        noLockin: '无供应商绑定'
+      },
+      cta: {
+        title: '立即接入所有主流模型',
+        copy: '通过一个 API，统一接入全球领先 AI 模型。',
+        button: '创建 API Key'
+      }
+    },
+    models: {
+      eyebrow: '模型广场',
+      title: '为每一种负载选择合适的模型',
+      subtitle: '按供应商、能力、分组和使用价格比较 GPT、Claude、Gemini、DeepSeek 等主流模型。',
+      modelCount: '{count} 个模型',
+      providers: {
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        google: 'Google',
+        gemini: 'Gemini',
+        deepseek: 'DeepSeek',
+        claude: 'Claude'
+      },
+      groups: {
+        openai: 'OpenAI 分组',
+        anthropic: 'Anthropic 分组',
+        claude: 'Claude 分组',
+        google: 'Google 分组',
+        gemini: 'Gemini 分组',
+        deepseek: 'DeepSeek 分组',
+        default: '默认分组',
+        public: '公开分组',
+        vip: 'VIP 分组',
+        standard: '标准分组',
+        premium: '高级分组',
+        codex: 'Codex 分组'
+      },
+      capabilities: {
+        openai_api: 'OpenAI 兼容接口',
+        chat: '对话',
+        messages: 'Messages 接口',
+        responses: 'Responses 接口',
+        tools: '工具调用',
+        tool: '工具调用',
+        vision: '视觉理解',
+        image: '图像',
+        image_generation: '图像生成',
+        code: '代码',
+        coding: '代码生成',
+        reasoning: '推理',
+        long_context: '长上下文',
+        embedding: '向量嵌入',
+        embeddings: '向量嵌入',
+        audio: '音频',
+        realtime: '实时'
+      },
+      priceTiers: {
+        input: '输入',
+        output: '输出',
+        cache_write: '缓存写入',
+        cache_read: '缓存读取',
+        prompt: '提示词',
+        completion: '补全'
+      }
+    },
+    partner: {
+      pageTitle: '合伙人计划',
+      eyebrow: '合伙人计划',
+      title: '把开发者带来 UseAiForMe，获得更高返利。',
+      subtitle: '如果你有社群、内容渠道或客户资源，可以把它变成长期合伙人收益。邀请需要稳定模型接入的团队，按他们的真实用量获得返佣。',
+      primaryCta: '申请或获取邀请链接',
+      secondaryCta: '查看接入文档',
+      rateCard: {
+        eyebrow: '高返佣合伙人计划',
+        rate: '最高 70%',
+        ratePrefix: '最高 {rate}',
+        copy: '合伙人返佣面向能带来真实 AI 用量的人。邀请来的有效用量越高，长期收益空间越大。'
+      },
+      stats: {
+        settlement: '按真实用量结算',
+        settlementValue: '真实消费',
+        lifetime: '长期收益空间',
+        lifetimeValue: '持续返佣'
+      },
+      valueProps: {
+        highRate: {
+          title: '给认真推广者更高收益',
+          copy: '合伙人计划关注真实用量，适合能持续带来客户和使用量的推广者，而不是一次性注册奖励。'
+        },
+        realUsage: {
+          title: '和实际 AI 消费绑定',
+          copy: '返佣来自被邀请用户的真实用量消费，客户持续构建，你的收益也能持续增长。'
+        },
+        easyShare: {
+          title: '更容易讲清楚的产品',
+          copy: '一个 OpenAI 兼容 API，接入多种前沿模型，价格清晰，对开发者和团队都有明确价值。'
+        }
+      },
+      tiers: {
+        eyebrow: '合伙人等级',
+        title: '影响力越被验证，返佣比例越高。',
+        copy: '先提交申请，邀请优质用户，并随着被邀请用户增长逐步解锁更高比例。',
+        items: {
+          spark: { name: '星火合伙人', rate: '40%', copy: '适合刚开始推广的小型社群、内容作者和早期渠道。' },
+          voyage: { name: '远航合伙人', rate: '50%', copy: '适合能稳定带来注册和用量的活跃渠道。' },
+          summit: { name: '峰芒合伙人', rate: '60%', copy: '适合转化稳定、流量质量已被验证的成熟合伙人。' },
+          cocreate: { name: '共创合伙人', rate: '70%', copy: '适合能带来长期高价值用量的战略合伙人。' }
+        }
+      },
+      flow: {
+        eyebrow: '加入流程',
+        title: '从影响力到收益，只需要几步。',
+        steps: {
+          apply: { title: '提交合伙人申请', copy: '告诉我们你的受众、渠道、社群或客户资源。' },
+          invite: { title: '分享你的邀请链接', copy: '把开发者带到一个实用的 AI API 网关，用一个接口接入多种模型。' },
+          settle: { title: '按有效用量获得返佣', copy: '被邀请用户产生真实模型用量后，你的合伙人返佣会随之增长。' }
+        }
+      },
+      calculator: {
+        eyebrow: '收益示例',
+        title: '按用量增长，比一次性注册奖励更有想象力。',
+        invitees: '邀请用户',
+        usage: '日用量消费',
+        reward: '示例返佣',
+        copy: '仅为示例：返现是在扣除平台成本后至高 {rate}，实际返佣取决于审核后的合伙人等级、有效用量、平台规则和结算复核。'
+      }
+    }
   },
 
 }

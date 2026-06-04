@@ -936,6 +936,7 @@
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
+      :allow-image-generation="selectedKey?.group?.allow_image_generation || false"
       @close="closeUseKeyModal"
     />
 

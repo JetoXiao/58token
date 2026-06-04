@@ -664,6 +664,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyTableDefaultPageSize,
 		SettingKeyTablePageSizeOptions,
 		SettingKeyCustomMenuItems,
+		SettingKeyMarketingNavItems,
 		SettingKeyCustomEndpoints,
 		SettingKeyLinuxDoConnectEnabled,
 		SettingKeyDingTalkConnectEnabled,
@@ -788,6 +789,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		TableDefaultPageSize:             tableDefaultPageSize,
 		TablePageSizeOptions:             tablePageSizeOptions,
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
+		MarketingNavItems:                NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
 		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
 		LinuxDoOAuthEnabled:              linuxDoEnabled,
 		DingTalkOAuthEnabled:             dingTalkEnabled,
@@ -847,6 +849,67 @@ func clampChannelMonitorInterval(v int) int {
 		return channelMonitorIntervalMax
 	}
 	return v
+}
+
+const defaultMarketingNavItemsJSON = `["models","docs","partner"]`
+
+var marketingNavItemOrder = []string{"models", "docs", "partner"}
+
+// ParseMarketingNavItems parses the stored marketing navbar item list.
+// Missing or invalid settings fall back to all default entries; an explicit
+// empty JSON array is preserved so admins can hide every marketing nav item.
+func ParseMarketingNavItems(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return append([]string(nil), marketingNavItemOrder...)
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return append([]string(nil), marketingNavItemOrder...)
+	}
+	return normalizeMarketingNavItems(items)
+}
+
+func MarketingNavItemsJSON(items []string) string {
+	normalized := normalizeMarketingNavItems(items)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return defaultMarketingNavItemsJSON
+	}
+	return string(data)
+}
+
+func NormalizeMarketingNavItemsJSON(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultMarketingNavItemsJSON
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return defaultMarketingNavItemsJSON
+	}
+	return MarketingNavItemsJSON(items)
+}
+
+func normalizeMarketingNavItems(items []string) []string {
+	enabled := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		switch strings.TrimSpace(item) {
+		case "models":
+			enabled["models"] = struct{}{}
+		case "docs":
+			enabled["docs"] = struct{}{}
+		case "partner":
+			enabled["partner"] = struct{}{}
+		}
+	}
+	normalized := make([]string, 0, len(marketingNavItemOrder))
+	for _, item := range marketingNavItemOrder {
+		if _, ok := enabled[item]; ok {
+			normalized = append(normalized, item)
+		}
+	}
+	return normalized
 }
 
 // ChannelMonitorRuntime is the lightweight view of the channel monitor feature
@@ -1041,6 +1104,7 @@ type PublicSettingsInjectionPayload struct {
 	TableDefaultPageSize             int                      `json:"table_default_page_size"`
 	TablePageSizeOptions             []int                    `json:"table_page_size_options"`
 	CustomMenuItems                  json.RawMessage          `json:"custom_menu_items"`
+	MarketingNavItems                json.RawMessage          `json:"marketing_nav_items"`
 	CustomEndpoints                  json.RawMessage          `json:"custom_endpoints"`
 	LinuxDoOAuthEnabled              bool                     `json:"linuxdo_oauth_enabled"`
 	DingTalkOAuthEnabled             bool                     `json:"dingtalk_oauth_enabled"`
@@ -1106,6 +1170,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		TableDefaultPageSize:             settings.TableDefaultPageSize,
 		TablePageSizeOptions:             settings.TablePageSizeOptions,
 		CustomMenuItems:                  filterUserVisibleMenuItems(settings.CustomMenuItems),
+		MarketingNavItems:                safeRawJSONArray(settings.MarketingNavItems),
 		CustomEndpoints:                  safeRawJSONArray(settings.CustomEndpoints),
 		LinuxDoOAuthEnabled:              settings.LinuxDoOAuthEnabled,
 		DingTalkOAuthEnabled:             settings.DingTalkOAuthEnabled,
@@ -1706,6 +1771,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	}
 	updates[SettingKeyTablePageSizeOptions] = string(tablePageSizeOptionsJSON)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
+	updates[SettingKeyMarketingNavItems] = NormalizeMarketingNavItemsJSON(settings.MarketingNavItems)
 	updates[SettingKeyCustomEndpoints] = settings.CustomEndpoints
 
 	// 默认配置
@@ -1731,6 +1797,11 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		settings.AffiliateRebatePerInviteeCap = AffiliateRebatePerInviteeCapDefault
 	}
 	updates[SettingKeyAffiliateRebatePerInviteeCap] = strconv.FormatFloat(settings.AffiliateRebatePerInviteeCap, 'f', 8, 64)
+	affiliateGroupProfitRates, err := marshalAffiliateGroupProfitRates(settings.AffiliateGroupProfitRates)
+	if err != nil {
+		return nil, err
+	}
+	updates[SettingKeyAffiliateGroupProfitRates] = affiliateGroupProfitRates
 	updates[SettingKeyDefaultUserRPMLimit] = strconv.Itoa(settings.DefaultUserRPMLimit)
 	defaultSubsJSON, err := json.Marshal(settings.DefaultSubscriptions)
 	if err != nil {
@@ -2266,6 +2337,17 @@ func (s *SettingService) GetAffiliateRebatePerInviteeCap(ctx context.Context) fl
 	return cap
 }
 
+func (s *SettingService) GetAffiliateGroupProfitRates(ctx context.Context) map[string]float64 {
+	if s == nil || s.settingRepo == nil {
+		return map[string]float64{}
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliateGroupProfitRates)
+	if err != nil {
+		return map[string]float64{}
+	}
+	return parseAffiliateGroupProfitRates(raw)
+}
+
 // IsPasswordResetEnabled 检查是否启用密码重置功能
 // 要求：必须同时开启邮件验证
 func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {
@@ -2494,6 +2576,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyTableDefaultPageSize:                      "20",
 		SettingKeyTablePageSizeOptions:                      "[10,20,50,100]",
 		SettingKeyCustomMenuItems:                           "[]",
+		SettingKeyMarketingNavItems:                         defaultMarketingNavItemsJSON,
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyWeChatConnectEnabled:                      "false",
 		SettingKeyWeChatConnectAppID:                        "",
@@ -2613,7 +2696,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAvailableChannelsEnabled: "false",
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
-		SettingKeyAffiliateEnabled: "false",
+		SettingKeyAffiliateEnabled:          "false",
+		SettingKeyAffiliateGroupProfitRates: "{}",
 
 		// 风控中心功能（默认关闭，显式启用）
 		SettingKeyRiskControlEnabled: "false",
@@ -2686,6 +2770,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
+		MarketingNavItems:                NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
 		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 	}
@@ -2737,6 +2822,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	if perInviteeCap, err := strconv.ParseFloat(settings[SettingKeyAffiliateRebatePerInviteeCap], 64); err == nil && perInviteeCap >= 0 {
 		result.AffiliateRebatePerInviteeCap = perInviteeCap
 	}
+	result.AffiliateGroupProfitRates = parseAffiliateGroupProfitRates(settings[SettingKeyAffiliateGroupProfitRates])
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 
 	// 敏感信息直接返回，方便测试连接时使用
@@ -3193,6 +3279,46 @@ func clampAffiliateRebateRate(value float64) float64 {
 		return AffiliateRebateRateMax
 	}
 	return value
+}
+
+func NormalizeAffiliateGroupProfitRates(input map[string]float64) map[string]float64 {
+	result := make(map[string]float64)
+	for rawGroupID, rawRate := range input {
+		groupID, err := strconv.ParseInt(strings.TrimSpace(rawGroupID), 10, 64)
+		if err != nil || groupID <= 0 || math.IsNaN(rawRate) || math.IsInf(rawRate, 0) {
+			continue
+		}
+		rate := rawRate
+		if rate < AffiliateGroupProfitRateDefault {
+			rate = AffiliateGroupProfitRateDefault
+		}
+		if rate > AffiliateRebateRateMax {
+			rate = AffiliateRebateRateMax
+		}
+		result[strconv.FormatInt(groupID, 10)] = rate
+	}
+	return result
+}
+
+func parseAffiliateGroupProfitRates(raw string) map[string]float64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return map[string]float64{}
+	}
+	var parsed map[string]float64
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return map[string]float64{}
+	}
+	return NormalizeAffiliateGroupProfitRates(parsed)
+}
+
+func marshalAffiliateGroupProfitRates(input map[string]float64) (string, error) {
+	normalized := NormalizeAffiliateGroupProfitRates(input)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", fmt.Errorf("marshal affiliate group profit rates: %w", err)
+	}
+	return string(data), nil
 }
 
 func isFalseSettingValue(value string) bool {

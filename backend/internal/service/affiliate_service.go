@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"math"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,12 +14,17 @@ import (
 )
 
 var (
-	ErrAffiliateProfileNotFound = infraerrors.NotFound("AFFILIATE_PROFILE_NOT_FOUND", "affiliate profile not found")
-	ErrAffiliateCodeInvalid     = infraerrors.BadRequest("AFFILIATE_CODE_INVALID", "invalid affiliate code")
-	ErrAffiliateCodeTaken       = infraerrors.Conflict("AFFILIATE_CODE_TAKEN", "affiliate code already in use")
-	ErrAffiliateAlreadyBound    = infraerrors.Conflict("AFFILIATE_ALREADY_BOUND", "affiliate inviter already bound")
-	ErrAffiliateSelfBinding     = infraerrors.BadRequest("AFFILIATE_SELF_BINDING", "invitee cannot be inviter")
-	ErrAffiliateQuotaEmpty      = infraerrors.BadRequest("AFFILIATE_QUOTA_EMPTY", "no affiliate quota available to transfer")
+	ErrAffiliateProfileNotFound             = infraerrors.NotFound("AFFILIATE_PROFILE_NOT_FOUND", "affiliate profile not found")
+	ErrAffiliateCodeInvalid                 = infraerrors.BadRequest("AFFILIATE_CODE_INVALID", "invalid affiliate code")
+	ErrAffiliateCodeTaken                   = infraerrors.Conflict("AFFILIATE_CODE_TAKEN", "affiliate code already in use")
+	ErrAffiliateAlreadyBound                = infraerrors.Conflict("AFFILIATE_ALREADY_BOUND", "affiliate inviter already bound")
+	ErrAffiliateSelfBinding                 = infraerrors.BadRequest("AFFILIATE_SELF_BINDING", "invitee cannot be inviter")
+	ErrAffiliateQuotaEmpty                  = infraerrors.BadRequest("AFFILIATE_QUOTA_EMPTY", "no affiliate quota available to transfer")
+	ErrAffiliatePartnerTransferUnsupported  = infraerrors.Forbidden("AFFILIATE_PARTNER_TRANSFER_UNSUPPORTED", "partner rebates are settled separately")
+	ErrAffiliatePartnerLevelInvalid         = infraerrors.BadRequest("AFFILIATE_PARTNER_LEVEL_INVALID", "invalid partner level")
+	ErrAffiliatePartnerApplicationPending   = infraerrors.Conflict("AFFILIATE_PARTNER_APPLICATION_PENDING", "pending partner application already exists")
+	ErrAffiliatePartnerApplicationNotFound  = infraerrors.NotFound("AFFILIATE_PARTNER_APPLICATION_NOT_FOUND", "partner application not found")
+	ErrAffiliatePartnerApplicationFinalized = infraerrors.Conflict("AFFILIATE_PARTNER_APPLICATION_FINALIZED", "partner application already reviewed")
 )
 
 const (
@@ -29,7 +36,109 @@ const (
 	// 12-char codes and admin-customized codes (e.g. "VIP2026").
 	AffiliateCodeMinLength = 4
 	AffiliateCodeMaxLength = 32
+
+	AffiliatePartnerLevelNone     = "none"
+	AffiliatePartnerLevelSpark    = "spark"
+	AffiliatePartnerLevelVoyage   = "voyage"
+	AffiliatePartnerLevelSummit   = "summit"
+	AffiliatePartnerLevelCoCreate = "cocreate"
+
+	AffiliatePartnerApplicationStatusPending  = "pending"
+	AffiliatePartnerApplicationStatusApproved = "approved"
+	AffiliatePartnerApplicationStatusRejected = "rejected"
 )
+
+type AffiliatePartnerTier struct {
+	Level                string  `json:"level"`
+	Name                 string  `json:"name"`
+	RebateRatePercent    float64 `json:"rebate_rate_percent"`
+	RequiredInvitees     int     `json:"required_invitees"`
+	NextRequiredInvitees *int    `json:"next_required_invitees,omitempty"`
+}
+
+var affiliatePartnerTiers = []AffiliatePartnerTier{
+	{Level: AffiliatePartnerLevelSpark, Name: "Spark", RebateRatePercent: 40, RequiredInvitees: 10},
+	{Level: AffiliatePartnerLevelVoyage, Name: "Voyage", RebateRatePercent: 50, RequiredInvitees: 30},
+	{Level: AffiliatePartnerLevelSummit, Name: "Summit", RebateRatePercent: 60, RequiredInvitees: 50},
+	{Level: AffiliatePartnerLevelCoCreate, Name: "Co-create", RebateRatePercent: 70, RequiredInvitees: 100},
+}
+
+func AffiliatePartnerTiers() []AffiliatePartnerTier {
+	tiers := make([]AffiliatePartnerTier, len(affiliatePartnerTiers))
+	copy(tiers, affiliatePartnerTiers)
+	for i := range tiers {
+		if i+1 < len(tiers) {
+			next := tiers[i+1].RequiredInvitees
+			tiers[i].NextRequiredInvitees = &next
+		}
+	}
+	return tiers
+}
+
+func NormalizeAffiliatePartnerLevel(level string) string {
+	level = strings.ToLower(strings.TrimSpace(level))
+	switch level {
+	case "", "normal", "user":
+		return AffiliatePartnerLevelNone
+	case "spark", "bronze":
+		return AffiliatePartnerLevelSpark
+	case "voyage", "silver":
+		return AffiliatePartnerLevelVoyage
+	case "summit", "gold":
+		return AffiliatePartnerLevelSummit
+	case "cocreate", "co-create", "diamond":
+		return AffiliatePartnerLevelCoCreate
+	default:
+		return level
+	}
+}
+
+func AffiliatePartnerTierByLevel(level string) (AffiliatePartnerTier, bool) {
+	level = NormalizeAffiliatePartnerLevel(level)
+	for _, tier := range AffiliatePartnerTiers() {
+		if tier.Level == level {
+			return tier, true
+		}
+	}
+	return AffiliatePartnerTier{}, false
+}
+
+func AffiliatePartnerLevelRank(level string) int {
+	level = NormalizeAffiliatePartnerLevel(level)
+	if level == AffiliatePartnerLevelNone {
+		return 0
+	}
+	for i, tier := range affiliatePartnerTiers {
+		if tier.Level == level {
+			return i + 1
+		}
+	}
+	return -1
+}
+
+func AffiliatePartnerTierByInviteCount(invitees int) (AffiliatePartnerTier, bool) {
+	var best AffiliatePartnerTier
+	found := false
+	for _, tier := range AffiliatePartnerTiers() {
+		if invitees >= tier.RequiredInvitees {
+			best = tier
+			found = true
+		}
+	}
+	return best, found
+}
+
+func AffiliatePartnerTierByRebateRatePercent(ratePercent float64) (AffiliatePartnerTier, bool) {
+	if math.IsNaN(ratePercent) || math.IsInf(ratePercent, 0) {
+		return AffiliatePartnerTier{}, false
+	}
+	for _, tier := range AffiliatePartnerTiers() {
+		if math.Abs(ratePercent-tier.RebateRatePercent) <= 0.0001 {
+			return tier, true
+		}
+	}
+	return AffiliatePartnerTier{}, false
+}
 
 // affiliateCodeValidChar accepts uppercase letters, digits, underscore and dash.
 // All input passes through strings.ToUpper before validation, so lowercase from
@@ -66,6 +175,7 @@ type AffiliateSummary struct {
 	AffCode              string    `json:"aff_code"`
 	AffCodeCustom        bool      `json:"aff_code_custom"`
 	AffRebateRatePercent *float64  `json:"aff_rebate_rate_percent,omitempty"`
+	PartnerLevel         string    `json:"partner_level"`
 	InviterID            *int64    `json:"inviter_id,omitempty"`
 	AffCount             int       `json:"aff_count"`
 	AffQuota             float64   `json:"aff_quota"`
@@ -76,21 +186,28 @@ type AffiliateSummary struct {
 }
 
 type AffiliateInvitee struct {
-	UserID      int64      `json:"user_id"`
-	Email       string     `json:"email"`
-	Username    string     `json:"username"`
-	CreatedAt   *time.Time `json:"created_at,omitempty"`
-	TotalRebate float64    `json:"total_rebate"`
+	UserID             int64      `json:"user_id"`
+	Email              string     `json:"email"`
+	Username           string     `json:"username"`
+	CreatedAt          *time.Time `json:"created_at,omitempty"`
+	RechargeAmount     float64    `json:"recharge_amount"`
+	RechargeAmountCNY  float64    `json:"recharge_amount_cny"`
+	RechargeAmountUSDT float64    `json:"recharge_amount_usdt"`
+	TotalRebate        float64    `json:"total_rebate"`
 }
 
 type AffiliateDetail struct {
-	UserID          int64   `json:"user_id"`
-	AffCode         string  `json:"aff_code"`
-	InviterID       *int64  `json:"inviter_id,omitempty"`
-	AffCount        int     `json:"aff_count"`
-	AffQuota        float64 `json:"aff_quota"`
-	AffFrozenQuota  float64 `json:"aff_frozen_quota"`
-	AffHistoryQuota float64 `json:"aff_history_quota"`
+	UserID             int64                        `json:"user_id"`
+	AffCode            string                       `json:"aff_code"`
+	InviterID          *int64                       `json:"inviter_id,omitempty"`
+	AffCount           int                          `json:"aff_count"`
+	AffQuota           float64                      `json:"aff_quota"`
+	AffFrozenQuota     float64                      `json:"aff_frozen_quota"`
+	AffHistoryQuota    float64                      `json:"aff_history_quota"`
+	PartnerLevel       string                       `json:"partner_level"`
+	PartnerTier        *AffiliatePartnerTier        `json:"partner_tier,omitempty"`
+	PartnerTiers       []AffiliatePartnerTier       `json:"partner_tiers"`
+	PartnerApplication *AffiliatePartnerApplication `json:"partner_application,omitempty"`
 	// EffectiveRebateRatePercent 是当前用户作为邀请人时实际生效的返利比例：
 	// 优先用户自己的专属比例（aff_rebate_rate_percent），否则回退到全局比例。
 	// 用于在用户的 /affiliate 页面直观展示「分享后能拿到多少」。
@@ -113,6 +230,13 @@ type AffiliateRepository interface {
 	ResetUserAffCode(ctx context.Context, userID int64) (string, error)
 	SetUserRebateRate(ctx context.Context, userID int64, ratePercent *float64) error
 	BatchSetUserRebateRate(ctx context.Context, userIDs []int64, ratePercent *float64) error
+	SetUserPartnerLevel(ctx context.Context, userID int64, level string) error
+	PromotePartnerLevelForInviteCount(ctx context.Context, userID int64) (*AffiliatePartnerTier, bool, error)
+	GetPartnerSummariesByUserIDs(ctx context.Context, userIDs []int64) (map[int64]AffiliatePartnerSummary, error)
+	CreatePartnerApplication(ctx context.Context, userID int64, input AffiliatePartnerApplicationInput) (*AffiliatePartnerApplication, error)
+	GetLatestPartnerApplication(ctx context.Context, userID int64) (*AffiliatePartnerApplication, error)
+	ListPartnerApplications(ctx context.Context, filter AffiliatePartnerApplicationFilter) ([]AffiliatePartnerApplication, int64, error)
+	ReviewPartnerApplication(ctx context.Context, applicationID, reviewerID int64, input AffiliatePartnerApplicationReviewInput) (*AffiliatePartnerApplication, error)
 	ListUsersWithCustomSettings(ctx context.Context, filter AffiliateAdminFilter) ([]AffiliateAdminEntry, int64, error)
 	AdminAssignInviter(ctx context.Context, inviteeID, inviterID int64) (*AffiliateInviteAssignment, error)
 	ListAffiliateInviteRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateInviteRecord, int64, error)
@@ -131,13 +255,68 @@ type AffiliateAdminFilter struct {
 
 // AffiliateAdminEntry 专属用户列表条目
 type AffiliateAdminEntry struct {
-	UserID               int64    `json:"user_id"`
-	Email                string   `json:"email"`
-	Username             string   `json:"username"`
-	AffCode              string   `json:"aff_code"`
-	AffCodeCustom        bool     `json:"aff_code_custom"`
-	AffRebateRatePercent *float64 `json:"aff_rebate_rate_percent,omitempty"`
-	AffCount             int      `json:"aff_count"`
+	UserID               int64                 `json:"user_id"`
+	Email                string                `json:"email"`
+	Username             string                `json:"username"`
+	AffCode              string                `json:"aff_code"`
+	AffCodeCustom        bool                  `json:"aff_code_custom"`
+	AffRebateRatePercent *float64              `json:"aff_rebate_rate_percent,omitempty"`
+	PartnerLevel         string                `json:"partner_level"`
+	PartnerTier          *AffiliatePartnerTier `json:"partner_tier,omitempty"`
+	AffCount             int                   `json:"aff_count"`
+}
+
+type AffiliatePartnerSummary struct {
+	UserID                     int64                 `json:"user_id"`
+	AffCode                    string                `json:"aff_code"`
+	AffCodeCustom              bool                  `json:"aff_code_custom"`
+	AffRebateRatePercent       *float64              `json:"aff_rebate_rate_percent,omitempty"`
+	PartnerLevel               string                `json:"partner_level"`
+	PartnerTier                *AffiliatePartnerTier `json:"partner_tier,omitempty"`
+	AffCount                   int                   `json:"aff_count"`
+	EffectiveRebateRatePercent float64               `json:"effective_rebate_rate_percent"`
+}
+
+type AffiliatePartnerApplicationInput struct {
+	RequestedLevel string `json:"requested_level"`
+	Source         string `json:"source"`
+	Strengths      string `json:"strengths"`
+	PortalURL      string `json:"portal_url"`
+}
+
+type AffiliatePartnerApplicationReviewInput struct {
+	Status       string `json:"status"`
+	GrantedLevel string `json:"granted_level,omitempty"`
+	ReviewNote   string `json:"review_note,omitempty"`
+}
+
+type AffiliatePartnerApplicationFilter struct {
+	Search   string
+	Status   string
+	Page     int
+	PageSize int
+}
+
+type AffiliatePartnerApplication struct {
+	ID             int64                 `json:"id"`
+	UserID         int64                 `json:"user_id"`
+	Email          string                `json:"email,omitempty"`
+	Username       string                `json:"username,omitempty"`
+	RequestedLevel string                `json:"requested_level"`
+	RequestedTier  *AffiliatePartnerTier `json:"requested_tier,omitempty"`
+	CurrentLevel   string                `json:"current_level,omitempty"`
+	CurrentTier    *AffiliatePartnerTier `json:"current_tier,omitempty"`
+	GrantedLevel   string                `json:"granted_level,omitempty"`
+	GrantedTier    *AffiliatePartnerTier `json:"granted_tier,omitempty"`
+	Source         string                `json:"source"`
+	Strengths      string                `json:"strengths"`
+	PortalURL      string                `json:"portal_url"`
+	Status         string                `json:"status"`
+	ReviewNote     string                `json:"review_note,omitempty"`
+	ReviewerID     *int64                `json:"reviewer_id,omitempty"`
+	ReviewedAt     *time.Time            `json:"reviewed_at,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
 type AffiliateRecordFilter struct {
@@ -160,6 +339,7 @@ type AffiliateUsageFilter struct {
 	InviterID                int64
 	InviteeID                int64
 	View                     string
+	GroupProfitRates         map[int64]float64
 	DefaultRebateRatePercent float64
 	SortBy                   string
 	SortDesc                 bool
@@ -184,28 +364,45 @@ type AffiliateInviteRecord struct {
 }
 
 type AffiliateUsageDailyRecord struct {
-	Date              string                      `json:"date,omitempty"`
-	InviterID         int64                       `json:"inviter_id"`
-	InviterEmail      string                      `json:"inviter_email"`
-	InviterUsername   string                      `json:"inviter_username"`
-	InviteeID         int64                       `json:"invitee_id"`
-	InviteeEmail      string                      `json:"invitee_email"`
-	InviteeUsername   string                      `json:"invitee_username"`
-	InviteeCount      int64                       `json:"invitee_count"`
-	Requests          int64                       `json:"requests"`
-	TotalTokens       int64                       `json:"total_tokens"`
-	ActualCost        float64                     `json:"actual_cost"`
-	RechargeAmount    float64                     `json:"recharge_amount"`
-	RebateRatePercent float64                     `json:"rebate_rate_percent"`
-	RebateAmount      float64                     `json:"rebate_amount"`
-	Unassigned        bool                        `json:"unassigned"`
-	Members           []AffiliateUsageDailyRecord `json:"members,omitempty"`
+	Date              string                       `json:"date,omitempty"`
+	InviterID         int64                        `json:"inviter_id"`
+	InviterEmail      string                       `json:"inviter_email"`
+	InviterUsername   string                       `json:"inviter_username"`
+	InviteeID         int64                        `json:"invitee_id"`
+	InviteeEmail      string                       `json:"invitee_email"`
+	InviteeUsername   string                       `json:"invitee_username"`
+	InviteeCount      int64                        `json:"invitee_count"`
+	Requests          int64                        `json:"requests"`
+	TotalTokens       int64                        `json:"total_tokens"`
+	ActualCost        float64                      `json:"actual_cost"`
+	AccountCost       float64                      `json:"account_cost"`
+	NetProfit         float64                      `json:"net_profit"`
+	RechargeAmount    float64                      `json:"recharge_amount"`
+	RebateRatePercent float64                      `json:"rebate_rate_percent"`
+	RebateAmount      float64                      `json:"rebate_amount"`
+	Unassigned        bool                         `json:"unassigned"`
+	ProfitDetails     []AffiliateUsageProfitDetail `json:"profit_details,omitempty"`
+	Members           []AffiliateUsageDailyRecord  `json:"members,omitempty"`
+}
+
+type AffiliateUsageProfitDetail struct {
+	GroupID           int64   `json:"group_id"`
+	GroupName         string  `json:"group_name"`
+	Model             string  `json:"model"`
+	Requests          int64   `json:"requests"`
+	TotalTokens       int64   `json:"total_tokens"`
+	ActualCost        float64 `json:"actual_cost"`
+	ProfitRatePercent float64 `json:"profit_rate_percent"`
+	NetProfit         float64 `json:"net_profit"`
+	RebateAmount      float64 `json:"rebate_amount"`
 }
 
 type AffiliateUsageSummary struct {
 	TotalRequests     int64   `json:"total_requests"`
 	TotalTokens       int64   `json:"total_tokens"`
 	TotalActualCost   float64 `json:"total_actual_cost"`
+	TotalAccountCost  float64 `json:"total_account_cost"`
+	TotalNetProfit    float64 `json:"total_net_profit"`
 	TotalRebateAmount float64 `json:"total_rebate_amount"`
 }
 
@@ -245,16 +442,18 @@ type AffiliateTransferRecord struct {
 }
 
 type AffiliateUserOverview struct {
-	UserID              int64   `json:"user_id"`
-	Email               string  `json:"email"`
-	Username            string  `json:"username"`
-	AffCode             string  `json:"aff_code"`
-	RebateRatePercent   float64 `json:"rebate_rate_percent"`
-	RebateRateCustom    bool    `json:"-"`
-	InvitedCount        int     `json:"invited_count"`
-	RebatedInviteeCount int     `json:"rebated_invitee_count"`
-	AvailableQuota      float64 `json:"available_quota"`
-	HistoryQuota        float64 `json:"history_quota"`
+	UserID              int64                 `json:"user_id"`
+	Email               string                `json:"email"`
+	Username            string                `json:"username"`
+	AffCode             string                `json:"aff_code"`
+	RebateRatePercent   float64               `json:"rebate_rate_percent"`
+	RebateRateCustom    bool                  `json:"-"`
+	PartnerLevel        string                `json:"partner_level"`
+	PartnerTier         *AffiliatePartnerTier `json:"partner_tier,omitempty"`
+	InvitedCount        int                   `json:"invited_count"`
+	RebatedInviteeCount int                   `json:"rebated_invitee_count"`
+	AvailableQuota      float64               `json:"available_quota"`
+	HistoryQuota        float64               `json:"history_quota"`
 }
 
 type AffiliateService struct {
@@ -306,6 +505,13 @@ func (s *AffiliateService) GetAffiliateDetail(ctx context.Context, userID int64)
 	if err != nil {
 		return nil, err
 	}
+	effectiveRate := s.resolveRebateRatePercent(ctx, summary)
+	partnerLevel := resolveEffectivePartnerLevel(summary)
+	partnerTier := affiliatePartnerTierPtr(partnerLevel)
+	application, appErr := s.repo.GetLatestPartnerApplication(ctx, userID)
+	if appErr != nil && !errors.Is(appErr, ErrAffiliatePartnerApplicationNotFound) {
+		return nil, appErr
+	}
 	return &AffiliateDetail{
 		UserID:                     summary.UserID,
 		AffCode:                    summary.AffCode,
@@ -314,7 +520,11 @@ func (s *AffiliateService) GetAffiliateDetail(ctx context.Context, userID int64)
 		AffQuota:                   summary.AffQuota,
 		AffFrozenQuota:             summary.AffFrozenQuota,
 		AffHistoryQuota:            summary.AffHistoryQuota,
-		EffectiveRebateRatePercent: s.resolveRebateRatePercent(ctx, summary),
+		PartnerLevel:               partnerLevel,
+		PartnerTier:                partnerTier,
+		PartnerTiers:               AffiliatePartnerTiers(),
+		PartnerApplication:         application,
+		EffectiveRebateRatePercent: effectiveRate,
 		Invitees:                   invitees,
 	}, nil
 }
@@ -361,6 +571,7 @@ func (s *AffiliateService) BindInviterByCode(ctx context.Context, userID int64, 
 	if !bound {
 		return ErrAffiliateAlreadyBound
 	}
+	_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, inviterSummary.UserID)
 	return nil
 }
 
@@ -392,6 +603,9 @@ func (s *AffiliateService) AccrueInviteRebateForOrder(ctx context.Context, invit
 	inviterSummary, err := s.repo.EnsureUserAffiliate(ctx, *inviteeSummary.InviterID)
 	if err != nil {
 		return 0, err
+	}
+	if s.isEffectivePartner(ctx, inviterSummary) {
+		return 0, nil
 	}
 	// 有效期检查：超过返利有效期后不再产生返利
 	if s.settingService != nil {
@@ -436,11 +650,12 @@ func (s *AffiliateService) AccrueInviteRebateForOrder(ctx context.Context, invit
 	if !applied {
 		return 0, nil
 	}
+	_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, *inviteeSummary.InviterID)
 	return rebate, nil
 }
 
 // resolveRebateRatePercent returns the inviter's exclusive rate when set,
-// otherwise the global setting value (clamped to [Min, Max]).
+// otherwise partner level rate, then the global setting value.
 func (s *AffiliateService) resolveRebateRatePercent(ctx context.Context, inviter *AffiliateSummary) float64 {
 	if inviter != nil && inviter.AffRebateRatePercent != nil {
 		v := *inviter.AffRebateRatePercent
@@ -448,6 +663,11 @@ func (s *AffiliateService) resolveRebateRatePercent(ctx context.Context, inviter
 			return s.globalRebateRatePercent(ctx)
 		}
 		return clampAffiliateRebateRate(v)
+	}
+	if inviter != nil {
+		if tier, ok := AffiliatePartnerTierByLevel(inviter.PartnerLevel); ok {
+			return clampAffiliateRebateRate(tier.RebateRatePercent)
+		}
 	}
 	return s.globalRebateRatePercent(ctx)
 }
@@ -465,6 +685,13 @@ func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID in
 	if s == nil || s.repo == nil {
 		return 0, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
+	summary, err := s.repo.EnsureUserAffiliate(ctx, userID)
+	if err != nil {
+		return 0, 0, err
+	}
+	if s.isEffectivePartner(ctx, summary) {
+		return 0, 0, ErrAffiliatePartnerTransferUnsupported
+	}
 
 	transferred, balance, err := s.repo.TransferQuotaToBalance(ctx, userID)
 	if err != nil {
@@ -474,6 +701,27 @@ func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID in
 		s.invalidateAffiliateCaches(ctx, userID)
 	}
 	return transferred, balance, nil
+}
+
+func resolveEffectivePartnerLevel(summary *AffiliateSummary) string {
+	if summary == nil {
+		return AffiliatePartnerLevelNone
+	}
+	level := NormalizeAffiliatePartnerLevel(summary.PartnerLevel)
+	if AffiliatePartnerLevelRank(level) > 0 {
+		return level
+	}
+	if summary.AffRebateRatePercent != nil {
+		if tier, ok := AffiliatePartnerTierByRebateRatePercent(clampAffiliateRebateRate(*summary.AffRebateRatePercent)); ok {
+			return tier.Level
+		}
+	}
+	return AffiliatePartnerLevelNone
+}
+
+func (s *AffiliateService) isEffectivePartner(ctx context.Context, summary *AffiliateSummary) bool {
+	_ = ctx
+	return AffiliatePartnerLevelRank(resolveEffectivePartnerLevel(summary)) > 0
 }
 
 func (s *AffiliateService) listInvitees(ctx context.Context, inviterID int64) ([]AffiliateInvitee, error) {
@@ -612,12 +860,139 @@ func (s *AffiliateService) AdminBatchSetUserRebateRate(ctx context.Context, user
 	return s.repo.BatchSetUserRebateRate(ctx, cleaned, ratePercent)
 }
 
+func (s *AffiliateService) AdminSetUserPartnerLevel(ctx context.Context, userID int64, level string) error {
+	if s == nil || s.repo == nil {
+		return infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	level = NormalizeAffiliatePartnerLevel(level)
+	if AffiliatePartnerLevelRank(level) < 0 {
+		return ErrAffiliatePartnerLevelInvalid
+	}
+	return s.repo.SetUserPartnerLevel(ctx, userID, level)
+}
+
+func (s *AffiliateService) AdminGetPartnerSummaries(ctx context.Context, userIDs []int64) (map[int64]AffiliatePartnerSummary, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	cleaned := make([]int64, 0, len(userIDs))
+	seen := make(map[int64]struct{}, len(userIDs))
+	for _, uid := range userIDs {
+		if uid <= 0 {
+			continue
+		}
+		if _, ok := seen[uid]; ok {
+			continue
+		}
+		seen[uid] = struct{}{}
+		cleaned = append(cleaned, uid)
+	}
+	if len(cleaned) == 0 {
+		return map[int64]AffiliatePartnerSummary{}, nil
+	}
+	summaries, err := s.repo.GetPartnerSummariesByUserIDs(ctx, cleaned)
+	if err != nil {
+		return nil, err
+	}
+	for uid, summary := range summaries {
+		summary.EffectiveRebateRatePercent = s.resolveRebateRatePercent(ctx, &AffiliateSummary{
+			UserID:               summary.UserID,
+			AffCode:              summary.AffCode,
+			AffCodeCustom:        summary.AffCodeCustom,
+			AffRebateRatePercent: summary.AffRebateRatePercent,
+			PartnerLevel:         summary.PartnerLevel,
+			AffCount:             summary.AffCount,
+		})
+		summary.PartnerLevel = resolveEffectivePartnerLevel(&AffiliateSummary{
+			AffRebateRatePercent: summary.AffRebateRatePercent,
+			PartnerLevel:         summary.PartnerLevel,
+		})
+		summary.PartnerTier = affiliatePartnerTierPtr(summary.PartnerLevel)
+		summaries[uid] = summary
+	}
+	defaultRate := s.globalRebateRatePercent(ctx)
+	for _, uid := range cleaned {
+		if _, ok := summaries[uid]; ok {
+			continue
+		}
+		summaries[uid] = AffiliatePartnerSummary{
+			UserID:                     uid,
+			PartnerLevel:               AffiliatePartnerLevelNone,
+			EffectiveRebateRatePercent: defaultRate,
+		}
+	}
+	return summaries, nil
+}
+
+func (s *AffiliateService) ApplyForPartner(ctx context.Context, userID int64, input AffiliatePartnerApplicationInput) (*AffiliatePartnerApplication, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if _, err := s.EnsureUserAffiliate(ctx, userID); err != nil {
+		return nil, err
+	}
+	input, err := normalizePartnerApplicationInput(input)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.CreatePartnerApplication(ctx, userID, input)
+}
+
+func (s *AffiliateService) AdminListPartnerApplications(ctx context.Context, filter AffiliatePartnerApplicationFilter) ([]AffiliatePartnerApplication, int64, error) {
+	if s == nil || s.repo == nil {
+		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	filter.Search = strings.TrimSpace(filter.Search)
+	filter.Status = normalizePartnerApplicationStatus(filter.Status)
+	if filter.Page <= 0 {
+		filter.Page = 1
+	}
+	if filter.PageSize <= 0 {
+		filter.PageSize = 20
+	}
+	if filter.PageSize > 100 {
+		filter.PageSize = 100
+	}
+	return s.repo.ListPartnerApplications(ctx, filter)
+}
+
+func (s *AffiliateService) AdminReviewPartnerApplication(ctx context.Context, applicationID, reviewerID int64, input AffiliatePartnerApplicationReviewInput) (*AffiliatePartnerApplication, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if applicationID <= 0 {
+		return nil, ErrAffiliatePartnerApplicationNotFound
+	}
+	input.Status = normalizePartnerApplicationStatus(input.Status)
+	if input.Status != AffiliatePartnerApplicationStatusApproved && input.Status != AffiliatePartnerApplicationStatusRejected {
+		return nil, infraerrors.BadRequest("INVALID_STATUS", "invalid application status")
+	}
+	input.ReviewNote = strings.TrimSpace(input.ReviewNote)
+	if input.Status == AffiliatePartnerApplicationStatusApproved {
+		input.GrantedLevel = NormalizeAffiliatePartnerLevel(input.GrantedLevel)
+		if AffiliatePartnerLevelRank(input.GrantedLevel) <= 0 {
+			return nil, ErrAffiliatePartnerLevelInvalid
+		}
+	} else {
+		input.GrantedLevel = AffiliatePartnerLevelNone
+	}
+	return s.repo.ReviewPartnerApplication(ctx, applicationID, reviewerID, input)
+}
+
 // AdminListCustomUsers 列出有专属配置的用户。
 func (s *AffiliateService) AdminListCustomUsers(ctx context.Context, filter AffiliateAdminFilter) ([]AffiliateAdminEntry, int64, error) {
 	if s == nil || s.repo == nil {
 		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
-	return s.repo.ListUsersWithCustomSettings(ctx, filter)
+	entries, total, err := s.repo.ListUsersWithCustomSettings(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range entries {
+		entries[i].PartnerLevel = NormalizeAffiliatePartnerLevel(entries[i].PartnerLevel)
+		entries[i].PartnerTier = affiliatePartnerTierPtr(entries[i].PartnerLevel)
+	}
+	return entries, total, nil
 }
 
 func (s *AffiliateService) AdminListInviteRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateInviteRecord, int64, error) {
@@ -637,7 +1012,14 @@ func (s *AffiliateService) AdminAssignInviter(ctx context.Context, inviteeID, in
 	if inviteeID == inviterID {
 		return nil, ErrAffiliateSelfBinding
 	}
-	return s.repo.AdminAssignInviter(ctx, inviteeID, inviterID)
+	assignment, err := s.repo.AdminAssignInviter(ctx, inviteeID, inviterID)
+	if err != nil {
+		return nil, err
+	}
+	if assignment != nil && assignment.Changed {
+		_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, inviterID)
+	}
+	return assignment, nil
 }
 
 func (s *AffiliateService) AdminListUsageDailyRecords(ctx context.Context, filter AffiliateUsageFilter) ([]AffiliateUsageDailyRecord, *AffiliateUsageSummary, int64, error) {
@@ -645,8 +1027,34 @@ func (s *AffiliateService) AdminListUsageDailyRecords(ctx context.Context, filte
 		return nil, nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
 	filter = normalizeAffiliateUsageFilter(filter)
-	filter.DefaultRebateRatePercent = AffiliateUsageCommissionRateDefault
+	if s.settingService != nil {
+		filter.DefaultRebateRatePercent = s.settingService.GetAffiliateRebateRatePercent(ctx)
+		filter.GroupProfitRates = affiliateGroupProfitRatesByID(s.settingService.GetAffiliateGroupProfitRates(ctx))
+	} else {
+		filter.DefaultRebateRatePercent = AffiliateUsageCommissionRateDefault
+	}
 	return s.repo.ListAffiliateUsageDailyRecords(ctx, filter)
+}
+
+func affiliateGroupProfitRatesByID(input map[string]float64) map[int64]float64 {
+	if len(input) == 0 {
+		return nil
+	}
+	result := make(map[int64]float64, len(input))
+	for rawID, rate := range input {
+		groupID, err := strconv.ParseInt(strings.TrimSpace(rawID), 10, 64)
+		if err != nil || groupID <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) || rate < 0 {
+			continue
+		}
+		if rate > 100 {
+			rate = 100
+		}
+		result[groupID] = rate
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
 }
 
 func (s *AffiliateService) AdminListRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error) {
@@ -676,11 +1084,64 @@ func (s *AffiliateService) AdminGetUserOverview(ctx context.Context, userID int6
 	}
 	if overview != nil {
 		if !overview.RebateRateCustom {
-			overview.RebateRatePercent = s.globalRebateRatePercent(ctx)
+			if tier, ok := AffiliatePartnerTierByLevel(overview.PartnerLevel); ok {
+				overview.RebateRatePercent = tier.RebateRatePercent
+			} else {
+				overview.RebateRatePercent = s.globalRebateRatePercent(ctx)
+			}
 		}
+		overview.PartnerLevel = NormalizeAffiliatePartnerLevel(overview.PartnerLevel)
+		overview.PartnerTier = affiliatePartnerTierPtr(overview.PartnerLevel)
 		overview.RebateRatePercent = clampAffiliateRebateRate(overview.RebateRatePercent)
 	}
 	return overview, nil
+}
+
+func affiliatePartnerTierPtr(level string) *AffiliatePartnerTier {
+	tier, ok := AffiliatePartnerTierByLevel(level)
+	if !ok {
+		return nil
+	}
+	return &tier
+}
+
+func normalizePartnerApplicationInput(input AffiliatePartnerApplicationInput) (AffiliatePartnerApplicationInput, error) {
+	input.RequestedLevel = AffiliatePartnerLevelNone
+	input.Source = strings.TrimSpace(input.Source)
+	input.Strengths = strings.TrimSpace(input.Strengths)
+	input.PortalURL = strings.TrimSpace(input.PortalURL)
+	if input.Source == "" {
+		return input, infraerrors.BadRequest("INVALID_SOURCE", "source is required")
+	}
+	if input.Strengths == "" {
+		return input, infraerrors.BadRequest("INVALID_STRENGTHS", "strengths are required")
+	}
+	if input.PortalURL == "" {
+		return input, infraerrors.BadRequest("INVALID_PORTAL_URL", "portal url is required")
+	}
+	parsed, err := url.ParseRequestURI(input.PortalURL)
+	if err != nil || parsed == nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return input, infraerrors.BadRequest("INVALID_PORTAL_URL", "invalid portal url")
+	}
+	if len(input.Source) > 128 {
+		input.Source = input.Source[:128]
+	}
+	if len(input.PortalURL) > 512 {
+		return input, infraerrors.BadRequest("INVALID_PORTAL_URL", "portal url is too long")
+	}
+	return input, nil
+}
+
+func normalizePartnerApplicationStatus(status string) string {
+	status = strings.ToLower(strings.TrimSpace(status))
+	switch status {
+	case "", "all":
+		return ""
+	case AffiliatePartnerApplicationStatusPending, AffiliatePartnerApplicationStatusApproved, AffiliatePartnerApplicationStatusRejected:
+		return status
+	default:
+		return status
+	}
 }
 
 func normalizeAffiliateRecordFilter(filter AffiliateRecordFilter) AffiliateRecordFilter {

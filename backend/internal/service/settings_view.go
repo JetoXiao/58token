@@ -140,6 +140,7 @@ type SystemSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
+	MarketingNavItems           string // JSON array of marketing navbar item keys
 	CustomEndpoints             string // JSON array of custom endpoints
 
 	DefaultConcurrency           int
@@ -150,6 +151,7 @@ type SystemSettings struct {
 	AffiliateRebateFreezeHours   int
 	AffiliateRebateDurationDays  int
 	AffiliateRebatePerInviteeCap float64
+	AffiliateGroupProfitRates    map[string]float64
 	DefaultUserRPMLimit          int
 	DefaultSubscriptions         []DefaultSubscriptionSetting
 
@@ -256,6 +258,7 @@ type PublicSettings struct {
 	TableDefaultPageSize        int
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
+	MarketingNavItems           string // JSON array of marketing navbar item keys
 	CustomEndpoints             string // JSON array of custom endpoints
 
 	LinuxDoOAuthEnabled      bool

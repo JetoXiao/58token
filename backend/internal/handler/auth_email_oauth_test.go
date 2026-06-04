@@ -384,6 +384,34 @@ func (r *oauthEmailAffiliateRepoStub) BatchSetUserRebateRate(context.Context, []
 	panic("unexpected BatchSetUserRebateRate call")
 }
 
+func (r *oauthEmailAffiliateRepoStub) SetUserPartnerLevel(context.Context, int64, string) error {
+	panic("unexpected SetUserPartnerLevel call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) PromotePartnerLevelForInviteCount(context.Context, int64) (*service.AffiliatePartnerTier, bool, error) {
+	return nil, false, nil
+}
+
+func (r *oauthEmailAffiliateRepoStub) GetPartnerSummariesByUserIDs(context.Context, []int64) (map[int64]service.AffiliatePartnerSummary, error) {
+	panic("unexpected GetPartnerSummariesByUserIDs call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) CreatePartnerApplication(context.Context, int64, service.AffiliatePartnerApplicationInput) (*service.AffiliatePartnerApplication, error) {
+	panic("unexpected CreatePartnerApplication call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) GetLatestPartnerApplication(context.Context, int64) (*service.AffiliatePartnerApplication, error) {
+	panic("unexpected GetLatestPartnerApplication call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) ListPartnerApplications(context.Context, service.AffiliatePartnerApplicationFilter) ([]service.AffiliatePartnerApplication, int64, error) {
+	panic("unexpected ListPartnerApplications call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) ReviewPartnerApplication(context.Context, int64, int64, service.AffiliatePartnerApplicationReviewInput) (*service.AffiliatePartnerApplication, error) {
+	panic("unexpected ReviewPartnerApplication call")
+}
+
 func (r *oauthEmailAffiliateRepoStub) ListUsersWithCustomSettings(context.Context, service.AffiliateAdminFilter) ([]service.AffiliateAdminEntry, int64, error) {
 	panic("unexpected ListUsersWithCustomSettings call")
 }

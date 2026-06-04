@@ -303,6 +303,7 @@ const baseSettingsResponse = {
   table_page_size_options: [10, 20, 50, 100],
   backend_mode_enabled: false,
   custom_menu_items: [],
+  marketing_nav_items: ["models", "docs", "partner"],
   custom_endpoints: [],
   frontend_url: "",
   smtp_host: "",
@@ -583,6 +584,46 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_source");
     expect(payload).not.toHaveProperty("payment_visible_method_alipay_enabled");
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_enabled");
+  });
+
+  it("keeps marketing nav items hidden when the update response omits them", async () => {
+    updateSettings.mockImplementationOnce(async (payload) => {
+      const {
+        marketing_nav_items: _marketingNavItems,
+        ...response
+      } = {
+        ...baseSettingsResponse,
+        ...payload,
+      };
+      return response;
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    const items = ["models", "docs", "partner"];
+    for (const item of items) {
+      const button = wrapper.get(`[data-testid="marketing-nav-${item}"]`);
+      expect(button.attributes("aria-pressed")).toBe("true");
+      await button.trigger("click");
+    }
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        marketing_nav_items: [],
+      }),
+    );
+    for (const item of items) {
+      expect(
+        wrapper.get(`[data-testid="marketing-nav-${item}"]`).attributes(
+          "aria-pressed",
+        ),
+      ).toBe("false");
+    }
   });
 
   it("submits Anthropic cache TTL injection gateway setting", async () => {

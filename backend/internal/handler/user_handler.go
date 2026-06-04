@@ -52,6 +52,12 @@ type UpdateProfileRequest struct {
 	BalanceNotifyThreshold *float64 `json:"balance_notify_threshold"`
 }
 
+type ApplyAffiliatePartnerRequest struct {
+	Source    string `json:"source" binding:"required"`
+	Strengths string `json:"strengths" binding:"required"`
+	PortalURL string `json:"portal_url" binding:"required"`
+}
+
 type userProfileResponse struct {
 	dto.User
 	AvatarURL         string                                 `json:"avatar_url,omitempty"`
@@ -180,6 +186,13 @@ func (h *UserHandler) GetAffiliate(c *gin.Context) {
 	response.Success(c, detail)
 }
 
+// ListPublicAffiliatePartnerTiers returns partner tiers for public marketing pages.
+// GET /api/v1/public/affiliate/partner-tiers
+func (h *UserHandler) ListPublicAffiliatePartnerTiers(c *gin.Context) {
+	c.Header("Cache-Control", "public, max-age=300")
+	response.Success(c, gin.H{"items": service.AffiliatePartnerTiers()})
+}
+
 // TransferAffiliateQuota transfers all available affiliate quota into current balance.
 // POST /api/v1/user/aff/transfer
 func (h *UserHandler) TransferAffiliateQuota(c *gin.Context) {
@@ -199,6 +212,33 @@ func (h *UserHandler) TransferAffiliateQuota(c *gin.Context) {
 		"transferred_quota": transferred,
 		"balance":           balance,
 	})
+}
+
+// ApplyAffiliatePartner submits the current user's partner program application.
+// POST /api/v1/user/aff/partner/apply
+func (h *UserHandler) ApplyAffiliatePartner(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	var req ApplyAffiliatePartnerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	application, err := h.affiliateService.ApplyForPartner(c.Request.Context(), subject.UserID, service.AffiliatePartnerApplicationInput{
+		Source:    req.Source,
+		Strengths: req.Strengths,
+		PortalURL: req.PortalURL,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, application)
 }
 
 type StartIdentityBindingRequest struct {

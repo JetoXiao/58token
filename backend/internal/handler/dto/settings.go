@@ -138,6 +138,7 @@ type SystemSettings struct {
 	TableDefaultPageSize        int              `json:"table_default_page_size"`
 	TablePageSizeOptions        []int            `json:"table_page_size_options"`
 	CustomMenuItems             []CustomMenuItem `json:"custom_menu_items"`
+	MarketingNavItems           []string         `json:"marketing_nav_items"`
 	CustomEndpoints             []CustomEndpoint `json:"custom_endpoints"`
 
 	DefaultConcurrency           int                          `json:"default_concurrency"`
@@ -146,6 +147,7 @@ type SystemSettings struct {
 	AffiliateRebateFreezeHours   int                          `json:"affiliate_rebate_freeze_hours"`
 	AffiliateRebateDurationDays  int                          `json:"affiliate_rebate_duration_days"`
 	AffiliateRebatePerInviteeCap float64                      `json:"affiliate_rebate_per_invitee_cap"`
+	AffiliateGroupProfitRates    map[string]float64           `json:"affiliate_group_profit_rates"`
 	DefaultUserRPMLimit          int                          `json:"default_user_rpm_limit"`
 	DefaultSubscriptions         []DefaultSubscriptionSetting `json:"default_subscriptions"`
 
@@ -286,6 +288,7 @@ type PublicSettings struct {
 	TableDefaultPageSize             int                      `json:"table_default_page_size"`
 	TablePageSizeOptions             []int                    `json:"table_page_size_options"`
 	CustomMenuItems                  []CustomMenuItem         `json:"custom_menu_items"`
+	MarketingNavItems                []string                 `json:"marketing_nav_items"`
 	CustomEndpoints                  []CustomEndpoint         `json:"custom_endpoints"`
 	DingTalkOAuthEnabled             bool                     `json:"dingtalk_oauth_enabled"`
 	LinuxDoOAuthEnabled              bool                     `json:"linuxdo_oauth_enabled"`

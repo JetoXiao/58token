@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -15,20 +16,27 @@ import (
 // UserWithConcurrency wraps AdminUser with current concurrency info
 type UserWithConcurrency struct {
 	dto.AdminUser
-	CurrentConcurrency int `json:"current_concurrency"`
+	CurrentConcurrency int                              `json:"current_concurrency"`
+	Affiliate          *service.AffiliatePartnerSummary `json:"affiliate,omitempty"`
 }
 
 // UserHandler handles admin user management
 type UserHandler struct {
 	adminService       service.AdminService
 	concurrencyService *service.ConcurrencyService
+	affiliateService   *service.AffiliateService
 }
 
 // NewUserHandler creates a new admin user handler
-func NewUserHandler(adminService service.AdminService, concurrencyService *service.ConcurrencyService) *UserHandler {
+func NewUserHandler(adminService service.AdminService, concurrencyService *service.ConcurrencyService, affiliateService ...*service.AffiliateService) *UserHandler {
+	var affSvc *service.AffiliateService
+	if len(affiliateService) > 0 {
+		affSvc = affiliateService[0]
+	}
 	return &UserHandler{
 		adminService:       adminService,
 		concurrencyService: concurrencyService,
+		affiliateService:   affSvc,
 	}
 }
 
@@ -132,7 +140,20 @@ func (h *UserHandler) List(c *gin.Context) {
 				MaxConcurrency: users[i].Concurrency,
 			}
 		}
-		loadInfo, _ = h.concurrencyService.GetUsersLoadBatch(c.Request.Context(), usersConcurrency)
+		loadCtx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		loadInfo, _ = h.concurrencyService.GetUsersLoadBatch(loadCtx, usersConcurrency)
+	}
+
+	var affiliateSummaries map[int64]service.AffiliatePartnerSummary
+	if len(users) > 0 && h.affiliateService != nil {
+		userIDs := make([]int64, len(users))
+		for i := range users {
+			userIDs[i] = users[i].ID
+		}
+		affiliateCtx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+		affiliateSummaries, _ = h.affiliateService.AdminGetPartnerSummaries(affiliateCtx, userIDs)
 	}
 
 	// Build response with concurrency info
@@ -143,6 +164,9 @@ func (h *UserHandler) List(c *gin.Context) {
 		}
 		if info := loadInfo[users[i].ID]; info != nil {
 			out[i].CurrentConcurrency = info.CurrentConcurrency
+		}
+		if summary, ok := affiliateSummaries[users[i].ID]; ok {
+			out[i].Affiliate = &summary
 		}
 	}
 

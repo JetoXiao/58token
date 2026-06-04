@@ -1,8 +1,11 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout class="affiliate-usage-layout">
       <template #actions>
-        <div class="grid gap-3 md:grid-cols-4">
+        <div
+          class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+          :class="viewMode === 'groups' ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+        >
           <SummaryStat
             :label="t('admin.affiliates.usage.summaryRequests')"
             :value="formatInteger(summary.total_requests)"
@@ -16,13 +19,18 @@
           <SummaryStat
             :label="t('admin.affiliates.usage.summaryCost')"
             :value="formatCost(summary.total_actual_cost)"
-            icon="dollar"
+            icon="creditCard"
+          />
+          <SummaryStat
+            :label="usageLabel('summaryNetProfit')"
+            :value="formatCost(summary.total_net_profit)"
+            icon="chart"
           />
           <SummaryStat
             v-if="viewMode === 'groups'"
             :label="t('admin.affiliates.usage.summaryRebate')"
             :value="formatRebateAmount(summary.total_rebate_amount)"
-            icon="dollar"
+            icon="creditCard"
           />
         </div>
       </template>
@@ -183,6 +191,16 @@
           <template #cell-actual_cost="{ row }">
             <span class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(row.actual_cost) }}</span>
           </template>
+          <template #cell-net_profit="{ row }">
+            <button
+              type="button"
+              class="inline-flex h-9 items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:border-indigo-900/50 dark:bg-indigo-900/20 dark:text-indigo-300 dark:hover:border-indigo-700 dark:hover:bg-indigo-900/30 dark:focus:ring-offset-dark-900"
+              @click.stop="openProfitDetailsDialog(row)"
+            >
+              <Icon name="eye" size="sm" />
+              <span>{{ formatCost(row.net_profit) }}</span>
+            </button>
+          </template>
           <template #cell-recharge_amount="{ row }">
             <span class="text-sm font-semibold text-sky-600 dark:text-sky-400">{{ formatRechargeAmount(row.recharge_amount) }}</span>
           </template>
@@ -242,6 +260,17 @@
                 <div class="mt-1 font-mono text-base font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(selectedMemberGroup.actual_cost) }}</div>
               </div>
               <div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">{{ usageLabel('netProfit') }}</div>
+                <button
+                  type="button"
+                  class="mt-1 inline-flex items-center justify-end gap-1.5 font-mono text-base font-semibold text-indigo-600 transition hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-indigo-400 dark:hover:text-indigo-300 dark:focus:ring-offset-dark-900"
+                  @click="openProfitDetailsDialog(selectedMemberGroup)"
+                >
+                  <Icon name="eye" size="xs" />
+                  <span>{{ formatCost(selectedMemberGroup.net_profit) }}</span>
+                </button>
+              </div>
+              <div>
                 <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.affiliates.usage.rechargeAmount') }}</div>
                 <div class="mt-1 font-mono text-base font-semibold text-sky-600 dark:text-sky-400">{{ formatRechargeAmount(selectedMemberGroup.recharge_amount) }}</div>
               </div>
@@ -251,7 +280,7 @@
 
         <div class="hidden overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700 md:block">
           <div class="max-h-[60vh] overflow-auto">
-            <table class="w-full min-w-[52rem] divide-y divide-gray-200 dark:divide-dark-700">
+            <table class="w-full min-w-[46rem] divide-y divide-gray-200 dark:divide-dark-700">
               <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-dark-800">
                 <tr>
                   <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
@@ -265,6 +294,9 @@
                   </th>
                   <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
                     {{ t('admin.affiliates.usage.actualCost') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ usageLabel('netProfit') }}
                   </th>
                   <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
                     {{ t('admin.affiliates.usage.rechargeAmount') }}
@@ -285,10 +317,20 @@
                   <td class="px-4 py-3 text-right font-mono text-sm text-gray-700 dark:text-dark-200">{{ formatInteger(member.requests) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm font-medium text-gray-900 dark:text-white">{{ formatTokens(member.total_tokens) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(member.actual_cost) }}</td>
+                  <td class="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-end gap-1.5 font-mono text-sm font-semibold text-indigo-600 transition hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-indigo-400 dark:hover:text-indigo-300 dark:focus:ring-offset-dark-900"
+                      @click="openProfitDetailsDialog(member)"
+                    >
+                      <Icon name="eye" size="xs" />
+                      <span>{{ formatCost(member.net_profit) }}</span>
+                    </button>
+                  </td>
                   <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-sky-600 dark:text-sky-400">{{ formatRechargeAmount(member.recharge_amount) }}</td>
                 </tr>
                 <tr v-if="!(selectedMemberGroup.members || []).length">
-                  <td colspan="5" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+                  <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
                     {{ t('empty.noData') }}
                   </td>
                 </tr>
@@ -330,6 +372,17 @@
                 <div class="mt-0.5 font-mono text-emerald-600 dark:text-emerald-400">{{ formatCost(member.actual_cost) }}</div>
               </div>
               <div>
+                <div>{{ usageLabel('netProfit') }}</div>
+                <button
+                  type="button"
+                  class="mt-0.5 inline-flex items-center gap-1 font-mono text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-indigo-400 dark:focus:ring-offset-dark-900"
+                  @click="openProfitDetailsDialog(member)"
+                >
+                  <Icon name="eye" size="xs" />
+                  <span>{{ formatCost(member.net_profit) }}</span>
+                </button>
+              </div>
+              <div>
                 <div>{{ t('admin.affiliates.usage.rechargeAmount') }}</div>
                 <div class="mt-0.5 font-mono text-sky-600 dark:text-sky-400">{{ formatRechargeAmount(member.recharge_amount) }}</div>
               </div>
@@ -343,6 +396,148 @@
 
       <template #footer>
         <button class="btn btn-secondary" type="button" @click="closeMembersDialog">
+          {{ t('common.close') }}
+        </button>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog
+      :show="profitDetailsDialog"
+      :title="t('admin.affiliates.usage.profitDetailsTitle')"
+      width="extra-wide"
+      @close="closeProfitDetailsDialog"
+    >
+      <div v-if="selectedProfitRecord" class="space-y-4">
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-900/60">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0 space-y-2">
+              <div class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                {{ t('admin.affiliates.usage.profitDetailsSubject') }}
+              </div>
+              <UnassignedCell v-if="selectedProfitRecord.unassigned && !selectedProfitRecord.invitee_id" />
+              <UserCell
+                v-else
+                :id="profitDetailsSubjectId(selectedProfitRecord)"
+                :email="profitDetailsSubjectEmail(selectedProfitRecord)"
+                :username="profitDetailsSubjectUsername(selectedProfitRecord)"
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-right sm:grid-cols-4 lg:min-w-[34rem]">
+              <div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.affiliates.usage.requests') }}</div>
+                <div class="mt-1 font-mono text-base font-semibold text-gray-900 dark:text-white">{{ formatInteger(selectedProfitRecord.requests) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.affiliates.usage.actualCost') }}</div>
+                <div class="mt-1 font-mono text-base font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(selectedProfitRecord.actual_cost) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">{{ usageLabel('netProfit') }}</div>
+                <div class="mt-1 font-mono text-base font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCost(selectedProfitRecord.net_profit) }}</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.affiliates.usage.rebateAmount') }}</div>
+                <div class="mt-1 font-mono text-base font-semibold text-primary-600 dark:text-primary-400">{{ formatRebateAmount(selectedProfitRecord.rebate_amount) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hidden overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700 md:block">
+          <div class="max-h-[60vh] overflow-auto">
+            <table class="w-full min-w-[58rem] divide-y divide-gray-200 dark:divide-dark-700">
+              <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-dark-800">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.profitDetailGroup') }}
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.profitDetailModel') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.requests') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.totalTokens') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.actualCost') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.profitDetailRate') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ usageLabel('netProfit') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.rebateAmount') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
+                <tr v-for="detail in selectedProfitDetails" :key="profitDetailKey(detail)" class="hover:bg-gray-50 dark:hover:bg-dark-800">
+                  <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ profitDetailGroupLabel(detail) }}</td>
+                  <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-dark-200">{{ detail.model || '-' }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm text-gray-700 dark:text-dark-200">{{ formatInteger(detail.requests) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-medium text-gray-900 dark:text-white">{{ formatTokens(detail.total_tokens) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(detail.actual_cost) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm text-gray-700 dark:text-dark-200">{{ formatPercent(detail.profit_rate_percent) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCost(detail.net_profit) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">{{ formatRebateAmount(detail.rebate_amount) }}</td>
+                </tr>
+                <tr v-if="selectedProfitDetails.length === 0">
+                  <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.profitDetailsEmpty') }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="space-y-3 md:hidden">
+          <div
+            v-for="detail in selectedProfitDetails"
+            :key="profitDetailKey(detail)"
+            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ profitDetailGroupLabel(detail) }}</div>
+                <div class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-dark-400">{{ detail.model || '-' }}</div>
+              </div>
+              <div class="shrink-0 text-right">
+                <div class="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCost(detail.net_profit) }}</div>
+                <div class="mt-1 font-mono text-xs text-primary-600 dark:text-primary-400">{{ formatRebateAmount(detail.rebate_amount) }}</div>
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-dark-400">
+              <div>
+                <div>{{ t('admin.affiliates.usage.requests') }}</div>
+                <div class="mt-0.5 font-mono text-gray-900 dark:text-white">{{ formatInteger(detail.requests) }}</div>
+              </div>
+              <div>
+                <div>{{ t('admin.affiliates.usage.totalTokens') }}</div>
+                <div class="mt-0.5 font-mono text-gray-900 dark:text-white">{{ formatTokens(detail.total_tokens) }}</div>
+              </div>
+              <div>
+                <div>{{ t('admin.affiliates.usage.actualCost') }}</div>
+                <div class="mt-0.5 font-mono text-emerald-600 dark:text-emerald-400">{{ formatCost(detail.actual_cost) }}</div>
+              </div>
+              <div>
+                <div>{{ t('admin.affiliates.usage.profitDetailRate') }}</div>
+                <div class="mt-0.5 font-mono text-gray-900 dark:text-white">{{ formatPercent(detail.profit_rate_percent) }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedProfitDetails.length === 0" class="rounded-lg border border-gray-200 bg-white py-10 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400">
+            {{ t('admin.affiliates.usage.profitDetailsEmpty') }}
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <button class="btn btn-secondary" type="button" @click="closeProfitDetailsDialog">
           {{ t('common.close') }}
         </button>
       </template>
@@ -438,6 +633,7 @@ import { useAppStore } from '@/stores/app'
 import {
   affiliatesAPI,
   type AffiliateUsageDailyRecord,
+  type AffiliateUsageProfitDetail,
   type AffiliateUsageSummary,
   type ListAffiliateUsageParams,
   type SimpleUser,
@@ -447,18 +643,49 @@ import { extractI18nErrorMessage } from '@/utils/apiError'
 type UserRole = 'inviter' | 'invitee'
 type UsageView = 'users' | 'groups'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
+
+const usageLabelFallbacks = {
+  netProfit: {
+    zh: '净利润',
+    en: 'Net Profit',
+  },
+  summaryNetProfit: {
+    zh: '区间净利润',
+    en: 'Range Net Profit',
+  },
+} as const
+
+type UsageLabelKey = keyof typeof usageLabelFallbacks
+
+function usageLabel(key: UsageLabelKey): string {
+  const path = `admin.affiliates.usage.${key}`
+  const value = t(path)
+  if (value !== path) return value
+  const lang = String(locale.value || '').toLowerCase().startsWith('zh') ? 'zh' : 'en'
+  return usageLabelFallbacks[key][lang]
+}
 
 const loading = ref(false)
 const viewMode = ref<UsageView>('users')
 const records = ref<AffiliateUsageDailyRecord[]>([])
 const membersDialog = ref(false)
 const selectedMemberGroup = ref<AffiliateUsageDailyRecord | null>(null)
+const profitDetailsDialog = ref(false)
+const selectedProfitRecord = ref<AffiliateUsageDailyRecord | null>(null)
+const selectedProfitDetails = computed(() => {
+  const record = selectedProfitRecord.value
+  if (!record) return []
+  if (record.profit_details?.length) return record.profit_details
+  return aggregateProfitDetails(record.members || [])
+})
 const summary = reactive<AffiliateUsageSummary>({
   total_requests: 0,
   total_tokens: 0,
   total_actual_cost: 0,
+  total_account_cost: 0,
+  total_net_profit: 0,
   total_rebate_amount: 0,
 })
 const filters = reactive({
@@ -514,6 +741,7 @@ const columns = computed<Column[]>(() => [
   { key: 'requests', label: t('admin.affiliates.usage.requests'), sortable: true },
   { key: 'total_tokens', label: t('admin.affiliates.usage.totalTokens'), sortable: true },
   { key: 'actual_cost', label: t('admin.affiliates.usage.actualCost'), sortable: true },
+  { key: 'net_profit', label: usageLabel('netProfit'), sortable: true },
   { key: 'recharge_amount', label: t('admin.affiliates.usage.rechargeAmount'), sortable: true },
   ...(viewMode.value === 'groups'
     ? [
@@ -559,6 +787,8 @@ async function loadRecords() {
     summary.total_requests = res.summary?.total_requests || 0
     summary.total_tokens = res.summary?.total_tokens || 0
     summary.total_actual_cost = res.summary?.total_actual_cost || 0
+    summary.total_account_cost = res.summary?.total_account_cost || 0
+    summary.total_net_profit = res.summary?.total_net_profit || 0
     summary.total_rebate_amount = res.summary?.total_rebate_amount || 0
   } catch (error) {
     appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
@@ -599,6 +829,7 @@ function setViewMode(mode: UsageView) {
   if (viewMode.value === mode) return
   viewMode.value = mode
   closeMembersDialog()
+  closeProfitDetailsDialog()
   sortState.sort_by = 'actual_cost'
   sortState.sort_order = 'desc'
   pagination.page = 1
@@ -617,6 +848,125 @@ function openMembersDialog(row: AffiliateUsageDailyRecord) {
 function closeMembersDialog() {
   membersDialog.value = false
   selectedMemberGroup.value = null
+}
+
+async function openProfitDetailsDialog(row: AffiliateUsageDailyRecord) {
+  const target = resolveProfitDetailsRecord(row)
+  selectedProfitRecord.value = target
+  profitDetailsDialog.value = true
+
+  const current = selectedProfitRecord.value
+  const hasCurrentDetails = !!current?.profit_details?.length || aggregateProfitDetails(current?.members || []).length > 0
+  if (hasCurrentDetails) return
+
+  try {
+    const res = await affiliatesAPI.listUsageDailyRecords(buildParams())
+    const latest = findMatchingProfitDetailsRecord(row, collectProfitDetailsCandidates(res.items || []))
+    if (latest && profitDetailsDialog.value && selectedProfitRecord.value && isSameProfitDetailsRecord(selectedProfitRecord.value, target)) {
+      selectedProfitRecord.value = latest
+    }
+  } catch {
+    // Keep the current snapshot if refresh fails; the dialog still shows the summary block.
+  }
+}
+
+function closeProfitDetailsDialog() {
+  profitDetailsDialog.value = false
+  selectedProfitRecord.value = null
+}
+
+function profitDetailsSubjectId(row: AffiliateUsageDailyRecord): number {
+  return row.invitee_id || row.inviter_id || 0
+}
+
+function profitDetailsSubjectEmail(row: AffiliateUsageDailyRecord): string {
+  return row.invitee_id ? row.invitee_email : row.inviter_email
+}
+
+function profitDetailsSubjectUsername(row: AffiliateUsageDailyRecord): string {
+  return row.invitee_id ? row.invitee_username : row.inviter_username
+}
+
+function profitDetailGroupLabel(detail: AffiliateUsageProfitDetail): string {
+  if (detail.group_name) return detail.group_name
+  if (detail.group_id > 0) return `#${detail.group_id}`
+  return t('admin.affiliates.usage.unassignedGroup')
+}
+
+function profitDetailKey(detail: AffiliateUsageProfitDetail): string {
+  return `${detail.group_id}:${detail.group_name}:${detail.model}:${detail.profit_rate_percent}`
+}
+
+function resolveProfitDetailsRecord(row: AffiliateUsageDailyRecord): AffiliateUsageDailyRecord {
+  if (row.profit_details?.length || row.members?.length) return row
+
+  return findMatchingProfitDetailsRecord(row, collectProfitDetailsCandidates([
+    ...records.value,
+    ...(selectedMemberGroup.value?.members || []),
+  ])) || row
+}
+
+function collectProfitDetailsCandidates(source: AffiliateUsageDailyRecord[]): AffiliateUsageDailyRecord[] {
+  const candidates: AffiliateUsageDailyRecord[] = []
+  for (const item of source) {
+    candidates.push(item)
+    for (const member of item.members || []) {
+      candidates.push(member)
+    }
+  }
+  return candidates
+}
+
+function findMatchingProfitDetailsRecord(
+  target: AffiliateUsageDailyRecord,
+  source: AffiliateUsageDailyRecord[],
+): AffiliateUsageDailyRecord | null {
+  return source.find((item) => (
+    item.inviter_id === target.inviter_id
+    && item.invitee_id === target.invitee_id
+    && item.unassigned === target.unassigned
+  )) || null
+}
+
+function isSameProfitDetailsRecord(left: AffiliateUsageDailyRecord, right: AffiliateUsageDailyRecord): boolean {
+  return left.inviter_id === right.inviter_id
+    && left.invitee_id === right.invitee_id
+    && left.unassigned === right.unassigned
+}
+
+function aggregateProfitDetails(records: AffiliateUsageDailyRecord[]): AffiliateUsageProfitDetail[] {
+  const byKey = new Map<string, AffiliateUsageProfitDetail>()
+  for (const record of records) {
+    for (const detail of record.profit_details || []) {
+      const key = profitDetailKey(detail)
+      const existing = byKey.get(key)
+      if (existing) {
+        existing.requests += Number(detail.requests || 0)
+        existing.total_tokens += Number(detail.total_tokens || 0)
+        existing.actual_cost += Number(detail.actual_cost || 0)
+        existing.net_profit += Number(detail.net_profit || 0)
+        existing.rebate_amount += Number(detail.rebate_amount || 0)
+      } else {
+        byKey.set(key, {
+          group_id: detail.group_id,
+          group_name: detail.group_name,
+          model: detail.model,
+          requests: Number(detail.requests || 0),
+          total_tokens: Number(detail.total_tokens || 0),
+          actual_cost: Number(detail.actual_cost || 0),
+          profit_rate_percent: Number(detail.profit_rate_percent || 0),
+          net_profit: Number(detail.net_profit || 0),
+          rebate_amount: Number(detail.rebate_amount || 0),
+        })
+      }
+    }
+  }
+  return Array.from(byKey.values()).sort((left, right) => (
+    Number(right.net_profit || 0) - Number(left.net_profit || 0)
+    || Number(right.actual_cost || 0) - Number(left.actual_cost || 0)
+    || profitDetailGroupLabel(left).localeCompare(profitDetailGroupLabel(right))
+    || String(left.model || '').localeCompare(String(right.model || ''))
+  ))
 }
 
 function onFilterUserInput(role: UserRole) {
@@ -905,18 +1255,33 @@ function trimNumber(value: number): string {
 }
 
 function formatCost(value: number | null | undefined): string {
-  const n = Number(value || 0)
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+  return formatUsdAmount(value)
 }
 
 function formatRechargeAmount(value: number | null | undefined): string {
-  const n = Number(value || 0)
-  return `¥${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+  return formatCnyAmount(value)
 }
 
 function formatRebateAmount(value: number | null | undefined): string {
+  return formatCnyAmount(value)
+}
+
+function formatUsdAmount(value: number | null | undefined): string {
   const n = Number(value || 0)
-  return `¥${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
+  const amount = Math.abs(n).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })
+  return `${n < 0 ? '-' : ''}$${amount}`
+}
+
+function formatCnyAmount(value: number | null | undefined): string {
+  const n = Number(value || 0)
+  const amount = Math.abs(n).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  })
+  return `${n < 0 ? '-' : ''}\u00a5${amount}`
 }
 
 function formatPercent(value: number | null | undefined): string {
@@ -960,17 +1325,17 @@ const SummaryStat = defineComponent({
   props: {
     label: { type: String, required: true },
     value: { type: String, required: true },
-    icon: { type: String as PropType<'chart' | 'database' | 'dollar'>, required: true },
+    icon: { type: String as PropType<'chart' | 'creditCard' | 'database' | 'dollar'>, required: true },
   },
   setup(statProps) {
-    return () => h('div', { class: 'rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-dark-700 dark:bg-dark-800' }, [
-      h('div', { class: 'flex items-center justify-between gap-3' }, [
-        h('div', { class: 'text-sm text-gray-500 dark:text-dark-400' }, statProps.label),
-        h('div', { class: 'rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' }, [
+    return () => h('div', { class: 'min-h-[6.25rem] rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-dark-700 dark:bg-dark-800 sm:p-4' }, [
+      h('div', { class: 'flex items-start justify-between gap-3' }, [
+        h('div', { class: 'min-w-0 text-sm leading-5 text-gray-500 dark:text-dark-400' }, statProps.label),
+        h('div', { class: 'shrink-0 rounded-lg bg-primary-50 p-2 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400' }, [
           h(Icon, { name: statProps.icon, size: 'md' }),
         ]),
       ]),
-      h('div', { class: 'mt-2 text-2xl font-semibold text-gray-900 dark:text-white' }, statProps.value),
+      h('div', { class: 'mt-2 truncate text-2xl font-semibold text-gray-900 dark:text-white' }, statProps.value),
     ])
   },
 })
@@ -1019,3 +1384,15 @@ onMounted(() => {
   void loadRecords()
 })
 </script>
+
+<style scoped>
+@media (min-width: 1024px) {
+  :deep(.affiliate-usage-layout) {
+    gap: 1rem;
+  }
+
+  :deep(.affiliate-usage-layout .layout-section-scrollable) {
+    min-height: 24rem;
+  }
+}
+</style>

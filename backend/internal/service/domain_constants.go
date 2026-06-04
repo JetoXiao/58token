@@ -20,7 +20,7 @@ const (
 
 // Affiliate rebate settings
 const (
-	AffiliateRebateRateDefault          = 20.0
+	AffiliateRebateRateDefault          = 5.0
 	AffiliateRebateRateMin              = 0.0
 	AffiliateRebateRateMax              = 100.0
 	AffiliateEnabledDefault             = false // 邀请返利总开关默认关闭
@@ -29,6 +29,7 @@ const (
 	AffiliateRebateDurationDaysDefault  = 0     // 0 = 永久有效
 	AffiliateRebateDurationDaysMax      = 3650  // ~10 年
 	AffiliateRebatePerInviteeCapDefault = 0.0   // 0 = 无上限
+	AffiliateGroupProfitRateDefault     = 0.0   // 未配置分组默认不产生净利润
 )
 
 // Platform constants
@@ -110,6 +111,7 @@ const (
 	SettingKeyAffiliateRebateFreezeHours       = "affiliate_rebate_freeze_hours"       // 返利冻结期（小时，0=不冻结）
 	SettingKeyAffiliateRebateDurationDays      = "affiliate_rebate_duration_days"      // 返利有效期（天，0=永久）
 	SettingKeyAffiliateRebatePerInviteeCap     = "affiliate_rebate_per_invitee_cap"    // 单人返利上限（0=无上限）
+	SettingKeyAffiliateGroupProfitRates        = "affiliate_group_profit_rates"        // 分组利润率（JSON，key=group_id，value=百分比）
 	SettingKeyRiskControlEnabled               = "risk_control_enabled"                // 是否启用风控中心入口与审计链路
 	SettingKeyContentModerationConfig          = "content_moderation_config"           // 内容审计配置（JSON）
 	SettingKeyLoginAgreementEnabled            = "login_agreement_enabled"             // 登录前是否要求同意条款
@@ -274,6 +276,7 @@ const (
 	SettingKeyAuthSourceDefaultDingTalkGrantOnSignup    = "auth_source_default_dingtalk_grant_on_signup"
 	SettingKeyAuthSourceDefaultDingTalkGrantOnFirstBind = "auth_source_default_dingtalk_grant_on_first_bind"
 	SettingKeyForceEmailOnThirdPartySignup              = "force_email_on_third_party_signup"
+	SettingKeyMarketingNavItems                         = "marketing_nav_items" // Marketing navbar items (JSON array)
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

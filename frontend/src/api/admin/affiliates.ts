@@ -5,7 +5,13 @@
  */
 
 import { apiClient } from '../client'
-import type { PaginatedResponse } from '@/types'
+import type {
+  AffiliatePartnerApplication,
+  AffiliatePartnerApplicationStatus,
+  AffiliatePartnerLevel,
+  AffiliatePartnerTier,
+  PaginatedResponse,
+} from '@/types'
 
 export interface AffiliateAdminEntry {
   user_id: number
@@ -14,6 +20,8 @@ export interface AffiliateAdminEntry {
   aff_code: string
   aff_code_custom: boolean
   aff_rebate_rate_percent?: number | null
+  partner_level: AffiliatePartnerLevel
+  partner_tier?: AffiliatePartnerTier | null
   aff_count: number
 }
 
@@ -64,17 +72,34 @@ export interface AffiliateUsageDailyRecord {
   requests: number
   total_tokens: number
   actual_cost: number
+  account_cost: number
+  net_profit: number
   recharge_amount: number
   rebate_rate_percent: number
   rebate_amount: number
   unassigned: boolean
+  profit_details?: AffiliateUsageProfitDetail[]
   members?: AffiliateUsageDailyRecord[]
+}
+
+export interface AffiliateUsageProfitDetail {
+  group_id: number
+  group_name: string
+  model: string
+  requests: number
+  total_tokens: number
+  actual_cost: number
+  profit_rate_percent: number
+  net_profit: number
+  rebate_amount: number
 }
 
 export interface AffiliateUsageSummary {
   total_requests: number
   total_tokens: number
   total_actual_cost: number
+  total_account_cost: number
+  total_net_profit: number
   total_rebate_amount: number
 }
 
@@ -118,6 +143,8 @@ export interface AffiliateUserOverview {
   email: string
   username: string
   aff_code: string
+  partner_level: AffiliatePartnerLevel
+  partner_tier?: AffiliatePartnerTier | null
   rebate_rate_percent: number
   invited_count: number
   rebated_invitee_count: number
@@ -128,8 +155,22 @@ export interface AffiliateUserOverview {
 export interface UpdateAffiliateUserRequest {
   aff_code?: string
   aff_rebate_rate_percent?: number | null
+  partner_level?: AffiliatePartnerLevel
   /** Set true to explicitly clear the per-user rate (sets it to NULL). */
   clear_rebate_rate?: boolean
+}
+
+export interface ListPartnerApplicationsParams {
+  page?: number
+  page_size?: number
+  search?: string
+  status?: AffiliatePartnerApplicationStatus | 'all' | ''
+}
+
+export interface ReviewPartnerApplicationRequest {
+  status: Exclude<AffiliatePartnerApplicationStatus, 'pending'>
+  granted_level?: Exclude<AffiliatePartnerLevel, 'none'>
+  review_note?: string
 }
 
 export interface BatchSetRateRequest {
@@ -205,6 +246,41 @@ export async function batchSetRate(
 ): Promise<{ affected: number }> {
   const { data } = await apiClient.post<{ affected: number }>(
     '/admin/affiliates/users/batch-rate',
+    payload,
+  )
+  return data
+}
+
+export async function listPartnerTiers(): Promise<AffiliatePartnerTier[]> {
+  const { data } = await apiClient.get<AffiliatePartnerTier[]>(
+    '/admin/affiliates/partner-tiers',
+  )
+  return data
+}
+
+export async function listPartnerApplications(
+  params: ListPartnerApplicationsParams = {},
+): Promise<PaginatedResponse<AffiliatePartnerApplication>> {
+  const { data } = await apiClient.get<PaginatedResponse<AffiliatePartnerApplication>>(
+    '/admin/affiliates/partner-applications',
+    {
+      params: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 20,
+        search: params.search ?? '',
+        status: params.status || undefined,
+      },
+    },
+  )
+  return data
+}
+
+export async function reviewPartnerApplication(
+  applicationId: number,
+  payload: ReviewPartnerApplicationRequest,
+): Promise<AffiliatePartnerApplication> {
+  const { data } = await apiClient.put<AffiliatePartnerApplication>(
+    `/admin/affiliates/partner-applications/${applicationId}/review`,
     payload,
   )
   return data
@@ -295,6 +371,9 @@ export const affiliatesAPI = {
   updateUserSettings,
   clearUserSettings,
   batchSetRate,
+  listPartnerTiers,
+  listPartnerApplications,
+  reviewPartnerApplication,
   assignInviter,
   listInviteRecords,
   listUsageDailyRecords,

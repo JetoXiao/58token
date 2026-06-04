@@ -339,6 +339,7 @@ export const useAppStore = defineStore('app', () => {
         table_default_page_size: 20,
         table_page_size_options: [10, 20, 50, 100],
         custom_menu_items: [],
+        marketing_nav_items: ['models', 'docs', 'partner'],
         custom_endpoints: [],
         linuxdo_oauth_enabled: false,
         wechat_oauth_enabled: false,
@@ -358,7 +359,7 @@ export const useAppStore = defineStore('app', () => {
         channel_monitor_default_interval_seconds: 60,
         available_channels_enabled: false,
         risk_control_enabled: false,
-        affiliate_enabled: false,
+        affiliate_enabled: true,
       }
     }
 

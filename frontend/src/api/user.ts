@@ -15,7 +15,9 @@ import type {
   NotifyEmailEntry,
   UserAuthProvider,
   UserAffiliateDetail,
-  AffiliateTransferResponse
+  AffiliateTransferResponse,
+  AffiliatePartnerApplication,
+  AffiliatePartnerTier
 } from '@/types'
 
 /**
@@ -180,8 +182,26 @@ export async function getAffiliateDetail(): Promise<UserAffiliateDetail> {
   return data
 }
 
+interface PublicAffiliatePartnerTiersResponse {
+  items: AffiliatePartnerTier[]
+}
+
+export async function getPublicAffiliatePartnerTiers(): Promise<AffiliatePartnerTier[]> {
+  const { data } = await apiClient.get<PublicAffiliatePartnerTiersResponse>('/public/affiliate/partner-tiers')
+  return Array.isArray(data.items) ? data.items : []
+}
+
 export async function transferAffiliateQuota(): Promise<AffiliateTransferResponse> {
   const { data } = await apiClient.post<AffiliateTransferResponse>('/user/aff/transfer')
+  return data
+}
+
+export async function applyAffiliatePartner(payload: {
+  source: string
+  strengths: string
+  portal_url: string
+}): Promise<AffiliatePartnerApplication> {
+  const { data } = await apiClient.post<AffiliatePartnerApplication>('/user/aff/partner/apply', payload)
   return data
 }
 
@@ -199,7 +219,9 @@ export const userAPI = {
   buildOAuthBindingStartURL,
   startOAuthBinding,
   getAffiliateDetail,
-  transferAffiliateQuota
+  getPublicAffiliatePartnerTiers,
+  transferAffiliateQuota,
+  applyAffiliatePartner
 }
 
 export default userAPI

@@ -18,6 +18,9 @@
       :cta-label="isAuthenticated ? t('home.dashboard') : t('home.login')"
       model-marketplace-to="/available-channels"
       :model-marketplace-label="t('nav.availableChannels')"
+      partner-to="/partners"
+      :partner-label="t('gateway.common.partner')"
+      :visible-items="marketingNavItems"
     >
       <template #tools>
         <LocaleSwitcher />
@@ -160,7 +163,7 @@
 
               <div class="mt-4 flex flex-wrap gap-1.5">
                 <span v-for="tag in item.capabilities.slice(0, 5)" :key="`${item.modelName}-${item.group}-${tag}`" class="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                  {{ tag }}
+                  {{ localizedCapability(tag) }}
                 </span>
               </div>
 
@@ -298,6 +301,24 @@ interface PriceRow {
 const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fallback', data: [] }
 
 const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {}
+const MARKETPLACE_MODEL_DESCRIPTION_KEYS: Record<string, string> = {
+  'claude-opus-4.8': 'claudeOpus48'
+}
+const MARKETPLACE_CAPABILITY_KEYS: Record<string, string> = {
+  Reasoning: 'reasoning',
+  Tools: 'tools',
+  Files: 'files',
+  Vision: 'vision',
+  'Computer Use': 'computerUse',
+  'Adaptive Thinking': 'adaptiveThinking',
+  'Fast Mode': 'fastMode',
+  '1M': 'context1m',
+  '128K': 'output128k',
+  'OpenAI API': 'openaiApi',
+  anthropic: 'anthropic',
+  openai: 'openai'
+}
+const RETIRED_MARKETPLACE_MODELS = new Set(['gpt-5.2', 'gpt-5.3-codex'])
 
 const FilterBlock = defineComponent({
   name: 'FilterBlock',
@@ -388,7 +409,7 @@ const PriceRowView = defineComponent({
   }
 })
 
-const { t } = useI18n()
+const { t, te, locale } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
@@ -410,11 +431,13 @@ const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appS
 const siteLogo = computed(() => BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
 const usdToCnyLabel = computed(() => trimNumber(usdToCnyRate.value, 2))
 const sourceVersion = computed(() => rawPricing.value.pricing_version || '')
+const isChineseLocale = computed(() => String(locale.value).startsWith('zh'))
 const pricingExample = computed(() => {
   const official = 5
   const multiplier = selectedGroup.value ? groupMultiplierFor(selectedGroup.value) : 1
@@ -435,12 +458,13 @@ const viewItems = computed(() => [
   { value: 'table', label: t('availableChannels.view.table') }
 ])
 
-const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.value.flatMap((definition) => {
+const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.value.filter(isVisibleMarketplaceItem).flatMap((definition) => {
   const pricingAliases = modelPricingAliases(definition.model_name, definition.pricing_aliases)
   const pricingModel = rawPricing.value.data?.find((item) => pricingAliases.includes(item.model_name.toLowerCase()))
   const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
-  const description = definition.description || pricingModel?.description || modelDescription(definition.model_name)
+  const description = localizedModelDescription(definition, pricingModel)
   const prices = normalizeOfficialPrices(definition.official_prices)
+  const localizedCapabilities = capabilities.map(localizedCapability)
 
   return definition.groups.map((group) => {
     const groupMultiplier = groupMultiplierFor(group)
@@ -455,7 +479,7 @@ const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.va
       description,
       prices,
       requestPrice: null,
-      searchText: [definition.model_name, ...pricingAliases, definition.vendor_name, group, ...capabilities, ...definition.endpoints].join(' ').toLowerCase()
+      searchText: [definition.model_name, ...pricingAliases, definition.vendor_name, group, ...capabilities, ...localizedCapabilities, ...definition.endpoints].join(' ').toLowerCase()
     }
   })
 }))
@@ -471,7 +495,11 @@ const groupOptions = computed(() => {
   const models = selectedProvider.value ? marketplaceModels.value.filter((model) => model.vendorName === selectedProvider.value) : marketplaceModels.value
   return toOptions(countUniqueModelsBy(models, (model) => model.group), groupOrder.value)
 })
-const capabilityOptions = computed(() => toOptions(countUniqueModelsBy(filterModelsByPrimarySelection(marketplaceModels.value), (model) => model.capabilities)))
+const capabilityOptions = computed(() => toOptions(
+  countUniqueModelsBy(filterModelsByPrimarySelection(marketplaceModels.value), (model) => model.capabilities),
+  [],
+  localizedCapability
+))
 const activeFilterCount = computed(() => (selectedProvider.value ? 1 : 0) + (selectedGroup.value ? 1 : 0) + (selectedCapability.value ? 1 : 0))
 const filteredModels = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -515,7 +543,7 @@ function filterModelsByPrimarySelection(models: MarketplaceModel[]): Marketplace
   })
 }
 
-function toOptions(counts: Map<string, number>, order: string[] = []): FilterOption[] {
+function toOptions(counts: Map<string, number>, order: string[] = [], labelFn: (value: string) => string = (value) => value): FilterOption[] {
   return Array.from(counts.entries())
     .sort((a, b) => {
       const orderA = order.indexOf(a[0])
@@ -527,7 +555,7 @@ function toOptions(counts: Map<string, number>, order: string[] = []): FilterOpt
       }
       return b[1] - a[1] || a[0].localeCompare(b[0])
     })
-    .map(([value, count]) => ({ value, label: value, count }))
+    .map(([value, count]) => ({ value, label: labelFn(value), count }))
 }
 
 function selectProvider(value: string) {
@@ -555,6 +583,31 @@ function parseCapabilities(tags: string[], endpoints: string[]): string[] {
   const tagItems = tags.map((tag) => tag.trim()).filter(Boolean)
   const endpointItems = endpoints.map((endpoint) => endpoint === 'openai' ? 'OpenAI API' : endpoint)
   return Array.from(new Set([...tagItems, ...endpointItems]))
+}
+
+function localizedModelDescription(definition: MarketplaceItemResponse, pricingModel?: PricingModel): string {
+  const modelName = definition.model_name.toLowerCase()
+  const exactKey = MARKETPLACE_MODEL_DESCRIPTION_KEYS[modelName]
+  if (exactKey && te(`availableChannels.modelDescriptions.${exactKey}`)) {
+    return t(`availableChannels.modelDescriptions.${exactKey}`)
+  }
+
+  const rawDescription = definition.description || pricingModel?.description || ''
+  if (isChineseLocale.value && hasLatinWords(rawDescription)) {
+    return modelDescription(modelName)
+  }
+  return rawDescription || modelDescription(modelName)
+}
+
+function localizedCapability(value: string): string {
+  const key = MARKETPLACE_CAPABILITY_KEYS[value]
+  if (!key) return value
+  const localeKey = `availableChannels.capabilityLabels.${key}`
+  return te(localeKey) ? t(localeKey) : value
+}
+
+function hasLatinWords(value: string): boolean {
+  return /[A-Za-z]{3,}/.test(value)
 }
 
 function modelPricingAliases(modelName: string, configuredAliases: readonly string[] | undefined): string[] {
@@ -716,7 +769,7 @@ async function loadPricingConfig() {
 async function loadMarketplaceItems(): Promise<void> {
   const response = await axios.get('/api/v1/public/model-marketplace', { timeout: 12000 })
   const payload = unwrapMarketplacePayload(response.data)
-  marketplaceItems.value = payload.items
+  marketplaceItems.value = payload.items.filter(isVisibleMarketplaceItem)
 }
 
 function unwrapMarketplacePayload(payload: unknown): MarketplaceResponse {
@@ -728,6 +781,10 @@ function unwrapMarketplacePayload(payload: unknown): MarketplaceResponse {
     return { items: Array.isArray(dataRecord.items) ? dataRecord.items as MarketplaceItemResponse[] : [] }
   }
   return { items: Array.isArray(record.items) ? record.items as MarketplaceItemResponse[] : [] }
+}
+
+function isVisibleMarketplaceItem(item: MarketplaceItemResponse): boolean {
+  return item.enabled !== false && !RETIRED_MARKETPLACE_MODELS.has(item.model_name.trim().toLowerCase())
 }
 
 function syncDefaultSelections() {

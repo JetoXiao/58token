@@ -9,7 +9,7 @@ import (
 
 const (
 	defaultBalanceRechargeMultiplier = 1.0
-	defaultUsdtCnyExchangeRate       = 7.2
+	defaultUsdtCnyExchangeRate       = 7.0
 	defaultRechargeBonusThreshold    = 100.0
 	defaultRechargeBonusAmount       = 10.0
 )

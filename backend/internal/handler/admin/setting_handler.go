@@ -224,6 +224,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		TableDefaultPageSize:                   settings.TableDefaultPageSize,
 		TablePageSizeOptions:                   settings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(settings.CustomMenuItems),
+		MarketingNavItems:                      service.ParseMarketingNavItems(settings.MarketingNavItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		DefaultConcurrency:                     settings.DefaultConcurrency,
 		DefaultBalance:                         settings.DefaultBalance,
@@ -232,6 +233,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		AffiliateRebateFreezeHours:             settings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            settings.AffiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           settings.AffiliateRebatePerInviteeCap,
+		AffiliateGroupProfitRates:              settings.AffiliateGroupProfitRates,
 		DefaultUserRPMLimit:                    settings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   defaultSubscriptions,
 		EnableModelFallback:                    settings.EnableModelFallback,
@@ -499,6 +501,7 @@ type UpdateSettingsRequest struct {
 	TableDefaultPageSize        int                   `json:"table_default_page_size"`
 	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
 	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
+	MarketingNavItems           *[]string             `json:"marketing_nav_items"`
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
@@ -508,6 +511,7 @@ type UpdateSettingsRequest struct {
 	AffiliateRebateFreezeHours                *int                              `json:"affiliate_rebate_freeze_hours"`
 	AffiliateRebateDurationDays               *int                              `json:"affiliate_rebate_duration_days"`
 	AffiliateRebatePerInviteeCap              *float64                          `json:"affiliate_rebate_per_invitee_cap"`
+	AffiliateGroupProfitRates                 *map[string]float64               `json:"affiliate_group_profit_rates"`
 	DefaultUserRPMLimit                       int                               `json:"default_user_rpm_limit"`
 	DefaultSubscriptions                      []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
 	AuthSourceDefaultEmailBalance             *float64                          `json:"auth_source_default_email_balance"`
@@ -710,6 +714,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 	if affiliateRebatePerInviteeCap < 0 {
 		affiliateRebatePerInviteeCap = service.AffiliateRebatePerInviteeCapDefault
+	}
+	affiliateGroupProfitRates := previousSettings.AffiliateGroupProfitRates
+	if req.AffiliateGroupProfitRates != nil {
+		affiliateGroupProfitRates = service.NormalizeAffiliateGroupProfitRates(*req.AffiliateGroupProfitRates)
 	}
 	// 通用表格配置：兼容旧客户端未传字段时保留当前值。
 	if req.TableDefaultPageSize <= 0 {
@@ -1344,6 +1352,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		maxEndpointDescriptionLen = 200
 	)
 
+	marketingNavItemsJSON := previousSettings.MarketingNavItems
+	if req.MarketingNavItems != nil {
+		marketingNavItemsJSON = service.MarketingNavItemsJSON(*req.MarketingNavItems)
+	}
+
 	customEndpointsJSON := previousSettings.CustomEndpoints
 	if req.CustomEndpoints != nil {
 		endpoints := *req.CustomEndpoints
@@ -1555,6 +1568,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   req.TableDefaultPageSize,
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		CustomMenuItems:                        customMenuJSON,
+		MarketingNavItems:                      marketingNavItemsJSON,
 		CustomEndpoints:                        customEndpointsJSON,
 		DefaultConcurrency:                     req.DefaultConcurrency,
 		DefaultBalance:                         req.DefaultBalance,
@@ -1562,6 +1576,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebateFreezeHours:             affiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            affiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           affiliateRebatePerInviteeCap,
+		AffiliateGroupProfitRates:              affiliateGroupProfitRates,
 		DefaultUserRPMLimit:                    req.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   defaultSubscriptions,
 		EnableModelFallback:                    req.EnableModelFallback,
@@ -1981,6 +1996,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TableDefaultPageSize:                   updatedSettings.TableDefaultPageSize,
 		TablePageSizeOptions:                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
+		MarketingNavItems:                      service.ParseMarketingNavItems(updatedSettings.MarketingNavItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                         updatedSettings.DefaultBalance,
@@ -1988,6 +2004,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebateFreezeHours:             updatedSettings.AffiliateRebateFreezeHours,
 		AffiliateRebateDurationDays:            updatedSettings.AffiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           updatedSettings.AffiliateRebatePerInviteeCap,
+		AffiliateGroupProfitRates:              updatedSettings.AffiliateGroupProfitRates,
 		DefaultUserRPMLimit:                    updatedSettings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   updatedDefaultSubscriptions,
 		EnableModelFallback:                    updatedSettings.EnableModelFallback,
@@ -2455,6 +2472,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.CustomMenuItems != after.CustomMenuItems {
 		changed = append(changed, "custom_menu_items")
+	}
+	if before.MarketingNavItems != after.MarketingNavItems {
+		changed = append(changed, "marketing_nav_items")
 	}
 	if before.CustomEndpoints != after.CustomEndpoints {
 		changed = append(changed, "custom_endpoints")
