@@ -114,7 +114,7 @@ INSERT INTO model_marketplace_items (
     '["openai"]'::jsonb,
     '{"input":1.75,"output":14,"cacheWrite":null,"cacheRead":0.175}'::jsonb,
     80,
-    FALSE
+    TRUE
 ),
 (
     'gpt-5.3-codex',
@@ -125,6 +125,6 @@ INSERT INTO model_marketplace_items (
     '["openai"]'::jsonb,
     '{"input":1.75,"output":14,"cacheWrite":null,"cacheRead":0.175}'::jsonb,
     90,
-    FALSE
+    TRUE
 )
 ON CONFLICT (model_name) DO NOTHING;
