@@ -152,6 +152,7 @@ type SystemSettings struct {
 	AffiliateRebateDurationDays  int
 	AffiliateRebatePerInviteeCap float64
 	AffiliateGroupProfitRates    map[string]float64
+	AffiliatePartnerTiers        []AffiliatePartnerTier
 	DefaultUserRPMLimit          int
 	DefaultSubscriptions         []DefaultSubscriptionSetting
 

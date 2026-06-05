@@ -411,6 +411,7 @@ export default {
     announcements: '公告',
     apiKeys: 'API 密钥',
     usage: '使用记录',
+    requests: '请求',
     redeem: '兑换',
     affiliate: '邀请返利',
     affiliateManagement: '邀请返利',
@@ -1652,10 +1653,16 @@ export default {
     stats: {
       partnerLevel: '合伙人等级',
       rebateRate: '我的返利比例',
-      rebateRateHint: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得返利',
-      partnerRebateRateHint: '合伙人按被邀请用户实际产生的消费金额返佣，并由平台单独结算',
+      rewardMode: '收益方式',
+      regularRewardMode: '返利额度',
+      partnerRewardMode: '专属返佣',
+      rebateRateHint: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得返利额度',
+      partnerRebateRateHint: '合伙人按被邀请用户实际产生的消费金额参与返佣，并由平台单独结算',
       invitedUsers: '邀请人数',
       availableQuota: '可转返利额度',
+      partnerSettlement: '结算方式',
+      manualSettlement: '人工返现',
+      partnerSettlementHint: '合伙人返佣由平台复核后单独对接返现',
       frozenQuota: '冻结中',
       frozenQuotaHint: '新产生的返利正在冻结期中',
       totalQuota: '历史返利额度'
@@ -1666,11 +1673,26 @@ export default {
       description: '申请成为合伙人，告诉我们你的社群触达和推广优势；邀请人数增长后，系统会自动升级合伙人等级。',
       normalRate: '普通用户返利',
       currentRate: '{rate} 合伙人返佣',
+      normalBenefit: '返利额度可转入余额',
+      currentBenefit: '专属合伙人权益',
       nextHint: '再邀请 {count} 人升级到 {level}',
       progress: '升级进度',
       progressHint: '累计邀请 {count} 人可升级为 {level}',
       maxLevelHint: '你已达到最高合伙人等级',
       tierRequirement: '邀请 {count}+ 人',
+      benefitLabels: {
+        none: '基础邀请权益',
+        spark: '成长权益',
+        voyage: '进阶权益',
+        summit: '核心权益',
+        cocreate: '共创权益'
+      },
+      tierBenefits: {
+        spark: '适合刚开始推广的小型社群、内容作者和早期渠道。',
+        voyage: '适合能稳定带来注册和用量的活跃渠道。',
+        summit: '适合转化稳定、流量质量已被验证的成熟合伙人。',
+        cocreate: '适合能带来长期高价值用量的战略合伙人。'
+      },
       applyTitle: '申请成为合伙人',
       applyDescription: '告诉我们你从哪里了解到我们，以及你适合推广的优势。',
       pendingDescription: '你的申请正在等待审核。',
@@ -1734,8 +1756,8 @@ export default {
     tips: {
       title: '使用说明',
       line1: '将邀请码或邀请链接分享给新用户。',
-      line2: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得 {rate} 返利额度，充值卡金额不参与计算。',
-      partnerLine2: '合伙人按被邀请用户实际产生的消费金额获得 {rate} 返佣，平台会单独对接结算。',
+      line2: '普通用户按被邀请用户人民币或 USDT 实际充值金额获得返利额度，充值卡金额不参与计算。',
+      partnerLine2: '合伙人按被邀请用户实际产生的消费金额参与返佣，平台会单独对接结算。',
       line3: '普通用户可将返利额度转入账户余额。',
       partnerLine3: '合伙人返佣不支持转入余额，平台会单独对接结算。',
       line4: '新产生的返利需要经过冻结期后才能提现。'
@@ -8014,10 +8036,10 @@ export default {
       primaryCta: '申请或获取邀请链接',
       secondaryCta: '查看接入文档',
       rateCard: {
-        eyebrow: '高返佣合伙人计划',
-        rate: '最高 70%',
-        ratePrefix: '最高 {rate}',
-        copy: '合伙人返佣面向能带来真实 AI 用量的人。邀请来的有效用量越高，长期收益空间越大。'
+        eyebrow: '合伙人增长计划',
+        headline: '把真实用量变成长期收益',
+        copy: '适合有社群、内容渠道或客户资源的推广者。被邀请用户持续使用，合伙人权益也会跟着成长。',
+        note: '普通邀请返利可转入账户余额；合伙人返佣由平台复核后单独对接返现。'
       },
       stats: {
         settlement: '按真实用量结算',
@@ -8027,8 +8049,8 @@ export default {
       },
       valueProps: {
         highRate: {
-          title: '给认真推广者更高收益',
-          copy: '合伙人计划关注真实用量，适合能持续带来客户和使用量的推广者，而不是一次性注册奖励。'
+          title: '给认真推广者成长权益',
+          copy: '合伙人计划关注真实用量和长期客户价值，适合能持续带来使用量的推广者。'
         },
         realUsage: {
           title: '和实际 AI 消费绑定',
@@ -8041,13 +8063,13 @@ export default {
       },
       tiers: {
         eyebrow: '合伙人等级',
-        title: '影响力越被验证，返佣比例越高。',
-        copy: '先提交申请，邀请优质用户，并随着被邀请用户增长逐步解锁更高比例。',
+        title: '影响力越被验证，权益越完整。',
+        copy: '先提交申请，邀请优质用户，并随着有效邀请和真实用量逐步解锁更高档权益。',
         items: {
-          spark: { name: '星火合伙人', rate: '40%', copy: '适合刚开始推广的小型社群、内容作者和早期渠道。' },
-          voyage: { name: '远航合伙人', rate: '50%', copy: '适合能稳定带来注册和用量的活跃渠道。' },
-          summit: { name: '峰芒合伙人', rate: '60%', copy: '适合转化稳定、流量质量已被验证的成熟合伙人。' },
-          cocreate: { name: '共创合伙人', rate: '70%', copy: '适合能带来长期高价值用量的战略合伙人。' }
+          spark: { name: '星火合伙人', benefit: '成长权益', copy: '适合刚开始推广的小型社群、内容作者和早期渠道。' },
+          voyage: { name: '远航合伙人', benefit: '进阶权益', copy: '适合能稳定带来注册和用量的活跃渠道。' },
+          summit: { name: '峰芒合伙人', benefit: '核心权益', copy: '适合转化稳定、流量质量已被验证的成熟合伙人。' },
+          cocreate: { name: '共创合伙人', benefit: '共创权益', copy: '适合能带来长期高价值用量的战略合伙人。' }
         }
       },
       flow: {
@@ -8059,13 +8081,15 @@ export default {
           settle: { title: '按有效用量获得返佣', copy: '被邀请用户产生真实模型用量后，你的合伙人返佣会随之增长。' }
         }
       },
-      calculator: {
-        eyebrow: '收益示例',
-        title: '按用量增长，比一次性注册奖励更有想象力。',
-        invitees: '邀请用户',
-        usage: '日用量消费',
-        reward: '示例返佣',
-        copy: '仅为示例：返现是在扣除平台成本后至高 {rate}，实际返佣取决于审核后的合伙人等级、有效用量、平台规则和结算复核。'
+      settlement: {
+        eyebrow: '结算机制',
+        title: '拉来真正会使用的人，收益才可持续。',
+        copy: '普通用户的邀请返利可在冻结期后转入账户余额；合伙人返佣按有效用量复核，由平台单独对接返现。',
+        items: {
+          usage: { title: '看有效用量', copy: '返佣围绕被邀请用户的真实模型消费，而不是只看一次性注册。' },
+          review: { title: '平台复核', copy: '结算前会确认有效用户、消费数据和合伙人等级，保证账务清晰。' },
+          payout: { title: '单独返现', copy: '合伙人返佣不进入余额提现流程，由平台单独沟通返现方式。' }
+        }
       }
     }
   },

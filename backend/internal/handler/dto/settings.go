@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 // CustomMenuItem represents a user-configured custom menu entry.
@@ -141,15 +143,16 @@ type SystemSettings struct {
 	MarketingNavItems           []string         `json:"marketing_nav_items"`
 	CustomEndpoints             []CustomEndpoint `json:"custom_endpoints"`
 
-	DefaultConcurrency           int                          `json:"default_concurrency"`
-	DefaultBalance               float64                      `json:"default_balance"`
-	AffiliateRebateRate          float64                      `json:"affiliate_rebate_rate"`
-	AffiliateRebateFreezeHours   int                          `json:"affiliate_rebate_freeze_hours"`
-	AffiliateRebateDurationDays  int                          `json:"affiliate_rebate_duration_days"`
-	AffiliateRebatePerInviteeCap float64                      `json:"affiliate_rebate_per_invitee_cap"`
-	AffiliateGroupProfitRates    map[string]float64           `json:"affiliate_group_profit_rates"`
-	DefaultUserRPMLimit          int                          `json:"default_user_rpm_limit"`
-	DefaultSubscriptions         []DefaultSubscriptionSetting `json:"default_subscriptions"`
+	DefaultConcurrency           int                            `json:"default_concurrency"`
+	DefaultBalance               float64                        `json:"default_balance"`
+	AffiliateRebateRate          float64                        `json:"affiliate_rebate_rate"`
+	AffiliateRebateFreezeHours   int                            `json:"affiliate_rebate_freeze_hours"`
+	AffiliateRebateDurationDays  int                            `json:"affiliate_rebate_duration_days"`
+	AffiliateRebatePerInviteeCap float64                        `json:"affiliate_rebate_per_invitee_cap"`
+	AffiliateGroupProfitRates    map[string]float64             `json:"affiliate_group_profit_rates"`
+	AffiliatePartnerTiers        []service.AffiliatePartnerTier `json:"affiliate_partner_tiers"`
+	DefaultUserRPMLimit          int                            `json:"default_user_rpm_limit"`
+	DefaultSubscriptions         []DefaultSubscriptionSetting   `json:"default_subscriptions"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`

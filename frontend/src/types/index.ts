@@ -1290,6 +1290,8 @@ export interface UsageLogAccountSummary {
 }
 
 export interface AdminUsageLog extends UsageLog {
+  user_email?: string | null
+  username?: string | null
   upstream_model?: string | null
   model_mapping_chain?: string | null
 

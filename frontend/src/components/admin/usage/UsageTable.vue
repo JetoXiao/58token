@@ -11,17 +11,28 @@
         @sort="(key, order) => $emit('sort', key, order)"
       >
         <template #cell-user="{ row }">
-          <div class="text-sm">
+          <div class="min-w-[180px] text-sm">
             <button
-              v-if="row.user?.email"
-              class="font-medium text-primary-600 underline decoration-dashed underline-offset-2 transition-colors hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-              @click="$emit('userClick', row.user_id, row.user?.email)"
+              v-if="usageUserEmail(row) || usageUsername(row)"
+              class="block max-w-[220px] text-left transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+              @click="$emit('userClick', row.user_id, usageUserEmail(row))"
               :title="t('admin.usage.clickToViewBalance')"
             >
-              {{ row.user.email }}
+              <span
+                v-if="usageUsername(row)"
+                class="block truncate font-medium text-primary-600 underline decoration-dashed underline-offset-2 dark:text-primary-400"
+              >
+                {{ usageUsername(row) }}
+              </span>
+              <span
+                class="block truncate text-xs text-gray-600 dark:text-gray-300"
+                :class="{ 'font-medium text-primary-600 underline decoration-dashed underline-offset-2 dark:text-primary-400': !usageUsername(row) }"
+              >
+                {{ usageUserEmail(row) || '-' }}
+              </span>
             </button>
             <span v-else class="font-medium text-gray-900 dark:text-white">-</span>
-            <span class="ml-1 text-gray-500 dark:text-gray-400">#{{ row.user_id }}</span>
+            <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">#{{ row.user_id }}</span>
           </div>
         </template>
 
@@ -444,6 +455,18 @@ defineEmits<{
   sort: [key: string, order: 'asc' | 'desc']
 }>()
 const { t } = useI18n()
+
+const cleanUserText = (value: string | null | undefined): string => {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+const usageUserEmail = (row: AdminUsageLog): string => {
+  return cleanUserText(row.user_email) || cleanUserText(row.user?.email)
+}
+
+const usageUsername = (row: AdminUsageLog): string => {
+  return cleanUserText(row.username) || cleanUserText(row.user?.username)
+}
 
 // Tooltip state - cost
 const tooltipVisible = ref(false)

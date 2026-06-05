@@ -116,6 +116,11 @@ export interface OpsRequestDetail {
 
   platform?: string
   model?: string
+  request_type?: string
+  inbound_endpoint?: string
+  upstream_endpoint?: string
+  requested_model?: string
+  upstream_model?: string
   duration_ms?: number | null
   status_code?: number | null
 
@@ -130,10 +135,11 @@ export interface OpsRequestDetail {
   group_id?: number | null
 
   stream?: boolean
+  request_params?: Record<string, unknown> | null
 }
 
 export interface OpsRequestDetailsParams {
-  time_range?: '5m' | '30m' | '1h' | '6h' | '24h'
+  time_range?: '5m' | '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
   start_time?: string
   end_time?: string
 
@@ -160,6 +166,20 @@ export interface OpsRequestDetailsParams {
 }
 
 export type OpsRequestDetailsResponse = PaginatedResponse<OpsRequestDetail>
+
+export interface OpsRequestFilterOption {
+  value: string
+  label: string
+}
+
+export interface OpsRequestFilterOptions {
+  platforms: OpsRequestFilterOption[]
+  models: OpsRequestFilterOption[]
+  users: OpsRequestFilterOption[]
+  api_keys: OpsRequestFilterOption[]
+  accounts: OpsRequestFilterOption[]
+  groups: OpsRequestFilterOption[]
+}
 
 export interface OpsLatencyHistogramBucket {
   range: string
@@ -1141,6 +1161,11 @@ export async function listRequestDetails(params: OpsRequestDetailsParams): Promi
   return data
 }
 
+export async function getRequestFilterOptions(params: Pick<OpsRequestDetailsParams, 'time_range' | 'start_time' | 'end_time' | 'kind'>): Promise<OpsRequestFilterOptions> {
+  const { data } = await apiClient.get<OpsRequestFilterOptions>('/admin/ops/requests/filters', { params })
+  return data
+}
+
 // Alert rules
 export async function listAlertRules(): Promise<AlertRule[]> {
   const { data } = await apiClient.get<AlertRule[]>('/admin/ops/alert-rules')
@@ -1303,6 +1328,7 @@ export const opsAPI = {
   listRequestErrorUpstreamErrors,
 
   listRequestDetails,
+  getRequestFilterOptions,
   listAlertRules,
   createAlertRule,
   updateAlertRule,

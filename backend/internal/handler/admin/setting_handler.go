@@ -234,6 +234,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		AffiliateRebateDurationDays:            settings.AffiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           settings.AffiliateRebatePerInviteeCap,
 		AffiliateGroupProfitRates:              settings.AffiliateGroupProfitRates,
+		AffiliatePartnerTiers:                  settings.AffiliatePartnerTiers,
 		DefaultUserRPMLimit:                    settings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   defaultSubscriptions,
 		EnableModelFallback:                    settings.EnableModelFallback,
@@ -512,6 +513,7 @@ type UpdateSettingsRequest struct {
 	AffiliateRebateDurationDays               *int                              `json:"affiliate_rebate_duration_days"`
 	AffiliateRebatePerInviteeCap              *float64                          `json:"affiliate_rebate_per_invitee_cap"`
 	AffiliateGroupProfitRates                 *map[string]float64               `json:"affiliate_group_profit_rates"`
+	AffiliatePartnerTiers                     *[]service.AffiliatePartnerTier   `json:"affiliate_partner_tiers"`
 	DefaultUserRPMLimit                       int                               `json:"default_user_rpm_limit"`
 	DefaultSubscriptions                      []dto.DefaultSubscriptionSetting  `json:"default_subscriptions"`
 	AuthSourceDefaultEmailBalance             *float64                          `json:"auth_source_default_email_balance"`
@@ -718,6 +720,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	affiliateGroupProfitRates := previousSettings.AffiliateGroupProfitRates
 	if req.AffiliateGroupProfitRates != nil {
 		affiliateGroupProfitRates = service.NormalizeAffiliateGroupProfitRates(*req.AffiliateGroupProfitRates)
+	}
+	affiliatePartnerTiers := previousSettings.AffiliatePartnerTiers
+	if req.AffiliatePartnerTiers != nil {
+		affiliatePartnerTiers = service.NormalizeAffiliatePartnerTiers(*req.AffiliatePartnerTiers)
 	}
 	// 通用表格配置：兼容旧客户端未传字段时保留当前值。
 	if req.TableDefaultPageSize <= 0 {
@@ -1577,6 +1583,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebateDurationDays:            affiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           affiliateRebatePerInviteeCap,
 		AffiliateGroupProfitRates:              affiliateGroupProfitRates,
+		AffiliatePartnerTiers:                  affiliatePartnerTiers,
 		DefaultUserRPMLimit:                    req.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   defaultSubscriptions,
 		EnableModelFallback:                    req.EnableModelFallback,
@@ -2005,6 +2012,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		AffiliateRebateDurationDays:            updatedSettings.AffiliateRebateDurationDays,
 		AffiliateRebatePerInviteeCap:           updatedSettings.AffiliateRebatePerInviteeCap,
 		AffiliateGroupProfitRates:              updatedSettings.AffiliateGroupProfitRates,
+		AffiliatePartnerTiers:                  updatedSettings.AffiliatePartnerTiers,
 		DefaultUserRPMLimit:                    updatedSettings.DefaultUserRPMLimit,
 		DefaultSubscriptions:                   updatedDefaultSubscriptions,
 		EnableModelFallback:                    updatedSettings.EnableModelFallback,
@@ -2410,6 +2418,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.AffiliateRebatePerInviteeCap != after.AffiliateRebatePerInviteeCap {
 		changed = append(changed, "affiliate_rebate_per_invitee_cap")
 	}
+	if !equalAffiliatePartnerTiers(before.AffiliatePartnerTiers, after.AffiliatePartnerTiers) {
+		changed = append(changed, "affiliate_partner_tiers")
+	}
 	if !equalDefaultSubscriptions(before.DefaultSubscriptions, after.DefaultSubscriptions) {
 		changed = append(changed, "default_subscriptions")
 	}
@@ -2727,6 +2738,23 @@ func equalDefaultSubscriptions(a, b []service.DefaultSubscriptionSetting) bool {
 	}
 	for i := range a {
 		if a[i].GroupID != b[i].GroupID || a[i].ValidityDays != b[i].ValidityDays {
+			return false
+		}
+	}
+	return true
+}
+
+func equalAffiliatePartnerTiers(a, b []service.AffiliatePartnerTier) bool {
+	a = service.NormalizeAffiliatePartnerTiers(a)
+	b = service.NormalizeAffiliatePartnerTiers(b)
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Level != b[i].Level ||
+			a[i].Name != b[i].Name ||
+			a[i].RebateRatePercent != b[i].RebateRatePercent ||
+			a[i].RequiredInvitees != b[i].RequiredInvitees {
 			return false
 		}
 	}

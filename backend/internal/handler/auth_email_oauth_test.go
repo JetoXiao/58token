@@ -388,7 +388,7 @@ func (r *oauthEmailAffiliateRepoStub) SetUserPartnerLevel(context.Context, int64
 	panic("unexpected SetUserPartnerLevel call")
 }
 
-func (r *oauthEmailAffiliateRepoStub) PromotePartnerLevelForInviteCount(context.Context, int64) (*service.AffiliatePartnerTier, bool, error) {
+func (r *oauthEmailAffiliateRepoStub) PromotePartnerLevelForInviteCount(context.Context, int64, []service.AffiliatePartnerTier) (*service.AffiliatePartnerTier, bool, error) {
 	return nil, false, nil
 }
 

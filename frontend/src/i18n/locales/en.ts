@@ -411,6 +411,7 @@ export default {
     announcements: 'Announcements',
     apiKeys: 'API Keys',
     usage: 'Usage',
+    requests: 'Requests',
     redeem: 'Redeem',
     affiliate: 'Affiliate Rebates',
     affiliateManagement: 'Affiliate Rebates',
@@ -1648,10 +1649,16 @@ export default {
     stats: {
       partnerLevel: 'Partner Level',
       rebateRate: 'My Rebate Rate',
-      rebateRateHint: 'Regular users earn from eligible RMB or USDT recharge payments',
-      partnerRebateRateHint: 'Partners earn from invitees’ actual usage spend and settle separately with the platform',
+      rewardMode: 'Reward Mode',
+      regularRewardMode: 'Rebate quota',
+      partnerRewardMode: 'Partner commission',
+      rebateRateHint: 'Regular users earn rebate quota from eligible RMB or USDT recharge payments',
+      partnerRebateRateHint: 'Partners participate in commission from invitees’ actual usage spend and settle separately with the platform',
       invitedUsers: 'Invited Users',
       availableQuota: 'Available Rebate Quota',
+      partnerSettlement: 'Settlement',
+      manualSettlement: 'Manual payout',
+      partnerSettlementHint: 'Partner commission is reviewed and paid out separately by the platform',
       frozenQuota: 'Frozen',
       frozenQuotaHint: 'Recently earned rebates pending release',
       totalQuota: 'Historical Rebate Quota'
@@ -1662,11 +1669,26 @@ export default {
       description: 'Apply to become a partner, share your community reach, and unlock higher commission tiers as your invited users grow.',
       normalRate: 'Regular user rebate',
       currentRate: '{rate} partner commission',
+      normalBenefit: 'Rebate quota can move to balance',
+      currentBenefit: 'Exclusive partner benefits',
       nextHint: '{count} more invites to {level}',
       progress: 'Upgrade Progress',
       progressHint: 'Reach {count} invited users to unlock {level}',
       maxLevelHint: 'You are at the highest partner level',
       tierRequirement: '{count}+ invited users',
+      benefitLabels: {
+        none: 'Base invite benefits',
+        spark: 'Growth benefits',
+        voyage: 'Advanced benefits',
+        summit: 'Core benefits',
+        cocreate: 'Co-creation benefits'
+      },
+      tierBenefits: {
+        spark: 'For early promoters and small communities starting to validate demand.',
+        voyage: 'For active channels bringing steady signups and usage.',
+        summit: 'For proven partners with repeat traffic and strong conversion.',
+        cocreate: 'For strategic partners who can bring sustained high-value usage.'
+      },
       applyTitle: 'Apply as a Partner',
       applyDescription: 'Tell us where you learned about us and why your audience is a good fit.',
       pendingDescription: 'Your application is pending review.',
@@ -1730,8 +1752,8 @@ export default {
     tips: {
       title: 'How It Works',
       line1: 'Share your affiliate code or invite link with new users.',
-      line2: 'For regular users, eligible RMB or USDT recharge payments generate {rate} rebate quota. Redeem-code balance is excluded.',
-      partnerLine2: 'Partners earn {rate} commission on invitees’ actual usage spend, settled separately by the platform.',
+      line2: 'For regular users, eligible RMB or USDT recharge payments generate rebate quota. Redeem-code balance is excluded.',
+      partnerLine2: 'Partners participate in commission from invitees’ actual usage spend, settled separately by the platform.',
       line3: 'Regular users can transfer available rebate quota to account balance.',
       partnerLine3: 'Partners are settled separately by the platform and cannot transfer rebates into account balance.',
       line4: 'Newly earned rebates may have a waiting period before they can be transferred.'
@@ -7832,10 +7854,10 @@ export default {
       primaryCta: 'Apply or get your link',
       secondaryCta: 'View integration docs',
       rateCard: {
-        eyebrow: 'High-commission partner plan',
-        rate: 'Up to 70%',
-        ratePrefix: 'Up to {rate}',
-        copy: 'Partner rewards are designed for people who can bring serious AI usage. More qualified usage means higher long-term upside.'
+        eyebrow: 'Partner growth program',
+        headline: 'Turn real usage into long-term upside',
+        copy: 'Built for promoters with communities, content channels, or client networks. As invited users keep using the platform, your partner benefits can grow with them.',
+        note: 'Regular invite rebates can move into account balance; partner commission is reviewed and paid out separately by the platform.'
       },
       stats: {
         settlement: 'Usage-based settlement',
@@ -7845,8 +7867,8 @@ export default {
       },
       valueProps: {
         highRate: {
-          title: 'Higher rewards for serious partners',
-          copy: 'The partner plan focuses on meaningful usage, so strong promoters can earn materially more than a one-time signup reward.'
+          title: 'Growth benefits for serious partners',
+          copy: 'The partner plan focuses on real usage and long-term customer value, making it a better fit for promoters who can bring sustained adoption.'
         },
         realUsage: {
           title: 'Aligned with actual AI consumption',
@@ -7859,13 +7881,13 @@ export default {
       },
       tiers: {
         eyebrow: 'Partner tiers',
-        title: 'Grow into better rates as your reach proves itself.',
-        copy: 'Start with an application, invite qualified users, and unlock stronger rates as your referred users grow.',
+        title: 'As your reach proves itself, benefits become more complete.',
+        copy: 'Start with an application, invite qualified users, and unlock stronger benefit tiers as your referrals and real usage grow.',
         items: {
-          spark: { name: 'Spark Partner', rate: '40%', copy: 'For early promoters and small communities starting to validate demand.' },
-          voyage: { name: 'Voyage Partner', rate: '50%', copy: 'For active channels bringing steady signups and usage.' },
-          summit: { name: 'Summit Partner', rate: '60%', copy: 'For proven partners with repeat traffic and strong conversion.' },
-          cocreate: { name: 'Co-create Partner', rate: '70%', copy: 'For strategic partners who can bring sustained high-value usage.' }
+          spark: { name: 'Spark Partner', benefit: 'Growth benefits', copy: 'For early promoters and small communities starting to validate demand.' },
+          voyage: { name: 'Voyage Partner', benefit: 'Advanced benefits', copy: 'For active channels bringing steady signups and usage.' },
+          summit: { name: 'Summit Partner', benefit: 'Core benefits', copy: 'For proven partners with repeat traffic and strong conversion.' },
+          cocreate: { name: 'Co-create Partner', benefit: 'Co-creation benefits', copy: 'For strategic partners who can bring sustained high-value usage.' }
         }
       },
       flow: {
@@ -7877,13 +7899,15 @@ export default {
           settle: { title: 'Earn from qualified usage', copy: 'As invited users spend on actual model usage, your partner commission grows with them.' }
         }
       },
-      calculator: {
-        eyebrow: 'Example upside',
-        title: 'Usage compounds better than a one-off signup bonus.',
-        invitees: 'Invited users',
-        usage: 'Daily usage',
-        reward: 'Example reward',
-        copy: 'Example only: cashback is up to {rate} after platform costs are deducted. Actual rewards depend on approved partner level, qualified usage, platform rules, and settlement review.'
+      settlement: {
+        eyebrow: 'Settlement model',
+        title: 'Bring people who truly use the product, and the upside can last.',
+        copy: 'Regular invite rebates can move into account balance after the waiting period; partner commission is reviewed against qualified usage and paid out separately by the platform.',
+        items: {
+          usage: { title: 'Qualified usage', copy: 'Commission is built around invited users’ real model spend, not one-off registrations.' },
+          review: { title: 'Platform review', copy: 'Before settlement, the platform confirms valid users, usage data, and partner tier for clear accounting.' },
+          payout: { title: 'Separate payout', copy: 'Partner commission does not enter the balance-transfer flow; payout is coordinated separately.' }
+        }
       }
     }
   },

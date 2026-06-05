@@ -18,16 +18,16 @@
               {{ partnerLevelLabel(effectivePartnerLevel) }}
             </p>
             <p class="mt-1 text-xs text-gray-400 dark:text-dark-500">
-              {{ currentTier ? t('affiliate.partner.currentRate', { rate: formatPercent(currentTier.rebate_rate_percent) }) : t('affiliate.partner.normalRate') }}
+              {{ currentTier ? t('affiliate.partner.currentBenefit') : t('affiliate.partner.normalBenefit') }}
             </p>
           </div>
           <div class="card p-5">
             <p class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-dark-400">
               <Icon name="dollar" size="sm" class="text-primary-500" />
-              {{ t('affiliate.stats.rebateRate') }}
+              {{ t('affiliate.stats.rewardMode') }}
             </p>
             <p class="mt-2 text-2xl font-semibold text-primary-600 dark:text-primary-400">
-              {{ formattedRebateRate }}<span class="ml-0.5 text-base font-medium">%</span>
+              {{ t(isPartner ? 'affiliate.stats.partnerRewardMode' : 'affiliate.stats.regularRewardMode') }}
             </p>
             <p class="mt-1 text-xs text-gray-400 dark:text-dark-500">
               {{ t(isPartner ? 'affiliate.stats.partnerRebateRateHint' : 'affiliate.stats.rebateRateHint') }}
@@ -43,11 +43,17 @@
             </p>
           </div>
           <div class="card p-5">
-            <p class="text-sm text-gray-500 dark:text-dark-400">{{ t('affiliate.stats.availableQuota') }}</p>
-            <p class="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
-              {{ formatCurrency(detail.aff_quota) }}
+            <p class="text-sm text-gray-500 dark:text-dark-400">
+              {{ t(isPartner ? 'affiliate.stats.partnerSettlement' : 'affiliate.stats.availableQuota') }}
             </p>
-            <p v-if="detail.aff_frozen_quota > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            <p class="mt-2 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+              <template v-if="isPartner">{{ t('affiliate.stats.manualSettlement') }}</template>
+              <template v-else>{{ formatCurrency(detail.aff_quota) }}</template>
+            </p>
+            <p v-if="isPartner" class="mt-1 text-xs text-gray-400 dark:text-dark-500">
+              {{ t('affiliate.stats.partnerSettlementHint') }}
+            </p>
+            <p v-else-if="detail.aff_frozen_quota > 0" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
               {{ t('affiliate.stats.frozenQuota') }}: {{ formatCurrency(detail.aff_frozen_quota) }}
             </p>
           </div>
@@ -98,9 +104,14 @@
                 <p class="font-medium text-gray-900 dark:text-white">{{ partnerLevelLabel(tier.level) }}</p>
                 <Icon v-if="partnerTierActive(tier.level)" name="checkCircle" size="sm" class="text-primary-500" />
               </div>
-              <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ formatPercent(tier.rebate_rate_percent) }}</p>
+              <p class="mt-2 text-sm font-semibold text-primary-700 dark:text-primary-300">
+                {{ partnerBenefitLabel(tier.level) }}
+              </p>
               <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
                 {{ t('affiliate.partner.tierRequirement', { count: tier.required_invitees }) }}
+              </p>
+              <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-dark-400">
+                {{ t(`affiliate.partner.tierBenefits.${tier.level}`) }}
               </p>
             </div>
           </div>
@@ -139,7 +150,7 @@
               <p class="text-sm font-medium text-primary-800 dark:text-primary-200">{{ t('affiliate.tips.title') }}</p>
               <ul class="mt-2 space-y-1 text-sm text-primary-700 dark:text-primary-300">
                 <li>1. {{ t('affiliate.tips.line1') }}</li>
-                <li>2. {{ t(isPartner ? 'affiliate.tips.partnerLine2' : 'affiliate.tips.line2', { rate: `${formattedRebateRate}%` }) }}</li>
+                <li>2. {{ t(isPartner ? 'affiliate.tips.partnerLine2' : 'affiliate.tips.line2') }}</li>
                 <li>3. {{ t(isPartner ? 'affiliate.tips.partnerLine3' : 'affiliate.tips.line3') }}</li>
                 <li v-if="!isPartner && detail.aff_frozen_quota > 0">4. {{ t('affiliate.tips.line4') }}</li>
               </ul>
@@ -326,8 +337,6 @@ const inviteLink = computed(() => {
   return `${window.location.origin}/register?aff=${encodeURIComponent(detail.value.aff_code)}`
 })
 
-const formattedRebateRate = computed(() => formatRate(detail.value?.effective_rebate_rate_percent ?? 0))
-
 const applicationStatusText = computed(() => {
   const app = latestApplication.value
   if (!app) return t('affiliate.partner.applyDescription')
@@ -344,15 +353,6 @@ const submitButtonText = computed(() => {
 
 function formatCount(value: number): string {
   return value.toLocaleString()
-}
-
-function formatRate(value: number): string {
-  const rounded = Math.round(value * 100) / 100
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toString()
-}
-
-function formatPercent(value: number): string {
-  return `${formatRate(value)}%`
 }
 
 function inviteeRechargeParts(item: AffiliateInvitee): string[] {
@@ -372,6 +372,11 @@ function inviteeRechargeParts(item: AffiliateInvitee): string[] {
 function partnerLevelLabel(level?: AffiliatePartnerLevel | ''): string {
   const normalized = level || 'none'
   return t(`affiliate.partner.levels.${normalized}`)
+}
+
+function partnerBenefitLabel(level?: AffiliatePartnerLevel | ''): string {
+  const normalized = level || 'none'
+  return t(`affiliate.partner.benefitLabels.${normalized}`)
 }
 
 function partnerLevelRank(level?: AffiliatePartnerLevel | ''): number {

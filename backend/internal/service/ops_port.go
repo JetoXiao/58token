@@ -11,6 +11,7 @@ type OpsRepository interface {
 	ListErrorLogs(ctx context.Context, filter *OpsErrorLogFilter) (*OpsErrorLogList, error)
 	GetErrorLogByID(ctx context.Context, id int64) (*OpsErrorLogDetail, error)
 	ListRequestDetails(ctx context.Context, filter *OpsRequestDetailFilter) ([]*OpsRequestDetail, int64, error)
+	ListRequestFilterOptions(ctx context.Context, filter *OpsRequestDetailFilter) (*OpsRequestFilterOptions, error)
 	BatchInsertSystemLogs(ctx context.Context, inputs []*OpsInsertSystemLogInput) (int64, error)
 	ListSystemLogs(ctx context.Context, filter *OpsSystemLogFilter) (*OpsSystemLogList, error)
 	DeleteSystemLogs(ctx context.Context, filter *OpsSystemLogCleanupFilter) (int64, error)
@@ -87,6 +88,8 @@ type OpsInsertErrorLogInput struct {
 	// Matches service.RequestType enum semantics from usage_log.go.
 	RequestType *int16
 	UserAgent   string
+	// RequestParams stores a compact sanitized summary of request parameters.
+	RequestParams map[string]any
 
 	ErrorPhase        string
 	ErrorType         string

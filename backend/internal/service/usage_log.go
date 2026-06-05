@@ -122,6 +122,8 @@ type UsageLog struct {
 	InboundEndpoint *string
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string
+	// RequestParams stores a compact sanitized summary of request parameters for admin drilldowns.
+	RequestParams map[string]any
 
 	GroupID        *int64
 	SubscriptionID *int64

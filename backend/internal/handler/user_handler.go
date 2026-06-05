@@ -190,7 +190,11 @@ func (h *UserHandler) GetAffiliate(c *gin.Context) {
 // GET /api/v1/public/affiliate/partner-tiers
 func (h *UserHandler) ListPublicAffiliatePartnerTiers(c *gin.Context) {
 	c.Header("Cache-Control", "public, max-age=300")
-	response.Success(c, gin.H{"items": service.AffiliatePartnerTiers()})
+	tiers := service.AffiliatePartnerTiers()
+	if h != nil && h.affiliateService != nil {
+		tiers = h.affiliateService.PartnerTiers(c.Request.Context())
+	}
+	response.Success(c, gin.H{"items": tiers})
 }
 
 // TransferAffiliateQuota transfers all available affiliate quota into current balance.

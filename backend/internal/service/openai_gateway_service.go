@@ -5420,6 +5420,7 @@ type OpenAIRecordUsageInput struct {
 	UserAgent          string // 请求的 User-Agent
 	IPAddress          string // 请求的客户端 IP 地址
 	RequestPayloadHash string
+	RequestParams      map[string]any
 	APIKeyService      APIKeyQuotaUpdater
 	ChannelUsageFields
 }
@@ -5555,6 +5556,7 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		ImageOutputSize:     optionalTrimmedStringPtr(result.ImageOutputSize),
 		ImageSizeSource:     optionalTrimmedStringPtr(result.ImageSizeSource),
 		ImageSizeBreakdown:  result.ImageSizeBreakdown,
+		RequestParams:       input.RequestParams,
 	}
 	if cost != nil {
 		usageLog.InputCost = cost.InputCost

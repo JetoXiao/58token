@@ -638,8 +638,16 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 	if l == nil {
 		return nil
 	}
+	userEmail := ""
+	username := ""
+	if l.User != nil {
+		userEmail = l.User.Email
+		username = l.User.Username
+	}
 	return &AdminUsageLog{
 		UsageLog:              usageLogFromServiceUser(l),
+		UserEmail:             userEmail,
+		Username:              username,
 		UpstreamModel:         l.UpstreamModel,
 		ChannelID:             l.ChannelID,
 		ModelMappingChain:     l.ModelMappingChain,
@@ -648,6 +656,7 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		AccountStatsCost:      l.AccountStatsCost,
 		IPAddress:             l.IPAddress,
 		Account:               AccountSummaryFromService(l.Account),
+		RequestParams:         l.RequestParams,
 	}
 }
 

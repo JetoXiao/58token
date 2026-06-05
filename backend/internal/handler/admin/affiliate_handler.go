@@ -134,7 +134,7 @@ func (h *AffiliateHandler) ClearUserSettings(c *gin.Context) {
 // ListPartnerTiers returns available partner levels.
 // GET /api/v1/admin/affiliates/partner-tiers
 func (h *AffiliateHandler) ListPartnerTiers(c *gin.Context) {
-	response.Success(c, service.AffiliatePartnerTiers())
+	response.Success(c, h.affiliateService.PartnerTiers(c.Request.Context()))
 }
 
 type ReviewAffiliatePartnerApplicationRequest struct {

@@ -1889,7 +1889,7 @@ WHERE user_id = $2`, level, userID)
 	})
 }
 
-func (r *affiliateRepository) PromotePartnerLevelForInviteCount(ctx context.Context, userID int64) (*service.AffiliatePartnerTier, bool, error) {
+func (r *affiliateRepository) PromotePartnerLevelForInviteCount(ctx context.Context, userID int64, tiers []service.AffiliatePartnerTier) (*service.AffiliatePartnerTier, bool, error) {
 	if userID <= 0 {
 		return nil, false, service.ErrUserNotFound
 	}
@@ -1900,7 +1900,7 @@ func (r *affiliateRepository) PromotePartnerLevelForInviteCount(ctx context.Cont
 		if err != nil {
 			return err
 		}
-		nextTier, ok := service.AffiliatePartnerTierByInviteCount(summary.AffCount)
+		nextTier, ok := service.AffiliatePartnerTierByInviteCountFrom(tiers, summary.AffCount)
 		if !ok {
 			return nil
 		}

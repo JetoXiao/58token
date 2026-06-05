@@ -188,6 +188,7 @@ func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		ops.PUT("/upstream-errors/:id/resolve", h.Admin.Ops.ResolveUpstreamError)
 
 		// Request drilldown (success + error)
+		ops.GET("/requests/filters", h.Admin.Ops.ListRequestFilterOptions)
 		ops.GET("/requests", h.Admin.Ops.ListRequestDetails)
 
 		// Indexed system logs

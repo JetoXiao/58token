@@ -112,6 +112,7 @@ const (
 	SettingKeyAffiliateRebateDurationDays      = "affiliate_rebate_duration_days"      // 返利有效期（天，0=永久）
 	SettingKeyAffiliateRebatePerInviteeCap     = "affiliate_rebate_per_invitee_cap"    // 单人返利上限（0=无上限）
 	SettingKeyAffiliateGroupProfitRates        = "affiliate_group_profit_rates"        // 分组利润率（JSON，key=group_id，value=百分比）
+	SettingKeyAffiliatePartnerTiers            = "affiliate_partner_tiers"             // 合伙人档位配置（JSON）
 	SettingKeyRiskControlEnabled               = "risk_control_enabled"                // 是否启用风控中心入口与审计链路
 	SettingKeyContentModerationConfig          = "content_moderation_config"           // 内容审计配置（JSON）
 	SettingKeyLoginAgreementEnabled            = "login_agreement_enabled"             // 登录前是否要求同意条款

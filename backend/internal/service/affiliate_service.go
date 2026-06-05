@@ -27,6 +27,13 @@ var (
 	ErrAffiliatePartnerApplicationFinalized = infraerrors.Conflict("AFFILIATE_PARTNER_APPLICATION_FINALIZED", "partner application already reviewed")
 )
 
+var affiliatePartnerLevelOrder = []string{
+	AffiliatePartnerLevelSpark,
+	AffiliatePartnerLevelVoyage,
+	AffiliatePartnerLevelSummit,
+	AffiliatePartnerLevelCoCreate,
+}
+
 const (
 	affiliateInviteesLimit = 100
 	// AffiliateUsageCommissionRateDefault is the default percentage used by the
@@ -56,7 +63,7 @@ type AffiliatePartnerTier struct {
 	NextRequiredInvitees *int    `json:"next_required_invitees,omitempty"`
 }
 
-var affiliatePartnerTiers = []AffiliatePartnerTier{
+var affiliatePartnerTierDefaults = []AffiliatePartnerTier{
 	{Level: AffiliatePartnerLevelSpark, Name: "Spark", RebateRatePercent: 40, RequiredInvitees: 10},
 	{Level: AffiliatePartnerLevelVoyage, Name: "Voyage", RebateRatePercent: 50, RequiredInvitees: 30},
 	{Level: AffiliatePartnerLevelSummit, Name: "Summit", RebateRatePercent: 60, RequiredInvitees: 50},
@@ -64,9 +71,80 @@ var affiliatePartnerTiers = []AffiliatePartnerTier{
 }
 
 func AffiliatePartnerTiers() []AffiliatePartnerTier {
-	tiers := make([]AffiliatePartnerTier, len(affiliatePartnerTiers))
-	copy(tiers, affiliatePartnerTiers)
+	return withAffiliatePartnerTierProgress(affiliatePartnerTierDefaults)
+}
+
+func NormalizeAffiliatePartnerTiers(input []AffiliatePartnerTier) []AffiliatePartnerTier {
+	byLevel := make(map[string]AffiliatePartnerTier, len(input))
+	for _, tier := range input {
+		level := NormalizeAffiliatePartnerLevel(tier.Level)
+		if level == AffiliatePartnerLevelNone || AffiliatePartnerLevelRank(level) <= 0 {
+			continue
+		}
+		byLevel[level] = tier
+	}
+
+	tiers := make([]AffiliatePartnerTier, 0, len(affiliatePartnerTierDefaults))
+	minInvitees := 0
+	for _, defaults := range affiliatePartnerTierDefaults {
+		tier := defaults
+		if raw, ok := byLevel[defaults.Level]; ok {
+			if !math.IsNaN(raw.RebateRatePercent) && !math.IsInf(raw.RebateRatePercent, 0) {
+				tier.RebateRatePercent = clampAffiliateRebateRate(raw.RebateRatePercent)
+			}
+			if raw.RequiredInvitees >= 0 {
+				tier.RequiredInvitees = raw.RequiredInvitees
+			}
+		}
+		if tier.RequiredInvitees < minInvitees {
+			tier.RequiredInvitees = minInvitees
+		}
+		minInvitees = tier.RequiredInvitees + 1
+		tier.NextRequiredInvitees = nil
+		tiers = append(tiers, tier)
+	}
+	return withAffiliatePartnerTierProgress(tiers)
+}
+
+func AffiliatePartnerTierByLevelFrom(tiers []AffiliatePartnerTier, level string) (AffiliatePartnerTier, bool) {
+	level = NormalizeAffiliatePartnerLevel(level)
+	for _, tier := range NormalizeAffiliatePartnerTiers(tiers) {
+		if tier.Level == level {
+			return tier, true
+		}
+	}
+	return AffiliatePartnerTier{}, false
+}
+
+func AffiliatePartnerTierByInviteCountFrom(tiers []AffiliatePartnerTier, invitees int) (AffiliatePartnerTier, bool) {
+	var best AffiliatePartnerTier
+	found := false
+	for _, tier := range NormalizeAffiliatePartnerTiers(tiers) {
+		if invitees >= tier.RequiredInvitees {
+			best = tier
+			found = true
+		}
+	}
+	return best, found
+}
+
+func AffiliatePartnerTierByRebateRatePercentFrom(tiers []AffiliatePartnerTier, ratePercent float64) (AffiliatePartnerTier, bool) {
+	if math.IsNaN(ratePercent) || math.IsInf(ratePercent, 0) {
+		return AffiliatePartnerTier{}, false
+	}
+	for _, tier := range NormalizeAffiliatePartnerTiers(tiers) {
+		if math.Abs(ratePercent-tier.RebateRatePercent) <= 0.0001 {
+			return tier, true
+		}
+	}
+	return AffiliatePartnerTier{}, false
+}
+
+func withAffiliatePartnerTierProgress(input []AffiliatePartnerTier) []AffiliatePartnerTier {
+	tiers := make([]AffiliatePartnerTier, len(input))
+	copy(tiers, input)
 	for i := range tiers {
+		tiers[i].NextRequiredInvitees = nil
 		if i+1 < len(tiers) {
 			next := tiers[i+1].RequiredInvitees
 			tiers[i].NextRequiredInvitees = &next
@@ -94,13 +172,7 @@ func NormalizeAffiliatePartnerLevel(level string) string {
 }
 
 func AffiliatePartnerTierByLevel(level string) (AffiliatePartnerTier, bool) {
-	level = NormalizeAffiliatePartnerLevel(level)
-	for _, tier := range AffiliatePartnerTiers() {
-		if tier.Level == level {
-			return tier, true
-		}
-	}
-	return AffiliatePartnerTier{}, false
+	return AffiliatePartnerTierByLevelFrom(AffiliatePartnerTiers(), level)
 }
 
 func AffiliatePartnerLevelRank(level string) int {
@@ -108,8 +180,8 @@ func AffiliatePartnerLevelRank(level string) int {
 	if level == AffiliatePartnerLevelNone {
 		return 0
 	}
-	for i, tier := range affiliatePartnerTiers {
-		if tier.Level == level {
+	for i, tierLevel := range affiliatePartnerLevelOrder {
+		if tierLevel == level {
 			return i + 1
 		}
 	}
@@ -117,27 +189,11 @@ func AffiliatePartnerLevelRank(level string) int {
 }
 
 func AffiliatePartnerTierByInviteCount(invitees int) (AffiliatePartnerTier, bool) {
-	var best AffiliatePartnerTier
-	found := false
-	for _, tier := range AffiliatePartnerTiers() {
-		if invitees >= tier.RequiredInvitees {
-			best = tier
-			found = true
-		}
-	}
-	return best, found
+	return AffiliatePartnerTierByInviteCountFrom(AffiliatePartnerTiers(), invitees)
 }
 
 func AffiliatePartnerTierByRebateRatePercent(ratePercent float64) (AffiliatePartnerTier, bool) {
-	if math.IsNaN(ratePercent) || math.IsInf(ratePercent, 0) {
-		return AffiliatePartnerTier{}, false
-	}
-	for _, tier := range AffiliatePartnerTiers() {
-		if math.Abs(ratePercent-tier.RebateRatePercent) <= 0.0001 {
-			return tier, true
-		}
-	}
-	return AffiliatePartnerTier{}, false
+	return AffiliatePartnerTierByRebateRatePercentFrom(AffiliatePartnerTiers(), ratePercent)
 }
 
 // affiliateCodeValidChar accepts uppercase letters, digits, underscore and dash.
@@ -231,7 +287,7 @@ type AffiliateRepository interface {
 	SetUserRebateRate(ctx context.Context, userID int64, ratePercent *float64) error
 	BatchSetUserRebateRate(ctx context.Context, userIDs []int64, ratePercent *float64) error
 	SetUserPartnerLevel(ctx context.Context, userID int64, level string) error
-	PromotePartnerLevelForInviteCount(ctx context.Context, userID int64) (*AffiliatePartnerTier, bool, error)
+	PromotePartnerLevelForInviteCount(ctx context.Context, userID int64, tiers []AffiliatePartnerTier) (*AffiliatePartnerTier, bool, error)
 	GetPartnerSummariesByUserIDs(ctx context.Context, userIDs []int64) (map[int64]AffiliatePartnerSummary, error)
 	CreatePartnerApplication(ctx context.Context, userID int64, input AffiliatePartnerApplicationInput) (*AffiliatePartnerApplication, error)
 	GetLatestPartnerApplication(ctx context.Context, userID int64) (*AffiliatePartnerApplication, error)
@@ -472,6 +528,13 @@ func NewAffiliateService(repo AffiliateRepository, settingService *SettingServic
 	}
 }
 
+func (s *AffiliateService) PartnerTiers(ctx context.Context) []AffiliatePartnerTier {
+	if s == nil || s.settingService == nil {
+		return AffiliatePartnerTiers()
+	}
+	return s.settingService.GetAffiliatePartnerTiers(ctx)
+}
+
 // IsEnabled reports whether the affiliate (邀请返利) feature is turned on.
 func (s *AffiliateService) IsEnabled(ctx context.Context) bool {
 	if s == nil || s.settingService == nil {
@@ -506,12 +569,13 @@ func (s *AffiliateService) GetAffiliateDetail(ctx context.Context, userID int64)
 		return nil, err
 	}
 	effectiveRate := s.resolveRebateRatePercent(ctx, summary)
-	partnerLevel := resolveEffectivePartnerLevel(summary)
-	partnerTier := affiliatePartnerTierPtr(partnerLevel)
+	partnerLevel := s.resolveEffectivePartnerLevel(ctx, summary)
+	partnerTier := s.affiliatePartnerTierPtr(ctx, partnerLevel)
 	application, appErr := s.repo.GetLatestPartnerApplication(ctx, userID)
 	if appErr != nil && !errors.Is(appErr, ErrAffiliatePartnerApplicationNotFound) {
 		return nil, appErr
 	}
+	s.applyPartnerApplicationTiers(ctx, application)
 	return &AffiliateDetail{
 		UserID:                     summary.UserID,
 		AffCode:                    summary.AffCode,
@@ -522,7 +586,7 @@ func (s *AffiliateService) GetAffiliateDetail(ctx context.Context, userID int64)
 		AffHistoryQuota:            summary.AffHistoryQuota,
 		PartnerLevel:               partnerLevel,
 		PartnerTier:                partnerTier,
-		PartnerTiers:               AffiliatePartnerTiers(),
+		PartnerTiers:               s.PartnerTiers(ctx),
 		PartnerApplication:         application,
 		EffectiveRebateRatePercent: effectiveRate,
 		Invitees:                   invitees,
@@ -571,7 +635,7 @@ func (s *AffiliateService) BindInviterByCode(ctx context.Context, userID int64, 
 	if !bound {
 		return ErrAffiliateAlreadyBound
 	}
-	_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, inviterSummary.UserID)
+	_, _, _ = s.promotePartnerLevelForInviteCount(ctx, inviterSummary.UserID)
 	return nil
 }
 
@@ -650,7 +714,7 @@ func (s *AffiliateService) AccrueInviteRebateForOrder(ctx context.Context, invit
 	if !applied {
 		return 0, nil
 	}
-	_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, *inviteeSummary.InviterID)
+	_, _, _ = s.promotePartnerLevelForInviteCount(ctx, *inviteeSummary.InviterID)
 	return rebate, nil
 }
 
@@ -665,7 +729,7 @@ func (s *AffiliateService) resolveRebateRatePercent(ctx context.Context, inviter
 		return clampAffiliateRebateRate(v)
 	}
 	if inviter != nil {
-		if tier, ok := AffiliatePartnerTierByLevel(inviter.PartnerLevel); ok {
+		if tier, ok := s.affiliatePartnerTierByLevel(ctx, inviter.PartnerLevel); ok {
 			return clampAffiliateRebateRate(tier.RebateRatePercent)
 		}
 	}
@@ -703,7 +767,7 @@ func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID in
 	return transferred, balance, nil
 }
 
-func resolveEffectivePartnerLevel(summary *AffiliateSummary) string {
+func (s *AffiliateService) resolveEffectivePartnerLevel(ctx context.Context, summary *AffiliateSummary) string {
 	if summary == nil {
 		return AffiliatePartnerLevelNone
 	}
@@ -712,7 +776,7 @@ func resolveEffectivePartnerLevel(summary *AffiliateSummary) string {
 		return level
 	}
 	if summary.AffRebateRatePercent != nil {
-		if tier, ok := AffiliatePartnerTierByRebateRatePercent(clampAffiliateRebateRate(*summary.AffRebateRatePercent)); ok {
+		if tier, ok := s.affiliatePartnerTierByRebateRatePercent(ctx, clampAffiliateRebateRate(*summary.AffRebateRatePercent)); ok {
 			return tier.Level
 		}
 	}
@@ -720,8 +784,7 @@ func resolveEffectivePartnerLevel(summary *AffiliateSummary) string {
 }
 
 func (s *AffiliateService) isEffectivePartner(ctx context.Context, summary *AffiliateSummary) bool {
-	_ = ctx
-	return AffiliatePartnerLevelRank(resolveEffectivePartnerLevel(summary)) > 0
+	return AffiliatePartnerLevelRank(s.resolveEffectivePartnerLevel(ctx, summary)) > 0
 }
 
 func (s *AffiliateService) listInvitees(ctx context.Context, inviterID int64) ([]AffiliateInvitee, error) {
@@ -903,11 +966,11 @@ func (s *AffiliateService) AdminGetPartnerSummaries(ctx context.Context, userIDs
 			PartnerLevel:         summary.PartnerLevel,
 			AffCount:             summary.AffCount,
 		})
-		summary.PartnerLevel = resolveEffectivePartnerLevel(&AffiliateSummary{
+		summary.PartnerLevel = s.resolveEffectivePartnerLevel(ctx, &AffiliateSummary{
 			AffRebateRatePercent: summary.AffRebateRatePercent,
 			PartnerLevel:         summary.PartnerLevel,
 		})
-		summary.PartnerTier = affiliatePartnerTierPtr(summary.PartnerLevel)
+		summary.PartnerTier = s.affiliatePartnerTierPtr(ctx, summary.PartnerLevel)
 		summaries[uid] = summary
 	}
 	defaultRate := s.globalRebateRatePercent(ctx)
@@ -935,7 +998,12 @@ func (s *AffiliateService) ApplyForPartner(ctx context.Context, userID int64, in
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.CreatePartnerApplication(ctx, userID, input)
+	application, err := s.repo.CreatePartnerApplication(ctx, userID, input)
+	if err != nil {
+		return nil, err
+	}
+	s.applyPartnerApplicationTiers(ctx, application)
+	return application, nil
 }
 
 func (s *AffiliateService) AdminListPartnerApplications(ctx context.Context, filter AffiliatePartnerApplicationFilter) ([]AffiliatePartnerApplication, int64, error) {
@@ -953,7 +1021,14 @@ func (s *AffiliateService) AdminListPartnerApplications(ctx context.Context, fil
 	if filter.PageSize > 100 {
 		filter.PageSize = 100
 	}
-	return s.repo.ListPartnerApplications(ctx, filter)
+	items, total, err := s.repo.ListPartnerApplications(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range items {
+		s.applyPartnerApplicationTiers(ctx, &items[i])
+	}
+	return items, total, nil
 }
 
 func (s *AffiliateService) AdminReviewPartnerApplication(ctx context.Context, applicationID, reviewerID int64, input AffiliatePartnerApplicationReviewInput) (*AffiliatePartnerApplication, error) {
@@ -976,7 +1051,12 @@ func (s *AffiliateService) AdminReviewPartnerApplication(ctx context.Context, ap
 	} else {
 		input.GrantedLevel = AffiliatePartnerLevelNone
 	}
-	return s.repo.ReviewPartnerApplication(ctx, applicationID, reviewerID, input)
+	application, err := s.repo.ReviewPartnerApplication(ctx, applicationID, reviewerID, input)
+	if err != nil {
+		return nil, err
+	}
+	s.applyPartnerApplicationTiers(ctx, application)
+	return application, nil
 }
 
 // AdminListCustomUsers 列出有专属配置的用户。
@@ -990,7 +1070,7 @@ func (s *AffiliateService) AdminListCustomUsers(ctx context.Context, filter Affi
 	}
 	for i := range entries {
 		entries[i].PartnerLevel = NormalizeAffiliatePartnerLevel(entries[i].PartnerLevel)
-		entries[i].PartnerTier = affiliatePartnerTierPtr(entries[i].PartnerLevel)
+		entries[i].PartnerTier = s.affiliatePartnerTierPtr(ctx, entries[i].PartnerLevel)
 	}
 	return entries, total, nil
 }
@@ -1017,7 +1097,7 @@ func (s *AffiliateService) AdminAssignInviter(ctx context.Context, inviteeID, in
 		return nil, err
 	}
 	if assignment != nil && assignment.Changed {
-		_, _, _ = s.repo.PromotePartnerLevelForInviteCount(ctx, inviterID)
+		_, _, _ = s.promotePartnerLevelForInviteCount(ctx, inviterID)
 	}
 	return assignment, nil
 }
@@ -1084,25 +1164,51 @@ func (s *AffiliateService) AdminGetUserOverview(ctx context.Context, userID int6
 	}
 	if overview != nil {
 		if !overview.RebateRateCustom {
-			if tier, ok := AffiliatePartnerTierByLevel(overview.PartnerLevel); ok {
+			if tier, ok := s.affiliatePartnerTierByLevel(ctx, overview.PartnerLevel); ok {
 				overview.RebateRatePercent = tier.RebateRatePercent
 			} else {
 				overview.RebateRatePercent = s.globalRebateRatePercent(ctx)
 			}
 		}
 		overview.PartnerLevel = NormalizeAffiliatePartnerLevel(overview.PartnerLevel)
-		overview.PartnerTier = affiliatePartnerTierPtr(overview.PartnerLevel)
+		overview.PartnerTier = s.affiliatePartnerTierPtr(ctx, overview.PartnerLevel)
 		overview.RebateRatePercent = clampAffiliateRebateRate(overview.RebateRatePercent)
 	}
 	return overview, nil
 }
 
-func affiliatePartnerTierPtr(level string) *AffiliatePartnerTier {
-	tier, ok := AffiliatePartnerTierByLevel(level)
+func (s *AffiliateService) affiliatePartnerTierByLevel(ctx context.Context, level string) (AffiliatePartnerTier, bool) {
+	return AffiliatePartnerTierByLevelFrom(s.PartnerTiers(ctx), level)
+}
+
+func (s *AffiliateService) affiliatePartnerTierByRebateRatePercent(ctx context.Context, ratePercent float64) (AffiliatePartnerTier, bool) {
+	return AffiliatePartnerTierByRebateRatePercentFrom(s.PartnerTiers(ctx), ratePercent)
+}
+
+func (s *AffiliateService) affiliatePartnerTierPtr(ctx context.Context, level string) *AffiliatePartnerTier {
+	tier, ok := s.affiliatePartnerTierByLevel(ctx, level)
 	if !ok {
 		return nil
 	}
 	return &tier
+}
+
+func (s *AffiliateService) promotePartnerLevelForInviteCount(ctx context.Context, userID int64) (*AffiliatePartnerTier, bool, error) {
+	if s == nil || s.repo == nil {
+		return nil, false, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	return s.repo.PromotePartnerLevelForInviteCount(ctx, userID, s.PartnerTiers(ctx))
+}
+
+func (s *AffiliateService) applyPartnerApplicationTiers(ctx context.Context, app *AffiliatePartnerApplication) {
+	if app == nil {
+		return
+	}
+	app.RequestedTier = s.affiliatePartnerTierPtr(ctx, app.RequestedLevel)
+	app.CurrentTier = s.affiliatePartnerTierPtr(ctx, app.CurrentLevel)
+	if app.GrantedLevel != "" {
+		app.GrantedTier = s.affiliatePartnerTierPtr(ctx, app.GrantedLevel)
+	}
 }
 
 func normalizePartnerApplicationInput(input AffiliatePartnerApplicationInput) (AffiliatePartnerApplicationInput, error) {

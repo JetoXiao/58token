@@ -1,9 +1,8 @@
 <template>
   <div class="relative flex min-h-screen flex-col overflow-hidden bg-[#f7f8fb] text-slate-950 dark:bg-[#05060a] dark:text-white">
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-emerald-300/25 blur-3xl dark:bg-emerald-400/14"></div>
-      <div class="absolute right-[-14rem] top-24 h-[34rem] w-[34rem] rounded-full bg-violet-300/25 blur-3xl dark:bg-violet-500/16"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+      <div class="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-100/70 via-white/20 to-transparent dark:from-emerald-950/35 dark:via-white/[0.03]"></div>
     </div>
 
     <MarketingNavbar
@@ -36,7 +35,7 @@
     </MarketingNavbar>
 
     <main class="relative z-10 flex-1 px-4 pb-16 pt-6 sm:px-6">
-      <section class="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-slate-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-center">
+      <section class="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-slate-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
         <div>
           <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
             <Icon name="sparkles" size="sm" />
@@ -67,13 +66,16 @@
 
         <div class="rounded-[1.5rem] border border-emerald-200/80 bg-emerald-50/65 p-5 shadow-sm backdrop-blur dark:border-emerald-900/50 dark:bg-emerald-900/15">
           <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('gateway.partner.rateCard.eyebrow') }}</p>
-          <div class="mt-4 text-6xl font-semibold tracking-normal text-slate-950 dark:text-white">{{ t('gateway.partner.rateCard.ratePrefix', { rate: maxRateLabel }) }}</div>
+          <div class="mt-4 text-4xl font-semibold leading-tight tracking-normal text-slate-950 dark:text-white md:text-5xl">{{ t('gateway.partner.rateCard.headline') }}</div>
           <p class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ t('gateway.partner.rateCard.copy') }}</p>
           <div class="mt-5 grid grid-cols-2 gap-3">
             <div v-for="stat in stats" :key="stat.label" class="rounded-2xl border border-white/70 bg-white/70 p-4 dark:border-white/10 dark:bg-white/[0.05]">
               <div class="text-2xl font-semibold text-slate-950 dark:text-white">{{ stat.value }}</div>
               <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ stat.label }}</div>
             </div>
+          </div>
+          <div class="mt-4 rounded-2xl border border-emerald-200 bg-white/65 p-4 text-sm leading-6 text-slate-600 dark:border-emerald-900/50 dark:bg-white/[0.04] dark:text-slate-300">
+            {{ t('gateway.partner.rateCard.note') }}
           </div>
         </div>
       </section>
@@ -99,7 +101,7 @@
         <div class="mt-6 grid gap-3 md:grid-cols-4">
           <div v-for="tier in tiers" :key="tier.name" class="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-slate-950/35">
             <div class="text-sm font-semibold text-slate-950 dark:text-white">{{ tier.name }}</div>
-            <div class="mt-3 text-3xl font-semibold text-emerald-600 dark:text-emerald-300">{{ tier.rate }}</div>
+            <div class="mt-3 text-lg font-semibold text-emerald-600 dark:text-emerald-300">{{ tier.benefit }}</div>
             <p class="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-200">{{ tier.requirement }}</p>
             <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ tier.copy }}</p>
           </div>
@@ -122,15 +124,18 @@
         </div>
 
         <div class="rounded-[2rem] border border-slate-200/70 bg-slate-950 p-6 text-white shadow-[0_26px_90px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-white/[0.06]">
-          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">{{ t('gateway.partner.calculator.eyebrow') }}</p>
-          <h2 class="mt-3 text-3xl font-semibold tracking-normal">{{ t('gateway.partner.calculator.title') }}</h2>
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">{{ t('gateway.partner.settlement.eyebrow') }}</p>
+          <h2 class="mt-3 text-3xl font-semibold tracking-normal">{{ t('gateway.partner.settlement.title') }}</h2>
           <div class="mt-6 grid gap-3 sm:grid-cols-3">
-            <div v-for="row in calculatorRows" :key="row.label" class="rounded-2xl border border-white/10 bg-white/10 p-4">
-              <div class="text-xs text-slate-300">{{ row.label }}</div>
-              <div class="mt-2 text-2xl font-semibold">{{ row.value }}</div>
+            <div v-for="item in settlementItems" :key="item.title" class="rounded-2xl border border-white/10 bg-white/10 p-4">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
+                <Icon :name="item.icon" size="sm" />
+              </div>
+              <div class="mt-4 text-base font-semibold">{{ item.title }}</div>
+              <p class="mt-2 text-xs leading-5 text-slate-300">{{ item.copy }}</p>
             </div>
           </div>
-          <p class="mt-5 text-sm leading-7 text-slate-300">{{ t('gateway.partner.calculator.copy', { rate: maxRateLabel }) }}</p>
+          <p class="mt-5 text-sm leading-7 text-slate-300">{{ t('gateway.partner.settlement.copy') }}</p>
         </div>
       </section>
     </main>
@@ -170,10 +175,6 @@ const isAdmin = computed(() => authStore.isAdmin)
 const dashboardPath = computed(() => isAdmin.value ? '/admin/dashboard' : '/dashboard')
 const primaryCtaTo = computed(() => isAuthenticated.value ? '/affiliate' : '/register')
 const displayPartnerTiers = computed(() => partnerTiers.value.length > 0 ? partnerTiers.value : fallbackPartnerTiers)
-const maxTier = computed(() => displayPartnerTiers.value.reduce((best, tier) => (
-  tier.rebate_rate_percent > best.rebate_rate_percent ? tier : best
-), displayPartnerTiers.value[0] ?? fallbackPartnerTiers[fallbackPartnerTiers.length - 1]))
-const maxRateLabel = computed(() => formatPercent(maxTier.value?.rebate_rate_percent ?? 70))
 
 const stats = computed(() => [
   { value: t('gateway.partner.stats.settlementValue'), label: t('gateway.partner.stats.settlement') },
@@ -186,7 +187,7 @@ const valueProps = computed<Array<{ title: string; copy: string; icon: 'dollar' 
 ])
 const tiers = computed(() => displayPartnerTiers.value.map((tier) => ({
   name: partnerLevelLabel(tier.level),
-  rate: formatPercent(tier.rebate_rate_percent),
+  benefit: t(`gateway.partner.tiers.items.${tier.level}.benefit`),
   requirement: t('affiliate.partner.tierRequirement', { count: tier.required_invitees }),
   copy: t(`gateway.partner.tiers.items.${tier.level}.copy`)
 })))
@@ -194,23 +195,14 @@ const steps = computed(() => ['apply', 'invite', 'settle'].map((key) => ({
   title: t(`gateway.partner.flow.steps.${key}.title`),
   copy: t(`gateway.partner.flow.steps.${key}.copy`)
 })))
-const calculatorRows = computed(() => [
-  { label: t('gateway.partner.calculator.invitees'), value: `${maxTier.value?.required_invitees ?? 100}+` },
-  { label: t('gateway.partner.calculator.usage'), value: formatRmb(2000) },
-  { label: t('gateway.partner.calculator.reward'), value: formatRmb(2000 * ((maxTier.value?.rebate_rate_percent ?? 70) / 100)) }
+const settlementItems = computed<Array<{ title: string; copy: string; icon: 'chart' | 'sync' | 'shield' }>>(() => [
+  { title: t('gateway.partner.settlement.items.usage.title'), copy: t('gateway.partner.settlement.items.usage.copy'), icon: 'chart' },
+  { title: t('gateway.partner.settlement.items.review.title'), copy: t('gateway.partner.settlement.items.review.copy'), icon: 'shield' },
+  { title: t('gateway.partner.settlement.items.payout.title'), copy: t('gateway.partner.settlement.items.payout.copy'), icon: 'sync' }
 ])
 
 function partnerLevelLabel(level: AffiliatePartnerLevel): string {
   return t(`affiliate.partner.levels.${level}`)
-}
-
-function formatPercent(value: number): string {
-  const normalized = Math.round(value * 100) / 100
-  return `${Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toString()}%`
-}
-
-function formatRmb(value: number): string {
-  return `¥${Math.round(value).toLocaleString('en-US')}`
 }
 
 function toggleTheme() {

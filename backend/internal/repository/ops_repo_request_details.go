@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -38,7 +39,7 @@ func (r *opsRepository) ListRequestDetails(ctx context.Context, filter *service.
 		}
 
 		if platform := strings.TrimSpace(strings.ToLower(filter.Platform)); platform != "" {
-			addCondition(fmt.Sprintf("platform = $%d", len(args)+1), platform)
+			addCondition(fmt.Sprintf("LOWER(platform) = $%d", len(args)+1), platform)
 		}
 		if filter.GroupID != nil && *filter.GroupID > 0 {
 			addCondition(fmt.Sprintf("group_id = $%d", len(args)+1), *filter.GroupID)
@@ -64,10 +65,10 @@ func (r *opsRepository) ListRequestDetails(ctx context.Context, filter *service.
 			like := "%" + strings.ToLower(q) + "%"
 			startIdx := len(args) + 1
 			addCondition(
-				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d)",
-					startIdx, startIdx+1, startIdx+2,
+				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d OR LOWER(COALESCE(request_params::text,'')) LIKE $%d)",
+					startIdx, startIdx+1, startIdx+2, startIdx+3,
 				),
-				like, like, like,
+				like, like, like, like,
 			)
 		}
 
@@ -102,7 +103,35 @@ WITH combined AS (
     ul.api_key_id AS api_key_id,
     ul.account_id AS account_id,
     ul.group_id AS group_id,
-    ul.stream AS stream
+    ul.stream AS stream,
+    ul.openai_ws_mode AS openai_ws_mode,
+    ul.request_type AS request_type,
+    COALESCE(ul.inbound_endpoint, '') AS inbound_endpoint,
+    COALESCE(ul.upstream_endpoint, '') AS upstream_endpoint,
+    COALESCE(ul.requested_model, ul.model, '') AS requested_model,
+    COALESCE(ul.upstream_model, '') AS upstream_model,
+    (
+      jsonb_strip_nulls(jsonb_build_object(
+        'model', COALESCE(ul.requested_model, ul.model),
+        'stream', ul.stream,
+        'request_type', CASE
+          WHEN ul.request_type = 3 THEN 'ws_v2'
+          WHEN ul.request_type = 2 THEN 'stream'
+          WHEN ul.request_type = 1 THEN 'sync'
+          WHEN ul.openai_ws_mode THEN 'ws_v2'
+          WHEN ul.stream THEN 'stream'
+          ELSE 'sync'
+        END,
+        'service_tier', ul.service_tier,
+        'reasoning_effort', ul.reasoning_effort,
+        'image_count', NULLIF(ul.image_count, 0),
+        'image_size', ul.image_size,
+        'image_input_size', ul.image_input_size,
+        'image_output_size', ul.image_output_size,
+        'image_size_source', ul.image_size_source,
+        'billing_mode', ul.billing_mode
+      )) || COALESCE(ul.request_params, '{}'::jsonb)
+    ) AS request_params
   FROM usage_logs ul
   LEFT JOIN groups g ON g.id = ul.group_id
   LEFT JOIN accounts a ON a.id = ul.account_id
@@ -126,7 +155,26 @@ WITH combined AS (
     o.api_key_id AS api_key_id,
     o.account_id AS account_id,
     o.group_id AS group_id,
-    o.stream AS stream
+    o.stream AS stream,
+    FALSE AS openai_ws_mode,
+    o.request_type AS request_type,
+    COALESCE(o.inbound_endpoint, '') AS inbound_endpoint,
+    COALESCE(o.upstream_endpoint, '') AS upstream_endpoint,
+    COALESCE(o.requested_model, o.model, '') AS requested_model,
+    COALESCE(o.upstream_model, '') AS upstream_model,
+    (
+      jsonb_strip_nulls(jsonb_build_object(
+        'model', COALESCE(o.requested_model, o.model),
+        'stream', o.stream,
+        'request_type', CASE
+          WHEN o.request_type = 3 THEN 'ws_v2'
+          WHEN o.request_type = 2 THEN 'stream'
+          WHEN o.request_type = 1 THEN 'sync'
+          WHEN o.stream THEN 'stream'
+          ELSE 'sync'
+        END
+      )) || COALESCE(o.request_params, '{}'::jsonb)
+    ) AS request_params
   FROM ops_error_logs o
   LEFT JOIN groups g ON g.id = o.group_id
   LEFT JOIN accounts a ON a.id = o.account_id
@@ -175,7 +223,14 @@ SELECT
   api_key_id,
   account_id,
   group_id,
-  stream
+  stream,
+  openai_ws_mode,
+  request_type,
+  inbound_endpoint,
+  upstream_endpoint,
+  requested_model,
+  upstream_model,
+  request_params
 FROM combined
 %s
 %s
@@ -226,7 +281,14 @@ LIMIT $%d OFFSET $%d
 			accountID sql.NullInt64
 			groupID   sql.NullInt64
 
-			stream bool
+			stream           bool
+			openAIWSMode     bool
+			requestTypeRaw   sql.NullInt64
+			inboundEndpoint  sql.NullString
+			upstreamEndpoint sql.NullString
+			requestedModel   sql.NullString
+			upstreamModel    sql.NullString
+			requestParams    sql.NullString
 		)
 
 		if err := rows.Scan(
@@ -246,8 +308,23 @@ LIMIT $%d OFFSET $%d
 			&accountID,
 			&groupID,
 			&stream,
+			&openAIWSMode,
+			&requestTypeRaw,
+			&inboundEndpoint,
+			&upstreamEndpoint,
+			&requestedModel,
+			&upstreamModel,
+			&requestParams,
 		); err != nil {
 			return nil, 0, err
+		}
+
+		requestType := service.RequestTypeUnknown
+		if requestTypeRaw.Valid {
+			requestType = service.RequestTypeFromInt16(int16(requestTypeRaw.Int64))
+		}
+		if requestType == service.RequestTypeUnknown {
+			requestType = service.RequestTypeFromLegacy(stream, openAIWSMode)
 		}
 
 		item := &service.OpsRequestDetail{
@@ -269,7 +346,13 @@ LIMIT $%d OFFSET $%d
 			AccountID: toInt64Ptr(accountID),
 			GroupID:   toInt64Ptr(groupID),
 
-			Stream: stream,
+			Stream:           stream,
+			RequestType:      requestType.String(),
+			InboundEndpoint:  strings.TrimSpace(inboundEndpoint.String),
+			UpstreamEndpoint: strings.TrimSpace(upstreamEndpoint.String),
+			RequestedModel:   strings.TrimSpace(requestedModel.String),
+			UpstreamModel:    strings.TrimSpace(upstreamModel.String),
+			RequestParams:    requestParamsFromNullJSON(requestParams),
 		}
 
 		if item.Platform == "" {
@@ -283,4 +366,223 @@ LIMIT $%d OFFSET $%d
 	}
 
 	return out, total, nil
+}
+
+func (r *opsRepository) ListRequestFilterOptions(ctx context.Context, filter *service.OpsRequestDetailFilter) (*service.OpsRequestFilterOptions, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("nil ops repository")
+	}
+
+	_, _, startTime, endTime := filter.Normalize()
+	args := []any{startTime.UTC(), endTime.UTC()}
+	kindWhere := ""
+	if filter != nil {
+		if kind := strings.TrimSpace(strings.ToLower(filter.Kind)); kind != "" && kind != "all" {
+			if kind != string(service.OpsRequestKindSuccess) && kind != string(service.OpsRequestKindError) {
+				return nil, fmt.Errorf("invalid kind")
+			}
+			args = append(args, kind)
+			kindWhere = "WHERE kind = $3"
+		}
+	}
+
+	queryWithKind := func(selectSQL string) string {
+		return requestFilterOptionsCTE + fmt.Sprintf(selectSQL, kindWhere)
+	}
+
+	out := &service.OpsRequestFilterOptions{}
+	var err error
+	out.Platforms, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT value, UPPER(value) AS label
+FROM (
+  SELECT DISTINCT LOWER(NULLIF(TRIM(platform), '')) AS value
+  FROM combined
+  %s
+) v
+WHERE value IS NOT NULL
+ORDER BY value
+LIMIT 200
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	out.Models, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT value, value AS label
+FROM (
+  SELECT DISTINCT NULLIF(TRIM(model), '') AS value
+  FROM combined
+  %s
+) v
+WHERE value IS NOT NULL
+ORDER BY value
+LIMIT 300
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	out.Users, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT c.user_id::TEXT AS value,
+       CASE
+         WHEN NULLIF(TRIM(COALESCE(u.email, '')), '') IS NULL THEN '#' || c.user_id::TEXT
+         ELSE TRIM(u.email) || ' (#' || c.user_id::TEXT || ')'
+       END AS label
+FROM (
+  SELECT DISTINCT user_id
+  FROM combined
+  %s
+) c
+LEFT JOIN users u ON u.id = c.user_id
+WHERE c.user_id IS NOT NULL
+ORDER BY label
+LIMIT 200
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	out.APIKeys, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT c.api_key_id::TEXT AS value,
+       CASE
+         WHEN NULLIF(TRIM(COALESCE(k.name, '')), '') IS NULL THEN '#' || c.api_key_id::TEXT
+         ELSE TRIM(k.name) || ' (#' || c.api_key_id::TEXT || ')'
+       END AS label
+FROM (
+  SELECT DISTINCT api_key_id
+  FROM combined
+  %s
+) c
+LEFT JOIN api_keys k ON k.id = c.api_key_id
+WHERE c.api_key_id IS NOT NULL
+ORDER BY label
+LIMIT 200
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	out.Accounts, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT c.account_id::TEXT AS value,
+       CASE
+         WHEN NULLIF(TRIM(COALESCE(a.name, '')), '') IS NULL THEN '#' || c.account_id::TEXT
+         ELSE TRIM(a.name) || ' (#' || c.account_id::TEXT || ')'
+       END AS label
+FROM (
+  SELECT DISTINCT account_id
+  FROM combined
+  %s
+) c
+LEFT JOIN accounts a ON a.id = c.account_id
+WHERE c.account_id IS NOT NULL
+ORDER BY label
+LIMIT 200
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	out.Groups, err = r.scanRequestFilterOptions(ctx, queryWithKind(`
+SELECT c.group_id::TEXT AS value,
+       CASE
+         WHEN NULLIF(TRIM(COALESCE(g.name, '')), '') IS NULL THEN '#' || c.group_id::TEXT
+         ELSE TRIM(g.name) || ' (#' || c.group_id::TEXT || ')'
+       END AS label
+FROM (
+  SELECT DISTINCT group_id
+  FROM combined
+  %s
+) c
+LEFT JOIN groups g ON g.id = c.group_id
+WHERE c.group_id IS NOT NULL
+ORDER BY label
+LIMIT 200
+`), args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+const requestFilterOptionsCTE = `
+WITH combined AS (
+  SELECT
+    'success'::TEXT AS kind,
+    COALESCE(NULLIF(g.platform, ''), NULLIF(a.platform, ''), '') AS platform,
+    COALESCE(ul.requested_model, ul.model, '') AS model,
+    ul.user_id AS user_id,
+    ul.api_key_id AS api_key_id,
+    ul.account_id AS account_id,
+    ul.group_id AS group_id
+  FROM usage_logs ul
+  LEFT JOIN groups g ON g.id = ul.group_id
+  LEFT JOIN accounts a ON a.id = ul.account_id
+  WHERE ul.created_at >= $1 AND ul.created_at < $2
+
+  UNION ALL
+
+  SELECT
+    'error'::TEXT AS kind,
+    COALESCE(NULLIF(o.platform, ''), NULLIF(g.platform, ''), NULLIF(a.platform, ''), '') AS platform,
+    COALESCE(o.requested_model, o.model, '') AS model,
+    o.user_id AS user_id,
+    o.api_key_id AS api_key_id,
+    o.account_id AS account_id,
+    o.group_id AS group_id
+  FROM ops_error_logs o
+  LEFT JOIN groups g ON g.id = o.group_id
+  LEFT JOIN accounts a ON a.id = o.account_id
+  WHERE o.created_at >= $1 AND o.created_at < $2
+    AND COALESCE(o.status_code, 0) >= 400
+)
+`
+
+func (r *opsRepository) scanRequestFilterOptions(ctx context.Context, query string, args ...any) ([]service.OpsRequestFilterOption, error) {
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]service.OpsRequestFilterOption, 0, 32)
+	for rows.Next() {
+		var value, label sql.NullString
+		if err := rows.Scan(&value, &label); err != nil {
+			return nil, err
+		}
+		if !value.Valid {
+			continue
+		}
+		v := strings.TrimSpace(value.String)
+		if v == "" {
+			continue
+		}
+		l := strings.TrimSpace(label.String)
+		if l == "" {
+			l = v
+		}
+		out = append(out, service.OpsRequestFilterOption{
+			Value: v,
+			Label: l,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func requestParamsFromNullJSON(v sql.NullString) map[string]any {
+	if !v.Valid || strings.TrimSpace(v.String) == "" {
+		return nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal([]byte(v.String), &out); err != nil {
+		return nil
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

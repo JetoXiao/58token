@@ -54,9 +54,10 @@ INSERT INTO ops_error_logs (
   upstream_latency_ms,
   response_latency_ms,
   time_to_first_token_ms,
+  request_params,
   created_at
 ) VALUES (
-  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37
+  $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38
 )`
 
 func NewOpsRepository(db *sql.DB) service.OpsRepository {
@@ -164,6 +165,7 @@ func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput) []any {
 		opsNullInt64(input.UpstreamLatencyMs),
 		opsNullInt64(input.ResponseLatencyMs),
 		opsNullInt64(input.TimeToFirstTokenMs),
+		opsNullRequestParamsJSON(input.RequestParams),
 		input.CreatedAt,
 	}
 }
@@ -1037,6 +1039,17 @@ func opsNullString(v any) any {
 	default:
 		return sql.NullString{}
 	}
+}
+
+func opsNullRequestParamsJSON(v map[string]any) any {
+	if len(v) == 0 {
+		return nil
+	}
+	payload, err := json.Marshal(v)
+	if err != nil {
+		return nil
+	}
+	return string(payload)
 }
 
 func opsNullInt64(v *int64) any {

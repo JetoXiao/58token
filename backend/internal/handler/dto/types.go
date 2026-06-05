@@ -488,6 +488,10 @@ type UsageLog struct {
 type AdminUsageLog struct {
 	UsageLog
 
+	// UserEmail/Username provide convenient top-level identity fields for admin tables.
+	UserEmail string `json:"user_email,omitempty"`
+	Username  string `json:"username,omitempty"`
+
 	// UpstreamModel is the actual model sent to the upstream provider after mapping.
 	// Omitted when no mapping was applied (requested model was used as-is).
 	UpstreamModel *string `json:"upstream_model,omitempty"`
@@ -509,6 +513,9 @@ type AdminUsageLog struct {
 
 	// Account 最小账号信息（避免泄露敏感字段）
 	Account *AccountSummary `json:"account,omitempty"`
+
+	// RequestParams 是脱敏后的入参摘要，仅管理员可见。
+	RequestParams map[string]any `json:"request_params,omitempty"`
 }
 
 type UsageCleanupFilters struct {

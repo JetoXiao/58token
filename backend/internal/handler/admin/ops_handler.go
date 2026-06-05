@@ -598,6 +598,43 @@ func (h *OpsHandler) ListRequestDetails(c *gin.Context) {
 	response.Paginated(c, out.Items, out.Total, out.Page, out.PageSize)
 }
 
+// ListRequestFilterOptions returns dropdown options for request drilldown filters.
+// GET /api/v1/admin/ops/requests/filters
+func (h *OpsHandler) ListRequestFilterOptions(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	startTime, endTime, err := parseOpsTimeRange(c, "1h")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	filter := &service.OpsRequestDetailFilter{
+		StartTime: &startTime,
+		EndTime:   &endTime,
+		Kind:      strings.TrimSpace(c.Query("kind")),
+	}
+
+	out, err := h.opsService.ListRequestFilterOptions(c.Request.Context(), filter)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "invalid") {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "Failed to list request filter options")
+		return
+	}
+
+	response.Success(c, out)
+}
+
 type opsResolveRequest struct {
 	Resolved bool `json:"resolved"`
 }

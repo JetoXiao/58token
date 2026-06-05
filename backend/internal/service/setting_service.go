@@ -1802,6 +1802,11 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		return nil, err
 	}
 	updates[SettingKeyAffiliateGroupProfitRates] = affiliateGroupProfitRates
+	affiliatePartnerTiers, err := marshalAffiliatePartnerTiers(settings.AffiliatePartnerTiers)
+	if err != nil {
+		return nil, err
+	}
+	updates[SettingKeyAffiliatePartnerTiers] = affiliatePartnerTiers
 	updates[SettingKeyDefaultUserRPMLimit] = strconv.Itoa(settings.DefaultUserRPMLimit)
 	defaultSubsJSON, err := json.Marshal(settings.DefaultSubscriptions)
 	if err != nil {
@@ -2348,6 +2353,17 @@ func (s *SettingService) GetAffiliateGroupProfitRates(ctx context.Context) map[s
 	return parseAffiliateGroupProfitRates(raw)
 }
 
+func (s *SettingService) GetAffiliatePartnerTiers(ctx context.Context) []AffiliatePartnerTier {
+	if s == nil || s.settingRepo == nil {
+		return AffiliatePartnerTiers()
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeyAffiliatePartnerTiers)
+	if err != nil {
+		return AffiliatePartnerTiers()
+	}
+	return parseAffiliatePartnerTiers(raw)
+}
+
 // IsPasswordResetEnabled 检查是否启用密码重置功能
 // 要求：必须同时开启邮件验证
 func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {
@@ -2632,6 +2648,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAffiliateRebateFreezeHours:                strconv.Itoa(AffiliateRebateFreezeHoursDefault),
 		SettingKeyAffiliateRebateDurationDays:               strconv.Itoa(AffiliateRebateDurationDaysDefault),
 		SettingKeyAffiliateRebatePerInviteeCap:              strconv.FormatFloat(AffiliateRebatePerInviteeCapDefault, 'f', 2, 64),
+		SettingKeyAffiliatePartnerTiers:                     defaultAffiliatePartnerTiersJSON(),
 		SettingKeyDefaultUserRPMLimit:                       "0",
 		SettingKeyDefaultSubscriptions:                      "[]",
 		SettingKeyAuthSourceDefaultEmailBalance:             "0",
@@ -2823,6 +2840,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.AffiliateRebatePerInviteeCap = perInviteeCap
 	}
 	result.AffiliateGroupProfitRates = parseAffiliateGroupProfitRates(settings[SettingKeyAffiliateGroupProfitRates])
+	result.AffiliatePartnerTiers = parseAffiliatePartnerTiers(settings[SettingKeyAffiliatePartnerTiers])
 	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 
 	// 敏感信息直接返回，方便测试连接时使用
@@ -3319,6 +3337,35 @@ func marshalAffiliateGroupProfitRates(input map[string]float64) (string, error) 
 		return "", fmt.Errorf("marshal affiliate group profit rates: %w", err)
 	}
 	return string(data), nil
+}
+
+func parseAffiliatePartnerTiers(raw string) []AffiliatePartnerTier {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return AffiliatePartnerTiers()
+	}
+	var parsed []AffiliatePartnerTier
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return AffiliatePartnerTiers()
+	}
+	return NormalizeAffiliatePartnerTiers(parsed)
+}
+
+func marshalAffiliatePartnerTiers(input []AffiliatePartnerTier) (string, error) {
+	normalized := NormalizeAffiliatePartnerTiers(input)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return "", fmt.Errorf("marshal affiliate partner tiers: %w", err)
+	}
+	return string(data), nil
+}
+
+func defaultAffiliatePartnerTiersJSON() string {
+	raw, err := marshalAffiliatePartnerTiers(AffiliatePartnerTiers())
+	if err != nil {
+		return "[]"
+	}
+	return raw
 }
 
 func isFalseSettingValue(value string) bool {
