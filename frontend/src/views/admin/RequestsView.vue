@@ -828,7 +828,9 @@ function assignPositiveNumber<K extends keyof OpsRequestDetailsParams>(params: O
 }
 
 function assignNonNegativeNumber<K extends keyof OpsRequestDetailsParams>(params: OpsRequestDetailsParams, key: K, value: string) {
-  const parsed = Number(value)
+  const normalized = String(value ?? '').trim()
+  if (!normalized) return
+  const parsed = Number(normalized)
   if (Number.isFinite(parsed) && parsed >= 0) {
     ;(params as Record<string, unknown>)[key] = Math.trunc(parsed)
   }
