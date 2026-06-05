@@ -65,10 +65,10 @@ func (r *opsRepository) ListRequestDetails(ctx context.Context, filter *service.
 			like := "%" + strings.ToLower(q) + "%"
 			startIdx := len(args) + 1
 			addCondition(
-				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d OR LOWER(COALESCE(request_params::text,'')) LIKE $%d)",
-					startIdx, startIdx+1, startIdx+2, startIdx+3,
+				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d OR LOWER(COALESCE(request_params::text,'')) LIKE $%d OR LOWER(COALESCE(user_email,'')) LIKE $%d OR LOWER(COALESCE(username,'')) LIKE $%d OR LOWER(COALESCE(api_key_name,'')) LIKE $%d OR LOWER(COALESCE(account_name,'')) LIKE $%d OR LOWER(COALESCE(group_name,'')) LIKE $%d)",
+					startIdx, startIdx+1, startIdx+2, startIdx+3, startIdx+4, startIdx+5, startIdx+6, startIdx+7, startIdx+8,
 				),
-				like, like, like, like,
+				like, like, like, like, like, like, like, like, like,
 			)
 		}
 
@@ -103,6 +103,11 @@ WITH combined AS (
     ul.api_key_id AS api_key_id,
     ul.account_id AS account_id,
     ul.group_id AS group_id,
+    COALESCE(u.email, '') AS user_email,
+    COALESCE(u.username, '') AS username,
+    COALESCE(k.name, '') AS api_key_name,
+    COALESCE(a.name, '') AS account_name,
+    COALESCE(g.name, '') AS group_name,
     ul.stream AS stream,
     ul.openai_ws_mode AS openai_ws_mode,
     ul.request_type AS request_type,
@@ -133,6 +138,8 @@ WITH combined AS (
       )) || COALESCE(ul.request_params, '{}'::jsonb)
     ) AS request_params
   FROM usage_logs ul
+  LEFT JOIN users u ON u.id = ul.user_id
+  LEFT JOIN api_keys k ON k.id = ul.api_key_id
   LEFT JOIN groups g ON g.id = ul.group_id
   LEFT JOIN accounts a ON a.id = ul.account_id
   WHERE ul.created_at >= $1 AND ul.created_at < $2
@@ -155,6 +162,11 @@ WITH combined AS (
     o.api_key_id AS api_key_id,
     o.account_id AS account_id,
     o.group_id AS group_id,
+    COALESCE(u.email, '') AS user_email,
+    COALESCE(u.username, '') AS username,
+    COALESCE(k.name, '') AS api_key_name,
+    COALESCE(a.name, '') AS account_name,
+    COALESCE(g.name, '') AS group_name,
     o.stream AS stream,
     FALSE AS openai_ws_mode,
     o.request_type AS request_type,
@@ -176,6 +188,8 @@ WITH combined AS (
       )) || COALESCE(o.request_params, '{}'::jsonb)
     ) AS request_params
   FROM ops_error_logs o
+  LEFT JOIN users u ON u.id = o.user_id
+  LEFT JOIN api_keys k ON k.id = o.api_key_id
   LEFT JOIN groups g ON g.id = o.group_id
   LEFT JOIN accounts a ON a.id = o.account_id
   WHERE o.created_at >= $1 AND o.created_at < $2
@@ -223,6 +237,11 @@ SELECT
   api_key_id,
   account_id,
   group_id,
+  user_email,
+  username,
+  api_key_name,
+  account_name,
+  group_name,
   stream,
   openai_ws_mode,
   request_type,
@@ -281,6 +300,12 @@ LIMIT $%d OFFSET $%d
 			accountID sql.NullInt64
 			groupID   sql.NullInt64
 
+			userEmail   sql.NullString
+			username    sql.NullString
+			apiKeyName  sql.NullString
+			accountName sql.NullString
+			groupName   sql.NullString
+
 			stream           bool
 			openAIWSMode     bool
 			requestTypeRaw   sql.NullInt64
@@ -307,6 +332,11 @@ LIMIT $%d OFFSET $%d
 			&apiKeyID,
 			&accountID,
 			&groupID,
+			&userEmail,
+			&username,
+			&apiKeyName,
+			&accountName,
+			&groupName,
 			&stream,
 			&openAIWSMode,
 			&requestTypeRaw,
@@ -345,6 +375,12 @@ LIMIT $%d OFFSET $%d
 			APIKeyID:  toInt64Ptr(apiKeyID),
 			AccountID: toInt64Ptr(accountID),
 			GroupID:   toInt64Ptr(groupID),
+
+			UserEmail:   strings.TrimSpace(userEmail.String),
+			Username:    strings.TrimSpace(username.String),
+			APIKeyName:  strings.TrimSpace(apiKeyName.String),
+			AccountName: strings.TrimSpace(accountName.String),
+			GroupName:   strings.TrimSpace(groupName.String),
 
 			Stream:           stream,
 			RequestType:      requestType.String(),

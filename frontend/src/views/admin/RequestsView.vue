@@ -190,49 +190,79 @@
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+          <table class="requests-table min-w-[1660px] divide-y divide-gray-200 dark:divide-dark-700">
+            <colgroup>
+              <col class="w-[155px]" />
+              <col class="w-[90px]" />
+              <col class="w-[300px]" />
+              <col class="w-[160px]" />
+              <col class="w-[180px]" />
+              <col class="w-[230px]" />
+              <col class="w-[130px]" />
+              <col class="w-[325px]" />
+              <col class="w-[90px]" />
+            </colgroup>
             <thead class="bg-gray-50 dark:bg-dark-900">
               <tr>
-                <th class="table-head">{{ ui.time }}</th>
-                <th class="table-head">{{ ui.result }}</th>
-                <th class="table-head">{{ ui.identity }}</th>
-                <th class="table-head">{{ ui.route }}</th>
-                <th class="table-head">{{ ui.model }}</th>
-                <th class="table-head">{{ ui.endpoint }}</th>
-                <th class="table-head">{{ ui.outcome }}</th>
-                <th class="table-head min-w-[300px]">{{ ui.params }}</th>
+                <th class="table-head text-center">{{ ui.time }}</th>
+                <th class="table-head text-center">{{ ui.result }}</th>
+                <th class="table-head text-center">{{ ui.identity }}</th>
+                <th class="table-head text-center">{{ ui.route }}</th>
+                <th class="table-head text-center">{{ ui.model }}</th>
+                <th class="table-head text-center">{{ ui.endpoint }}</th>
+                <th class="table-head text-center">{{ ui.outcome }}</th>
+                <th class="table-head text-center">{{ ui.params }}</th>
                 <th class="table-head text-right">{{ ui.actions }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-dark-700">
               <template v-for="(row, index) in items" :key="rowKey(row, index)">
                 <tr class="hover:bg-gray-50 dark:hover:bg-dark-700/50">
-                  <td class="table-cell whitespace-nowrap text-xs text-gray-600 dark:text-gray-300">
+                  <td class="table-cell whitespace-nowrap text-center text-xs text-gray-600 dark:text-gray-300">
                     {{ formatDateTime(row.created_at) || '-' }}
                   </td>
-                  <td class="table-cell">
+                  <td class="table-cell text-center">
                     <span class="inline-flex rounded-full px-2 py-1 text-[11px] font-semibold" :class="kindBadgeClass(row.kind)">
                       {{ row.kind === 'error' ? ui.failed : ui.success }}
                     </span>
                   </td>
                   <td class="table-cell">
-                    <div class="space-y-0.5 text-xs">
-                      <div class="text-gray-700 dark:text-gray-200">{{ ui.userId }}: {{ row.user_id ?? '-' }}</div>
-                      <div class="text-gray-500 dark:text-gray-400">{{ ui.apiKeyId }}: {{ row.api_key_id ?? '-' }}</div>
-                      <div class="text-gray-500 dark:text-gray-400">{{ ui.accountId }}: {{ row.account_id ?? '-' }}</div>
+                    <div class="identity-cell">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <div class="identity-avatar">{{ identityInitial(row) }}</div>
+                        <div class="min-w-0">
+                          <div class="truncate font-semibold text-gray-900 dark:text-white" :title="identityTitle(row)">
+                            {{ displayUserName(row) }}
+                          </div>
+                          <div class="truncate text-xs text-gray-500 dark:text-gray-400" :title="displayUserSecondary(row)">
+                            {{ displayUserSecondary(row) }}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="mt-2 space-y-1 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                        <div class="truncate" :title="displayApiKey(row)">
+                          <span class="field-label">{{ ui.apiKeyId }}:</span>{{ displayApiKey(row) }}
+                        </div>
+                        <div class="truncate" :title="displayAccount(row)">
+                          <span class="field-label">{{ ui.accountId }}:</span>{{ displayAccount(row) }}
+                        </div>
+                        <div class="truncate" :title="displayGroup(row)">
+                          <span class="field-label">{{ ui.groupId }}:</span>{{ displayGroup(row) }}
+                        </div>
+                      </div>
                     </div>
                   </td>
-                  <td class="table-cell">
-                    <div class="space-y-1 text-xs">
+                  <td class="table-cell text-center">
+                    <div class="min-w-0 space-y-1 text-xs">
                       <div class="font-semibold text-gray-800 dark:text-gray-100">{{ formatPlatform(row.platform) }}</div>
-                      <div class="flex flex-wrap gap-1">
+                      <div class="flex flex-wrap justify-center gap-1">
                         <span v-if="row.request_type" class="chip">{{ row.request_type }}</span>
                         <span class="chip">{{ row.stream ? 'stream' : 'sync' }}</span>
                       </div>
                     </div>
                   </td>
-                  <td class="table-cell">
-                    <div class="max-w-[260px] space-y-0.5 text-xs">
+                  <td class="table-cell text-center">
+                    <div class="min-w-0 space-y-0.5 text-xs">
                       <div class="truncate font-medium text-gray-800 dark:text-gray-100" :title="row.model || ''">{{ row.model || '-' }}</div>
                       <div v-if="row.requested_model && row.requested_model !== row.model" class="truncate text-gray-500 dark:text-gray-400" :title="row.requested_model">
                         {{ ui.requested }}: {{ row.requested_model }}
@@ -242,8 +272,8 @@
                       </div>
                     </div>
                   </td>
-                  <td class="table-cell">
-                    <div class="max-w-[280px] space-y-0.5 text-xs">
+                  <td class="table-cell text-center">
+                    <div class="min-w-0 space-y-0.5 text-xs">
                       <div class="truncate text-gray-700 dark:text-gray-200" :title="row.inbound_endpoint || ''">
                         {{ ui.inbound }}: {{ row.inbound_endpoint || '-' }}
                       </div>
@@ -252,7 +282,7 @@
                       </div>
                     </div>
                   </td>
-                  <td class="table-cell">
+                  <td class="table-cell text-center">
                     <div class="space-y-0.5 text-xs">
                       <div>{{ formatDuration(row.duration_ms) }}</div>
                       <div v-if="row.kind === 'error'" class="text-red-600 dark:text-red-300">
@@ -262,7 +292,7 @@
                     </div>
                   </td>
                   <td class="table-cell">
-                    <div v-if="hasParams(row.request_params)" class="flex max-w-[360px] flex-wrap gap-1.5">
+                    <div v-if="hasParams(row.request_params)" class="flex min-w-0 flex-wrap justify-center gap-1.5">
                       <span v-for="param in summaryParams(row.request_params)" :key="param.key" class="param-chip" :title="`${param.key}: ${param.value}`">
                         <span class="text-gray-500 dark:text-gray-400">{{ param.key }}</span>
                         <span class="ml-1 font-medium text-gray-800 dark:text-gray-100">{{ param.value }}</span>
@@ -359,6 +389,7 @@ import {
   type OpsRequestDetailsKind,
   type OpsRequestDetailsParams,
   type OpsRequestDetailsSort,
+  type OpsRequestFilterOption,
   type OpsRequestFilterOptions
 } from '@/api/admin/ops'
 import { useAppStore } from '@/stores'
@@ -405,7 +436,7 @@ const zh = {
   sortCreated: '最新请求',
   sortDuration: '耗时最长',
   search: '搜索',
-  searchPlaceholder: '模型、请求 ID、错误或参数',
+  searchPlaceholder: '模型、请求 ID、用户、邮箱、密钥或参数',
   requestId: '请求 ID',
   model: '模型',
   platform: '平台',
@@ -413,6 +444,8 @@ const zh = {
   apiKeyId: '密钥',
   accountId: '账号',
   groupId: '分组',
+  email: '邮箱',
+  id: 'ID',
   minDuration: '最小耗时 ms',
   maxDuration: '最大耗时 ms',
   apply: '应用筛选',
@@ -465,7 +498,7 @@ const en: typeof zh = {
   sortCreated: 'Newest',
   sortDuration: 'Slowest',
   search: 'Search',
-  searchPlaceholder: 'Model, request ID, error, or params',
+  searchPlaceholder: 'Model, request ID, user, email, key, or params',
   requestId: 'Request ID',
   model: 'Model',
   platform: 'Platform',
@@ -473,6 +506,8 @@ const en: typeof zh = {
   apiKeyId: 'API key',
   accountId: 'Account',
   groupId: 'Group',
+  email: 'Email',
+  id: 'ID',
   minDuration: 'Min duration ms',
   maxDuration: 'Max duration ms',
   apply: 'Apply filters',
@@ -698,18 +733,19 @@ function summaryParams(params: OpsRequestDetail['request_params']): Array<{ key:
   if (!hasParams(params)) return []
   const result: Array<{ key: string; value: string }> = []
   const used = new Set<string>()
+  const maxSummaryParams = 5
 
   for (const key of priorityParamKeys) {
     if (!(key in params)) continue
     result.push({ key, value: formatParamValue(params[key]) })
     used.add(key)
-    if (result.length >= 7) return result
+    if (result.length >= maxSummaryParams) return result
   }
 
   for (const [key, value] of Object.entries(params)) {
     if (used.has(key)) continue
     result.push({ key, value: formatParamValue(value) })
-    if (result.length >= 7) break
+    if (result.length >= maxSummaryParams) break
   }
   return result
 }
@@ -739,10 +775,11 @@ function formatParamValue(value: unknown): string {
 function detailRows(row: OpsRequestDetail): Array<{ label: string; value: string }> {
   return [
     { label: ui.value.requestId, value: row.request_id || '-' },
-    { label: ui.value.userId, value: String(row.user_id ?? '-') },
-    { label: ui.value.apiKeyId, value: String(row.api_key_id ?? '-') },
-    { label: ui.value.accountId, value: String(row.account_id ?? '-') },
-    { label: ui.value.groupId, value: String(row.group_id ?? '-') },
+    { label: ui.value.userId, value: displayUserName(row) },
+    { label: ui.value.email, value: displayUserEmail(row) || '-' },
+    { label: ui.value.apiKeyId, value: displayApiKey(row) },
+    { label: ui.value.accountId, value: displayAccount(row) },
+    { label: ui.value.groupId, value: displayGroup(row) },
     { label: ui.value.platform, value: formatPlatform(row.platform) },
     { label: ui.value.result, value: row.kind === 'error' ? ui.value.failed : ui.value.success },
     { label: ui.value.model, value: row.model || '-' },
@@ -752,6 +789,79 @@ function detailRows(row: OpsRequestDetail): Array<{ label: string; value: string
     { label: ui.value.endpoint, value: row.upstream_endpoint || '-' },
     { label: ui.value.outcome, value: `${formatDuration(row.duration_ms)} / ${row.status_code ?? (row.kind === 'success' ? 200 : '-')}` }
   ]
+}
+
+function cleanText(value?: string | null): string {
+  return String(value || '').trim()
+}
+
+function compactId(id?: number | null): string {
+  return typeof id === 'number' && id > 0 ? `#${id}` : '-'
+}
+
+function labelWithId(name?: string | null, id?: number | null): string {
+  const label = cleanText(name)
+  const suffix = compactId(id)
+  if (!label) return suffix
+  return suffix === '-' ? label : `${label} ${suffix}`
+}
+
+function optionLabel(options: OpsRequestFilterOption[], id?: number | null): string {
+  if (typeof id !== 'number' || id <= 0) return ''
+  return cleanText(options.find((option) => option.value === String(id))?.label)
+}
+
+function optionLabelName(options: OpsRequestFilterOption[], id?: number | null): string {
+  return optionLabel(options, id).replace(/\s*\(#[^)]+\)\s*$/, '').trim()
+}
+
+function displayUserName(row: OpsRequestDetail): string {
+  return (
+    cleanText(row.username) ||
+    optionLabelName(filterOptions.value.users, row.user_id) ||
+    cleanText(row.user_email) ||
+    labelWithId(null, row.user_id)
+  )
+}
+
+function displayUserEmail(row: OpsRequestDetail): string {
+  const email = cleanText(row.user_email)
+  if (email) return email
+  const fallback = optionLabelName(filterOptions.value.users, row.user_id)
+  return fallback.includes('@') ? fallback : ''
+}
+
+function displayUserSecondary(row: OpsRequestDetail): string {
+  const email = displayUserEmail(row)
+  const name = displayUserName(row)
+  if (email && email !== name) return email
+  return compactId(row.user_id)
+}
+
+function displayApiKey(row: OpsRequestDetail): string {
+  return labelWithId(row.api_key_name || optionLabelName(filterOptions.value.api_keys, row.api_key_id), row.api_key_id)
+}
+
+function displayAccount(row: OpsRequestDetail): string {
+  return labelWithId(row.account_name || optionLabelName(filterOptions.value.accounts, row.account_id), row.account_id)
+}
+
+function displayGroup(row: OpsRequestDetail): string {
+  return labelWithId(row.group_name || optionLabelName(filterOptions.value.groups, row.group_id), row.group_id)
+}
+
+function identityTitle(row: OpsRequestDetail): string {
+  const parts = [
+    displayUserName(row),
+    displayUserEmail(row),
+    `${ui.value.id}: ${compactId(row.user_id)}`
+  ].filter((part) => part && part !== '-')
+  return parts.join(' / ')
+}
+
+function identityInitial(row: OpsRequestDetail): string {
+  const value = displayUserName(row)
+  return value && value !== '-' ? value.slice(0, 1).toUpperCase() : '?'
 }
 
 function kindBadgeClass(kind: string): string {
@@ -838,20 +948,36 @@ function assignNonNegativeNumber<K extends keyof OpsRequestDetailsParams>(params
 </script>
 
 <style scoped>
+.requests-table {
+  table-layout: fixed;
+}
+
 .table-head {
-  @apply px-4 py-3 text-left text-[11px] font-semibold uppercase text-gray-500 dark:text-gray-400;
+  @apply whitespace-nowrap px-4 py-3 text-[11px] font-semibold uppercase text-gray-500 dark:text-gray-400;
 }
 
 .table-cell {
-  @apply px-4 py-3 align-top;
+  @apply min-w-0 px-4 py-4 align-middle;
+}
+
+.identity-cell {
+  @apply mx-auto min-w-0 max-w-[280px] text-left;
+}
+
+.identity-avatar {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-200;
+}
+
+.field-label {
+  @apply mr-1 text-gray-400 dark:text-gray-500;
 }
 
 .chip {
-  @apply rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-dark-700 dark:text-gray-300;
+  @apply max-w-full truncate rounded-md bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-dark-700 dark:text-gray-300;
 }
 
 .param-chip {
-  @apply max-w-full truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] dark:border-dark-600 dark:bg-dark-700;
+  @apply inline-flex max-w-full items-center truncate rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] dark:border-dark-600 dark:bg-dark-700;
 }
 
 .icon-button {

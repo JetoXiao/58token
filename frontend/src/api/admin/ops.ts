@@ -133,6 +133,11 @@ export interface OpsRequestDetail {
   api_key_id?: number | null
   account_id?: number | null
   group_id?: number | null
+  user_email?: string
+  username?: string
+  api_key_name?: string
+  account_name?: string
+  group_name?: string
 
   stream?: boolean
   request_params?: Record<string, unknown> | null
