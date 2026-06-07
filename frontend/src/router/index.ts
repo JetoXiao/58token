@@ -10,6 +10,7 @@ import { useAdminSettingsStore } from '@/stores/adminSettings'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
+import { isUserMenuItemEnabled, resolveUserMenuFallbackPath } from '@/utils/userMenuItems'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveDocumentTitle } from './title'
 
@@ -209,7 +210,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Dashboard',
       titleKey: 'dashboard.title',
-      descriptionKey: 'dashboard.welcomeMessage'
+      descriptionKey: 'dashboard.welcomeMessage',
+      userMenuKey: 'dashboard'
     }
   },
   {
@@ -221,7 +223,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'API Keys',
       titleKey: 'keys.title',
-      descriptionKey: 'keys.description'
+      descriptionKey: 'keys.description',
+      userMenuKey: 'api_keys'
     }
   },
   {
@@ -233,7 +236,21 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Usage Records',
       titleKey: 'usage.title',
-      descriptionKey: 'usage.description'
+      descriptionKey: 'usage.description',
+      userMenuKey: 'usage'
+    }
+  },
+  {
+    path: '/image-generation',
+    name: 'ImageGeneration',
+    component: () => import('@/views/user/ImageGenerationView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'AI Image Generation',
+      titleKey: 'imageGeneration.title',
+      descriptionKey: 'imageGeneration.description',
+      userMenuKey: 'image_generation'
     }
   },
   {
@@ -245,7 +262,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Redeem Code',
       titleKey: 'redeem.title',
-      descriptionKey: 'redeem.description'
+      descriptionKey: 'redeem.description',
+      userMenuKey: 'redeem'
     }
   },
   {
@@ -257,7 +275,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Affiliate',
       titleKey: 'affiliate.title',
-      descriptionKey: 'affiliate.description'
+      descriptionKey: 'affiliate.description',
+      userMenuKey: 'affiliate'
     }
   },
   {
@@ -281,7 +300,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Profile',
       titleKey: 'profile.title',
-      descriptionKey: 'profile.description'
+      descriptionKey: 'profile.description',
+      userMenuKey: 'profile'
     }
   },
   {
@@ -293,7 +313,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Subscriptions',
       titleKey: 'userSubscriptions.title',
-      descriptionKey: 'userSubscriptions.description'
+      descriptionKey: 'userSubscriptions.description',
+      userMenuKey: 'subscriptions'
     }
   },
   {
@@ -306,7 +327,8 @@ const routes: RouteRecordRaw[] = [
       title: 'Purchase Subscription',
       titleKey: 'nav.buySubscription',
       descriptionKey: 'purchase.description',
-      requiresPayment: true
+      requiresPayment: true,
+      userMenuKey: 'purchase'
     }
   },
   {
@@ -318,7 +340,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Orders',
       titleKey: 'nav.myOrders',
-      requiresPayment: true
+      requiresPayment: true,
+      userMenuKey: 'orders'
     }
   },
   {
@@ -330,7 +353,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Payment',
       titleKey: 'payment.qr.scanToPay',
-      requiresPayment: true
+      requiresPayment: true,
+      userMenuKey: 'purchase'
     }
   },
   {
@@ -492,7 +516,8 @@ const routes: RouteRecordRaw[] = [
       requiresAuth: true,
       requiresAdmin: false,
       title: 'Channel Status',
-      titleKey: 'nav.channelStatus'
+      titleKey: 'nav.channelStatus',
+      userMenuKey: 'channel_status'
     }
   },
   {
@@ -860,6 +885,17 @@ router.beforeEach(async (to, _from, next) => {
     // User is authenticated but not admin, redirect to user dashboard
     next('/dashboard')
     return
+  }
+
+  if (!authStore.isAdmin && to.meta.userMenuKey) {
+    const settings = appStore.publicSettingsLoaded
+      ? appStore.cachedPublicSettings
+      : await appStore.fetchPublicSettings()
+    const userMenuItems = settings?.user_menu_items ?? appStore.cachedPublicSettings?.user_menu_items
+    if (!isUserMenuItemEnabled(userMenuItems, to.meta.userMenuKey)) {
+      next(resolveUserMenuFallbackPath(userMenuItems))
+      return
+    }
   }
 
 

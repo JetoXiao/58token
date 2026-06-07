@@ -5,6 +5,7 @@
 
 import { apiClient } from "../client";
 import type {
+  AffiliatePartnerTier,
   CustomEndpoint,
   CustomMenuItem,
   LoginAgreementDocument,
@@ -332,6 +333,7 @@ export interface SystemSettings {
   affiliate_rebate_duration_days: number;
   affiliate_rebate_per_invitee_cap: number;
   affiliate_group_profit_rates: Record<string, number>;
+  affiliate_partner_tiers: AffiliatePartnerTier[];
   default_concurrency: number;
   default_user_rpm_limit: number;
   default_subscriptions: DefaultSubscriptionSetting[];
@@ -385,6 +387,7 @@ export interface SystemSettings {
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
   marketing_nav_items: string[];
+  user_menu_items: string[];
   custom_endpoints: CustomEndpoint[];
   // SMTP settings
   smtp_host: string;
@@ -584,6 +587,7 @@ export interface UpdateSettingsRequest {
   affiliate_rebate_duration_days?: number;
   affiliate_rebate_per_invitee_cap?: number;
   affiliate_group_profit_rates?: Record<string, number>;
+  affiliate_partner_tiers?: AffiliatePartnerTier[];
   default_concurrency?: number;
   default_user_rpm_limit?: number;
   default_subscriptions?: DefaultSubscriptionSetting[];
@@ -636,6 +640,7 @@ export interface UpdateSettingsRequest {
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
   marketing_nav_items?: string[];
+  user_menu_items?: string[];
   custom_endpoints?: CustomEndpoint[];
   smtp_host?: string;
   smtp_port?: number;

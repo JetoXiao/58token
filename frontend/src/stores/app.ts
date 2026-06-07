@@ -13,6 +13,7 @@ import {
   type ReleaseInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
+import { DEFAULT_USER_MENU_ITEMS } from '@/utils/userMenuItems'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -44,6 +45,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Auto-incrementing ID for toasts
   let toastIdCounter = 0
+  let publicSettingsRequest: Promise<PublicSettings | null> | null = null
 
   // ==================== Computed ====================
 
@@ -340,6 +342,7 @@ export const useAppStore = defineStore('app', () => {
         table_page_size_options: [10, 20, 50, 100],
         custom_menu_items: [],
         marketing_nav_items: ['models', 'docs', 'partner'],
+        user_menu_items: [...DEFAULT_USER_MENU_ITEMS],
         custom_endpoints: [],
         linuxdo_oauth_enabled: false,
         wechat_oauth_enabled: false,
@@ -363,22 +366,29 @@ export const useAppStore = defineStore('app', () => {
       }
     }
 
-    // Prevent duplicate requests
-    if (publicSettingsLoading.value) {
-      return null
+    // Share an in-flight request so route guards can wait for the same settings.
+    if (publicSettingsRequest && !force) {
+      return publicSettingsRequest
     }
 
     publicSettingsLoading.value = true
-    try {
-      const data = await fetchPublicSettingsAPI()
-      applySettings(data)
-      return data
-    } catch (error) {
-      console.error('Failed to fetch public settings:', error)
-      return null
-    } finally {
-      publicSettingsLoading.value = false
-    }
+    const request = fetchPublicSettingsAPI()
+      .then((data) => {
+        applySettings(data)
+        return data
+      })
+      .catch((error) => {
+        console.error('Failed to fetch public settings:', error)
+        return null
+      })
+      .finally(() => {
+        if (publicSettingsRequest === request) {
+          publicSettingsLoading.value = false
+          publicSettingsRequest = null
+        }
+      })
+    publicSettingsRequest = request
+    return request
   }
 
   /**
@@ -387,6 +397,8 @@ export const useAppStore = defineStore('app', () => {
   function clearPublicSettingsCache(): void {
     publicSettingsLoaded.value = false
     cachedPublicSettings.value = null
+    publicSettingsRequest = null
+    publicSettingsLoading.value = false
   }
 
   /**

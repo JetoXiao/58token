@@ -171,6 +171,150 @@ export default {
     }
   },
 
+  imageGeneration: {
+    eyebrow: 'Creative workspace',
+    title: 'AI Image Studio',
+    description: 'Turn ideas into production-ready images with your existing API keys, model routing, and billing rules.',
+    compose: {
+      title: 'Create',
+      subtitle: 'Choose an image-enabled API key, then describe what you want to make.'
+    },
+    form: {
+      apiKey: 'Image API key',
+      noGroup: 'No group',
+      model: 'Model',
+      modelPlaceholder: 'gpt-image-2',
+      noSupportedModels: 'No image models are available for this key group',
+      prompt: 'Prompt',
+      promptPlaceholder: 'Describe the subject, style, composition, lighting, colors, and any exact text you need in the image...',
+      promptHint: 'Specific prompts usually produce more consistent results.',
+      size: 'Canvas size',
+      quality: 'Quality',
+      count: 'Outputs',
+      templates: 'Prompt starters'
+    },
+    emptyKeys: {
+      title: 'No image-enabled API key',
+      description: 'Create or update an active OpenAI API key in a group that allows image generation.',
+      action: 'Manage API keys'
+    },
+    sizes: {
+      square1k: 'Square 1024 x 1024',
+      landscape1_5k: 'Landscape 1536 x 1024',
+      portrait1_5k: 'Portrait 1024 x 1536',
+      square2k: 'Square 2048 x 2048',
+      landscape2k: 'Landscape 2048 x 1152',
+      square2880: 'Square 2880 x 2880',
+      landscape4k: 'Landscape 3840 x 2160',
+      portrait4k: 'Portrait 2160 x 3840'
+    },
+    customSize: {
+      add: 'Custom size...',
+      current: 'Current size: {size}',
+      width: 'Width',
+      height: 'Height',
+      hint: 'Saved sizes are added to this list and kept in this browser.',
+      optionLabel: 'Custom {size}',
+      saved: 'Custom size saved',
+      errors: {
+        format: 'Enter a valid width and height.',
+        maxSide: 'Width and height must both be {max} px or less.',
+        multiple: 'Width and height must both be multiples of {step}.',
+        ratio: 'The long-side to short-side ratio cannot exceed {ratio}.',
+        pixels: 'Total pixels must be between {min} and {max}.'
+      }
+    },
+    sizeRules: {
+      title: 'Image size rules',
+      summary: 'Preset and custom sizes must satisfy all of these constraints:',
+      maxSide: 'The longest side must be 3840 px or less.',
+      multiple: 'Both width and height must be multiples of 16.',
+      ratio: 'The long-side to short-side ratio cannot exceed 3:1.',
+      pixels: 'Total pixels must be between 655,360 and 8,294,400.',
+      presets: 'All sizes in this list already meet these rules.'
+    },
+    pricing: {
+      title: 'Estimated price',
+      tier: '{tier} tier',
+      noKey: 'Choose an image-enabled API key to preview the estimated charge.',
+      configuredDescription: 'Estimated from the current group image price. Outputs: {count}.',
+      defaultDescription: 'This group has no configured price for this size tier. The final charge will use the server default model price.',
+      multiplier: 'Multiplier',
+      unitPrice: 'Per image',
+      estimatedTotal: 'Estimated total',
+      serverDefault: 'Server default',
+      serverCalculated: 'Server calculated'
+    },
+    qualities: {
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+      auto: 'Auto'
+    },
+    templates: {
+      product: {
+        title: 'Product shot',
+        description: 'Clean commercial image for a real product.',
+        prompt: 'Create a clean product image on a neutral studio background. Show the object clearly, use soft directional lighting, realistic materials, crisp edges, and enough negative space for interface placement.'
+      },
+      poster: {
+        title: 'Campaign poster',
+        description: 'Bold editorial composition with readable text.',
+        prompt: 'Design a polished campaign poster with a clear visual hierarchy, refined typography, strong focal image, restrained color palette, and readable headline text. Keep the composition modern and premium.'
+      },
+      icon: {
+        title: 'App icon',
+        description: 'Compact brand asset with strong silhouette.',
+        prompt: 'Create a modern app icon with a simple geometric symbol, strong silhouette, balanced contrast, subtle depth, and a transparent or clean solid background. Avoid tiny unreadable details.'
+      },
+      infographic: {
+        title: 'Infographic',
+        description: 'Structured visual explanation for social posts.',
+        prompt: 'Create a minimal infographic with a central topic node and four surrounding content modules. Use clean line icons, clear labels, balanced spacing, and a calm professional visual style.'
+      }
+    },
+    actions: {
+      generating: 'Generating...',
+      generate: 'Generate',
+      downloadAll: 'Download all',
+      download: 'Download'
+    },
+    preview: {
+      title: 'Preview',
+      generating: 'Request submitted. Waiting for the server response. {seconds}s elapsed.',
+      readyOne: '1 image ready',
+      readyMany: '{count} images ready',
+      idle: 'Generated images will appear here.',
+      emptyTitle: 'Ready when you are',
+      emptyDescription: 'Write a prompt or start from a template, then generate images through your active API key.',
+      runningTitle: 'Generating images',
+      runningDescription: 'The request has been sent to the gateway. Image generation can take a little while; results will appear here automatically.',
+      elapsed: 'Elapsed',
+      elapsedSeconds: '{seconds}s',
+      requestId: 'Generation request ID',
+      logHint: 'Copy this ID into the ops log client_request_id filter to confirm the request reached the backend.',
+      imageAlt: 'Generated image {number}',
+      imageNumber: 'Image {number}',
+      fullscreenAlt: 'Full-screen generated image'
+    },
+    history: {
+      title: 'Recent generations',
+      subtitle: 'Saved locally in this browser for quick reuse.',
+      clear: 'Clear',
+      empty: 'No recent images yet.'
+    },
+    errors: {
+      loadKeysFailed: 'Failed to load API keys',
+      noImages: 'The gateway returned no images.',
+      partialImages: 'Generated {count}/{requested} images. The remaining images were not returned.',
+      generateFailed: 'Image generation failed'
+    },
+    messages: {
+      generated: 'Image generation complete',
+      requestIdCopied: 'Generation request ID copied'
+    }
+  },
+
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key Usage',
@@ -410,6 +554,7 @@ export default {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
     apiKeys: 'API Keys',
+    imageGeneration: 'AI Images',
     usage: 'Usage',
     requests: 'Requests',
     redeem: 'Redeem',

@@ -55,6 +55,48 @@ func TestClientRequestID_PreservesExisting(t *testing.T) {
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
+func TestClientRequestID_UsesValidIncomingHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(ClientRequestID())
+	r.GET("/t", func(c *gin.Context) {
+		id, ok := c.Request.Context().Value(ctxkey.ClientRequestID).(string)
+		require.True(t, ok)
+		require.Equal(t, "img-123_test.4", id)
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set(clientRequestIDHeader, " img-123_test.4 ")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, "img-123_test.4", w.Header().Get(clientRequestIDHeader))
+}
+
+func TestClientRequestID_IgnoresInvalidIncomingHeader(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	r.Use(ClientRequestID())
+	r.GET("/t", func(c *gin.Context) {
+		id, ok := c.Request.Context().Value(ctxkey.ClientRequestID).(string)
+		require.True(t, ok)
+		require.NotEmpty(t, id)
+		require.NotEqual(t, "bad value", id)
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set(clientRequestIDHeader, "bad value")
+	r.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.NotEmpty(t, w.Header().Get(clientRequestIDHeader))
+	require.NotEqual(t, "bad value", w.Header().Get(clientRequestIDHeader))
+}
+
 func TestRequestBodyLimit_LimitsBody(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

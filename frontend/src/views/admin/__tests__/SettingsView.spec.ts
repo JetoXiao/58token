@@ -289,6 +289,41 @@ const baseSettingsResponse = {
   totp_enabled: false,
   totp_encryption_key_configured: false,
   default_balance: 0,
+  affiliate_rebate_rate: 20,
+  affiliate_rebate_freeze_hours: 0,
+  affiliate_rebate_duration_days: 0,
+  affiliate_rebate_per_invitee_cap: 0,
+  affiliate_group_profit_rates: {},
+  affiliate_partner_tiers: [
+    {
+      level: "spark",
+      name: "Spark",
+      rebate_rate_percent: 40,
+      required_invitees: 10,
+      next_required_invitees: 30,
+    },
+    {
+      level: "voyage",
+      name: "Voyage",
+      rebate_rate_percent: 50,
+      required_invitees: 30,
+      next_required_invitees: 50,
+    },
+    {
+      level: "summit",
+      name: "Summit",
+      rebate_rate_percent: 60,
+      required_invitees: 50,
+      next_required_invitees: 100,
+    },
+    {
+      level: "cocreate",
+      name: "Co-create",
+      rebate_rate_percent: 70,
+      required_invitees: 100,
+      next_required_invitees: null,
+    },
+  ],
   default_concurrency: 1,
   default_subscriptions: [],
   site_name: "UseAiForMe",
@@ -304,6 +339,19 @@ const baseSettingsResponse = {
   backend_mode_enabled: false,
   custom_menu_items: [],
   marketing_nav_items: ["models", "docs", "partner"],
+  user_menu_items: [
+    "dashboard",
+    "api_keys",
+    "image_generation",
+    "usage",
+    "channel_status",
+    "subscriptions",
+    "purchase",
+    "orders",
+    "redeem",
+    "affiliate",
+    "profile",
+  ],
   custom_endpoints: [],
   frontend_url: "",
   smtp_host: "",
@@ -620,6 +668,46 @@ describe("admin SettingsView payment visible method controls", () => {
     for (const item of items) {
       expect(
         wrapper.get(`[data-testid="marketing-nav-${item}"]`).attributes(
+          "aria-pressed",
+        ),
+      ).toBe("false");
+    }
+  });
+
+  it("keeps user menu items hidden when the update response omits them", async () => {
+    updateSettings.mockImplementationOnce(async (payload) => {
+      const {
+        user_menu_items: _userMenuItems,
+        ...response
+      } = {
+        ...baseSettingsResponse,
+        ...payload,
+      };
+      return response;
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    const items = ["image_generation", "redeem", "affiliate"];
+    for (const item of items) {
+      const button = wrapper.get(`[data-testid="user-menu-${item}"]`);
+      expect(button.attributes("aria-pressed")).toBe("true");
+      await button.trigger("click");
+    }
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(updateSettings).toHaveBeenCalledTimes(1);
+    expect(updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_menu_items: expect.not.arrayContaining(items),
+      }),
+    );
+    for (const item of items) {
+      expect(
+        wrapper.get(`[data-testid="user-menu-${item}"]`).attributes(
           "aria-pressed",
         ),
       ).toBe("false");

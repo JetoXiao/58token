@@ -141,6 +141,7 @@ type SystemSettings struct {
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
 	MarketingNavItems           string // JSON array of marketing navbar item keys
+	UserMenuItems               string // JSON array of built-in user menu item keys
 	CustomEndpoints             string // JSON array of custom endpoints
 
 	DefaultConcurrency           int
@@ -260,6 +261,7 @@ type PublicSettings struct {
 	TablePageSizeOptions        []int
 	CustomMenuItems             string // JSON array of custom menu items
 	MarketingNavItems           string // JSON array of marketing navbar item keys
+	UserMenuItems               string // JSON array of built-in user menu item keys
 	CustomEndpoints             string // JSON array of custom endpoints
 
 	LinuxDoOAuthEnabled      bool

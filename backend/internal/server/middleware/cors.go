@@ -12,7 +12,7 @@ import (
 
 var corsWarningOnce sync.Once
 
-// CORS 跨域中间件
+// CORS returns the configured cross-origin middleware.
 func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 	allowedOrigins := normalizeOrigins(cfg.AllowedOrigins)
 	allowAll := false
@@ -52,9 +52,9 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 	}
 	allowHeaders := []string{
 		"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token", "Authorization",
-		"accept", "origin", "Cache-Control", "X-Requested-With", "X-API-Key",
+		"accept", "origin", "Cache-Control", "X-Requested-With", "X-API-Key", "X-Client-Request-ID",
 	}
-	// OpenAI Node SDK 会发送 x-stainless-* 请求头，需在 CORS 中显式放行。
+	// The OpenAI Node SDK sends x-stainless-* request headers, so allow them explicitly.
 	openAIProperties := []string{
 		"lang", "package-version", "os", "arch", "retry-count", "runtime",
 		"runtime-version", "async", "helper-method", "poll-helper", "custom-poll-interval", "timeout",
@@ -83,10 +83,9 @@ func CORS(cfg config.CORSConfig) gin.HandlerFunc {
 			}
 			c.Writer.Header().Set("Access-Control-Allow-Headers", allowHeadersValue)
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag")
+			c.Writer.Header().Set("Access-Control-Expose-Headers", "ETag, X-Request-ID, X-Client-Request-ID")
 			c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 		}
-		// 处理预检请求
 		if c.Request.Method == http.MethodOptions {
 			if originAllowed {
 				c.AbortWithStatus(http.StatusNoContent)

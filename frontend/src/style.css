@@ -9,11 +9,13 @@
 
   html {
     @apply scroll-smooth antialiased;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-[#f7f8fb] text-gray-900 dark:bg-[#05060a] dark:text-gray-100;
     @apply min-h-screen;
+    overflow-x: hidden;
     font-feature-settings:
       'cv02',
       'cv03',

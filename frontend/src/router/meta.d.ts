@@ -4,6 +4,7 @@
  */
 
 import 'vue-router'
+import type { UserMenuItem } from '@/utils/userMenuItems'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -48,6 +49,11 @@ declare module 'vue-router' {
      * @default false
      */
     requiresPayment?: boolean
+
+    /**
+     * Built-in user menu item that controls whether this user route is available.
+     */
+    userMenuKey?: UserMenuItem
 
     /**
      * 是否要求风控中心功能开关已启用

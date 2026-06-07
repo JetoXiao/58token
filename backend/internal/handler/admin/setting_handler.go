@@ -225,6 +225,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		TablePageSizeOptions:                   settings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(settings.CustomMenuItems),
 		MarketingNavItems:                      service.ParseMarketingNavItems(settings.MarketingNavItems),
+		UserMenuItems:                          service.ParseUserMenuItems(settings.UserMenuItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(settings.CustomEndpoints),
 		DefaultConcurrency:                     settings.DefaultConcurrency,
 		DefaultBalance:                         settings.DefaultBalance,
@@ -503,6 +504,7 @@ type UpdateSettingsRequest struct {
 	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
 	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
 	MarketingNavItems           *[]string             `json:"marketing_nav_items"`
+	UserMenuItems               *[]string             `json:"user_menu_items"`
 	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
 
 	// 默认配置
@@ -1362,6 +1364,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	if req.MarketingNavItems != nil {
 		marketingNavItemsJSON = service.MarketingNavItemsJSON(*req.MarketingNavItems)
 	}
+	userMenuItemsJSON := previousSettings.UserMenuItems
+	if req.UserMenuItems != nil {
+		userMenuItemsJSON = service.UserMenuItemsJSON(*req.UserMenuItems)
+	}
 
 	customEndpointsJSON := previousSettings.CustomEndpoints
 	if req.CustomEndpoints != nil {
@@ -1575,6 +1581,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TablePageSizeOptions:                   req.TablePageSizeOptions,
 		CustomMenuItems:                        customMenuJSON,
 		MarketingNavItems:                      marketingNavItemsJSON,
+		UserMenuItems:                          userMenuItemsJSON,
 		CustomEndpoints:                        customEndpointsJSON,
 		DefaultConcurrency:                     req.DefaultConcurrency,
 		DefaultBalance:                         req.DefaultBalance,
@@ -2004,6 +2011,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		TablePageSizeOptions:                   updatedSettings.TablePageSizeOptions,
 		CustomMenuItems:                        dto.ParseCustomMenuItems(updatedSettings.CustomMenuItems),
 		MarketingNavItems:                      service.ParseMarketingNavItems(updatedSettings.MarketingNavItems),
+		UserMenuItems:                          service.ParseUserMenuItems(updatedSettings.UserMenuItems),
 		CustomEndpoints:                        dto.ParseCustomEndpoints(updatedSettings.CustomEndpoints),
 		DefaultConcurrency:                     updatedSettings.DefaultConcurrency,
 		DefaultBalance:                         updatedSettings.DefaultBalance,
@@ -2486,6 +2494,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.MarketingNavItems != after.MarketingNavItems {
 		changed = append(changed, "marketing_nav_items")
+	}
+	if before.UserMenuItems != after.UserMenuItems {
+		changed = append(changed, "user_menu_items")
 	}
 	if before.CustomEndpoints != after.CustomEndpoints {
 		changed = append(changed, "custom_endpoints")

@@ -171,6 +171,150 @@ export default {
     }
   },
 
+  imageGeneration: {
+    eyebrow: '创作工作台',
+    title: 'AI 生图工坊',
+    description: '使用现有 API 密钥、模型路由和计费规则，把想法直接生成可用图片。',
+    compose: {
+      title: '开始创作',
+      subtitle: '选择已开启生图权限的 API 密钥，再描述你想生成的画面。'
+    },
+    form: {
+      apiKey: '生图 API 密钥',
+      noGroup: '未分组',
+      model: '模型',
+      modelPlaceholder: 'gpt-image-2',
+      noSupportedModels: '当前密钥分组暂无可用生图模型',
+      prompt: '提示词',
+      promptPlaceholder: '描述主体、风格、构图、光线、配色，以及画面里必须出现的文字...',
+      promptHint: '提示词越具体，生成结果通常越稳定。',
+      size: '画布尺寸',
+      quality: '质量',
+      count: '生成数量',
+      templates: '提示词模板'
+    },
+    emptyKeys: {
+      title: '暂无可生图的 API 密钥',
+      description: '请创建或更新一个启用中的 OpenAI API 密钥，并确保所在分组已允许生图。',
+      action: '管理 API 密钥'
+    },
+    sizes: {
+      square1k: '方图 1024 x 1024',
+      landscape1_5k: '横图 1536 x 1024',
+      portrait1_5k: '竖图 1024 x 1536',
+      square2k: '方图 2048 x 2048',
+      landscape2k: '横图 2048 x 1152',
+      square2880: '方图 2880 x 2880',
+      landscape4k: '横图 3840 x 2160',
+      portrait4k: '竖图 2160 x 3840'
+    },
+    customSize: {
+      add: '自定义尺寸...',
+      current: '当前尺寸：{size}',
+      width: '宽度',
+      height: '高度',
+      hint: '保存后会加入下拉列表，并在当前浏览器保留。',
+      optionLabel: '自定义 {size}',
+      saved: '自定义尺寸已保存',
+      errors: {
+        format: '请输入有效的宽度和高度。',
+        maxSide: '宽和高都不能超过 {max} px。',
+        multiple: '宽和高都必须是 {step} 的倍数。',
+        ratio: '长边与短边的比例不能超过 {ratio}。',
+        pixels: '总像素需在 {min} 到 {max} 之间。'
+      }
+    },
+    sizeRules: {
+      title: '生图尺寸规则',
+      summary: '预设或自定义尺寸需要同时满足这些条件：',
+      maxSide: '最大边长不能超过 3840 px。',
+      multiple: '宽和高都必须是 16 的倍数。',
+      ratio: '长边与短边的比例不能超过 3:1。',
+      pixels: '总像素需在 655,360 到 8,294,400 之间。',
+      presets: '当前下拉列表中的尺寸都已经符合这些规则。'
+    },
+    pricing: {
+      title: '预计价格',
+      tier: '{tier} 档',
+      noKey: '选择可生图 API 密钥后展示预计扣费。',
+      configuredDescription: '按当前分组配置价格预估，数量：{count}。',
+      defaultDescription: '当前分组未配置该尺寸档位价格，实际扣费将由服务端默认模型价格计算。',
+      multiplier: '倍率',
+      unitPrice: '单张扣费',
+      estimatedTotal: '预计总计',
+      serverDefault: '服务端默认',
+      serverCalculated: '服务端计算'
+    },
+    qualities: {
+      high: '高质量',
+      medium: '中等',
+      low: '快速',
+      auto: '自动'
+    },
+    templates: {
+      product: {
+        title: '产品图',
+        description: '适合真实商品的干净商业图。',
+        prompt: '生成一张干净的产品展示图，使用中性影棚背景，清晰呈现主体，柔和定向光，材质真实，边缘锐利，并保留足够留白用于界面排版。'
+      },
+      poster: {
+        title: '活动海报',
+        description: '有视觉重心且文字清晰的海报。',
+        prompt: '设计一张精致的活动海报，层级清晰，字体优雅，视觉主体突出，配色克制，标题文字可读，整体现代且有高级感。'
+      },
+      icon: {
+        title: '应用图标',
+        description: '轮廓鲜明的小尺寸品牌资产。',
+        prompt: '生成一个现代应用图标，使用简洁几何符号，轮廓鲜明，对比平衡，带有轻微纵深，背景透明或纯色干净，避免过小且不可读的细节。'
+      },
+      infographic: {
+        title: '信息图',
+        description: '适合社媒发布的结构化说明图。',
+        prompt: '生成一张极简信息图，中心为主题节点，周围四个内容模块，使用干净线性图标、清晰标签、均衡留白和沉稳专业的视觉风格。'
+      }
+    },
+    actions: {
+      generating: '生成中...',
+      generate: '生成图片',
+      downloadAll: '全部下载',
+      download: '下载'
+    },
+    preview: {
+      title: '预览',
+      generating: '请求已提交，正在等待服务端返回，已等待 {seconds} 秒。',
+      readyOne: '已生成 1 张图片',
+      readyMany: '已生成 {count} 张图片',
+      idle: '生成结果会显示在这里。',
+      emptyTitle: '准备好了就开始',
+      emptyDescription: '输入提示词，或从模板开始，通过你的启用中 API 密钥生成图片。',
+      runningTitle: '正在生成图片',
+      runningDescription: '请求已经发到网关，图片生成通常需要一点时间。完成后结果会自动显示在这里。',
+      elapsed: '等待时间',
+      elapsedSeconds: '{seconds} 秒',
+      requestId: '生成请求 ID',
+      logHint: '可复制这个 ID 到运营日志的 client_request_id 里搜索，确认请求是否进入后端。',
+      imageAlt: '生成图片 {number}',
+      imageNumber: '图片 {number}',
+      fullscreenAlt: '全屏生成图片'
+    },
+    history: {
+      title: '最近生成',
+      subtitle: '仅保存在当前浏览器，方便快速复用。',
+      clear: '清空',
+      empty: '还没有最近生成记录。'
+    },
+    errors: {
+      loadKeysFailed: '加载 API 密钥失败',
+      noImages: '网关没有返回图片。',
+      partialImages: '已生成 {count}/{requested} 张图片，剩余图片未返回。',
+      generateFailed: '生图失败'
+    },
+    messages: {
+      generated: '图片生成完成',
+      requestIdCopied: '生成请求 ID 已复制'
+    }
+  },
+
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key 用量查询',
@@ -410,6 +554,7 @@ export default {
     dashboard: '仪表盘',
     announcements: '公告',
     apiKeys: 'API 密钥',
+    imageGeneration: 'AI 生图',
     usage: '使用记录',
     requests: '请求',
     redeem: '兑换',

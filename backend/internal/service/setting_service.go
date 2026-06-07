@@ -665,6 +665,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyTablePageSizeOptions,
 		SettingKeyCustomMenuItems,
 		SettingKeyMarketingNavItems,
+		SettingKeyUserMenuItems,
 		SettingKeyCustomEndpoints,
 		SettingKeyLinuxDoConnectEnabled,
 		SettingKeyDingTalkConnectEnabled,
@@ -790,6 +791,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		TablePageSizeOptions:             tablePageSizeOptions,
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
 		MarketingNavItems:                NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
+		UserMenuItems:                    NormalizeUserMenuItemsJSON(settings[SettingKeyUserMenuItems]),
 		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
 		LinuxDoOAuthEnabled:              linuxDoEnabled,
 		DingTalkOAuthEnabled:             dingTalkEnabled,
@@ -852,8 +854,22 @@ func clampChannelMonitorInterval(v int) int {
 }
 
 const defaultMarketingNavItemsJSON = `["models","docs","partner"]`
+const defaultUserMenuItemsJSON = `["dashboard","api_keys","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","profile"]`
 
 var marketingNavItemOrder = []string{"models", "docs", "partner"}
+var userMenuItemOrder = []string{
+	"dashboard",
+	"api_keys",
+	"image_generation",
+	"usage",
+	"channel_status",
+	"subscriptions",
+	"purchase",
+	"orders",
+	"redeem",
+	"affiliate",
+	"profile",
+}
 
 // ParseMarketingNavItems parses the stored marketing navbar item list.
 // Missing or invalid settings fall back to all default entries; an explicit
@@ -905,6 +921,79 @@ func normalizeMarketingNavItems(items []string) []string {
 	}
 	normalized := make([]string, 0, len(marketingNavItemOrder))
 	for _, item := range marketingNavItemOrder {
+		if _, ok := enabled[item]; ok {
+			normalized = append(normalized, item)
+		}
+	}
+	return normalized
+}
+
+// ParseUserMenuItems parses the stored built-in user menu item list.
+// Missing or invalid settings fall back to all default entries; an explicit
+// empty JSON array is preserved so admins can hide every built-in user menu.
+func ParseUserMenuItems(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return append([]string(nil), userMenuItemOrder...)
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return append([]string(nil), userMenuItemOrder...)
+	}
+	return normalizeUserMenuItems(items)
+}
+
+func UserMenuItemsJSON(items []string) string {
+	normalized := normalizeUserMenuItems(items)
+	data, err := json.Marshal(normalized)
+	if err != nil {
+		return defaultUserMenuItemsJSON
+	}
+	return string(data)
+}
+
+func NormalizeUserMenuItemsJSON(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultUserMenuItemsJSON
+	}
+	var items []string
+	if err := json.Unmarshal([]byte(raw), &items); err != nil {
+		return defaultUserMenuItemsJSON
+	}
+	return UserMenuItemsJSON(items)
+}
+
+func normalizeUserMenuItems(items []string) []string {
+	enabled := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		switch strings.TrimSpace(item) {
+		case "dashboard":
+			enabled["dashboard"] = struct{}{}
+		case "api_keys", "keys":
+			enabled["api_keys"] = struct{}{}
+		case "image_generation", "image-generation":
+			enabled["image_generation"] = struct{}{}
+		case "usage":
+			enabled["usage"] = struct{}{}
+		case "channel_status", "monitor":
+			enabled["channel_status"] = struct{}{}
+		case "subscriptions":
+			enabled["subscriptions"] = struct{}{}
+		case "purchase":
+			enabled["purchase"] = struct{}{}
+		case "orders":
+			enabled["orders"] = struct{}{}
+		case "redeem":
+			enabled["redeem"] = struct{}{}
+		case "affiliate":
+			enabled["affiliate"] = struct{}{}
+		case "profile":
+			enabled["profile"] = struct{}{}
+		}
+	}
+	normalized := make([]string, 0, len(userMenuItemOrder))
+	for _, item := range userMenuItemOrder {
 		if _, ok := enabled[item]; ok {
 			normalized = append(normalized, item)
 		}
@@ -1105,6 +1194,7 @@ type PublicSettingsInjectionPayload struct {
 	TablePageSizeOptions             []int                    `json:"table_page_size_options"`
 	CustomMenuItems                  json.RawMessage          `json:"custom_menu_items"`
 	MarketingNavItems                json.RawMessage          `json:"marketing_nav_items"`
+	UserMenuItems                    json.RawMessage          `json:"user_menu_items"`
 	CustomEndpoints                  json.RawMessage          `json:"custom_endpoints"`
 	LinuxDoOAuthEnabled              bool                     `json:"linuxdo_oauth_enabled"`
 	DingTalkOAuthEnabled             bool                     `json:"dingtalk_oauth_enabled"`
@@ -1171,6 +1261,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		TablePageSizeOptions:             settings.TablePageSizeOptions,
 		CustomMenuItems:                  filterUserVisibleMenuItems(settings.CustomMenuItems),
 		MarketingNavItems:                safeRawJSONArray(settings.MarketingNavItems),
+		UserMenuItems:                    safeRawJSONArray(settings.UserMenuItems),
 		CustomEndpoints:                  safeRawJSONArray(settings.CustomEndpoints),
 		LinuxDoOAuthEnabled:              settings.LinuxDoOAuthEnabled,
 		DingTalkOAuthEnabled:             settings.DingTalkOAuthEnabled,
@@ -1772,6 +1863,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyTablePageSizeOptions] = string(tablePageSizeOptionsJSON)
 	updates[SettingKeyCustomMenuItems] = settings.CustomMenuItems
 	updates[SettingKeyMarketingNavItems] = NormalizeMarketingNavItemsJSON(settings.MarketingNavItems)
+	updates[SettingKeyUserMenuItems] = NormalizeUserMenuItemsJSON(settings.UserMenuItems)
 	updates[SettingKeyCustomEndpoints] = settings.CustomEndpoints
 
 	// 默认配置
@@ -2593,6 +2685,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyTablePageSizeOptions:                      "[10,20,50,100]",
 		SettingKeyCustomMenuItems:                           "[]",
 		SettingKeyMarketingNavItems:                         defaultMarketingNavItemsJSON,
+		SettingKeyUserMenuItems:                             defaultUserMenuItemsJSON,
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyWeChatConnectEnabled:                      "false",
 		SettingKeyWeChatConnectAppID:                        "",
@@ -2788,6 +2881,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
 		MarketingNavItems:                NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
+		UserMenuItems:                    NormalizeUserMenuItemsJSON(settings[SettingKeyUserMenuItems]),
 		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 	}

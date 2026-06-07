@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-[#f7f8fb] dark:bg-[#05060a]">
+  <div class="min-h-screen overflow-x-hidden bg-[#f7f8fb] dark:bg-[#05060a]">
     <!-- Background Decoration -->
     <div class="pointer-events-none fixed inset-0 bg-mesh-gradient opacity-90"></div>
     <div class="pointer-events-none fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:72px_72px] opacity-0 dark:opacity-100"></div>

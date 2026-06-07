@@ -4380,6 +4380,48 @@
                 </div>
               </div>
 
+              <div class="rounded-lg border border-gray-100 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/50">
+                <div>
+                  <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                    {{ localText("用户侧菜单", "User Menu") }}
+                  </h3>
+                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText("控制登录用户侧边栏展示哪些内置菜单；关闭后对应页面也会阻止普通用户访问。", "Control which built-in sidebar menus are shown to signed-in users; disabled entries also block normal user access to the matching page.") }}
+                  </p>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <button
+                    v-for="item in userMenuOptions"
+                    :key="item.value"
+                    type="button"
+                    :data-testid="`user-menu-${item.value}`"
+                    class="flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-900"
+                    :class="isUserMenuItemSelected(item.value)
+                      ? 'border-primary-300 bg-primary-50/80 dark:border-primary-500/60 dark:bg-primary-900/20'
+                      : 'border-gray-200 bg-white hover:border-primary-200 hover:bg-primary-50/40 dark:border-dark-600 dark:bg-dark-900/70 dark:hover:border-primary-500/40 dark:hover:bg-primary-900/10'"
+                    :aria-pressed="isUserMenuItemSelected(item.value)"
+                    @click="toggleUserMenuItem(item.value)"
+                  >
+                    <span
+                      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition"
+                      :class="isUserMenuItemSelected(item.value)
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-gray-300 bg-white text-transparent dark:border-dark-500 dark:bg-dark-800'"
+                    >
+                      <Icon name="check" size="xs" :stroke-width="3" />
+                    </span>
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                        {{ item.label }}
+                      </span>
+                      <span class="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">
+                        {{ item.description }}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <!-- API Base URL -->
               <div>
                 <label
@@ -5204,6 +5246,81 @@
                 </p>
               </div>
               <Toggle v-model="form.affiliate_enabled" />
+            </div>
+
+            <div class="border-t border-gray-100 pt-6 dark:border-dark-700">
+              <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ localText("合伙人返利等级", "Partner Rebate Tiers") }}
+                  </h3>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ localText("配置达到指定邀请人数后自动升级到的返利档位，例如邀请 10 人返利 30%。", "Configure the rebate tier reached after a required invite count, for example 30% rebate after 10 invites.") }}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm shrink-0"
+                  @click="resetAffiliatePartnerTiers"
+                >
+                  {{ localText("恢复默认档位", "Reset tiers") }}
+                </button>
+              </div>
+
+              <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
+                  <thead class="bg-gray-50 dark:bg-dark-800">
+                    <tr>
+                      <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                        {{ localText("等级", "Tier") }}
+                      </th>
+                      <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                        {{ localText("邀请人数", "Invites") }}
+                      </th>
+                      <th class="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
+                        {{ localText("返利比例", "Rebate") }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
+                    <tr
+                      v-for="tier in form.affiliate_partner_tiers"
+                      :key="tier.level"
+                    >
+                      <td class="px-3 py-3">
+                        <div class="font-medium text-gray-900 dark:text-white">
+                          {{ tier.name }}
+                        </div>
+                        <div class="text-xs uppercase text-gray-500 dark:text-dark-400">
+                          {{ tier.level }}
+                        </div>
+                      </td>
+                      <td class="px-3 py-3">
+                        <input
+                          v-model.number="tier.required_invitees"
+                          type="number"
+                          step="1"
+                          min="0"
+                          class="input min-w-[7rem] text-sm"
+                        />
+                      </td>
+                      <td class="px-3 py-3">
+                        <div class="relative max-w-[9rem]">
+                          <input
+                            v-model.number="tier.rebate_rate_percent"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            class="input pr-8 text-sm"
+                          />
+                          <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div v-if="form.affiliate_enabled" class="space-y-6">
@@ -6781,6 +6898,7 @@ import type {
   WebSearchTestResult,
 } from "@/api/admin/settings";
 import type {
+  AffiliatePartnerTier,
   AdminGroup,
   LoginAgreementDocument,
   NotifyEmailEntry,
@@ -6818,6 +6936,11 @@ import {
   normalizeMarketingNavItems,
   type MarketingNavItem,
 } from "@/utils/marketingNav";
+import {
+  DEFAULT_USER_MENU_ITEMS,
+  normalizeUserMenuItems,
+  type UserMenuItem,
+} from "@/utils/userMenuItems";
 
 const { t, locale } = useI18n();
 const appStore = useAppStore();
@@ -6852,6 +6975,110 @@ const marketingNavSelection = reactive<Record<MarketingNavItem, boolean>>({
   docs: true,
   partner: true,
 });
+
+const userMenuOptions = computed<
+  Array<{ value: UserMenuItem; label: string; description: string }>
+>(() => [
+  {
+    value: "dashboard",
+    label: t("nav.dashboard"),
+    description: localText("用户总览、余额和账户状态入口。", "User overview, balance, and account status."),
+  },
+  {
+    value: "api_keys",
+    label: t("nav.apiKeys"),
+    description: localText("创建和管理用户自己的 API 密钥。", "Create and manage the user's own API keys."),
+  },
+  {
+    value: "image_generation",
+    label: t("nav.imageGeneration"),
+    description: localText("AI 生图工具入口。", "AI image generation tool entry."),
+  },
+  {
+    value: "usage",
+    label: t("nav.usage"),
+    description: localText("查看调用用量和消费记录。", "Review usage and spending records."),
+  },
+  {
+    value: "channel_status",
+    label: t("nav.channelStatus"),
+    description: localText("查看用户侧渠道可用状态。", "View user-facing channel status."),
+  },
+  {
+    value: "subscriptions",
+    label: t("nav.subscriptions"),
+    description: localText("查看当前订阅和权益。", "View current subscriptions and benefits."),
+  },
+  {
+    value: "purchase",
+    label: t("nav.buySubscription"),
+    description: localText("购买订阅或进入支付流程。", "Buy subscriptions or enter the payment flow."),
+  },
+  {
+    value: "orders",
+    label: t("nav.myOrders"),
+    description: localText("查看用户自己的订单。", "View the user's own orders."),
+  },
+  {
+    value: "redeem",
+    label: t("nav.redeem"),
+    description: localText("兑换码使用入口。", "Redeem-code entry."),
+  },
+  {
+    value: "affiliate",
+    label: t("nav.affiliate"),
+    description: localText("邀请返利和合伙人入口。", "Referral rebate and partner entry."),
+  },
+  {
+    value: "profile",
+    label: t("nav.profile"),
+    description: localText("个人资料、安全和偏好设置。", "Profile, security, and preferences."),
+  },
+]);
+const userMenuSelection = reactive<Record<UserMenuItem, boolean>>({
+  dashboard: true,
+  api_keys: true,
+  image_generation: true,
+  usage: true,
+  channel_status: true,
+  subscriptions: true,
+  purchase: true,
+  orders: true,
+  redeem: true,
+  affiliate: true,
+  profile: true,
+});
+
+const DEFAULT_AFFILIATE_PARTNER_TIERS: AffiliatePartnerTier[] = [
+  {
+    level: "spark",
+    name: "Spark",
+    rebate_rate_percent: 40,
+    required_invitees: 10,
+    next_required_invitees: 30,
+  },
+  {
+    level: "voyage",
+    name: "Voyage",
+    rebate_rate_percent: 50,
+    required_invitees: 30,
+    next_required_invitees: 50,
+  },
+  {
+    level: "summit",
+    name: "Summit",
+    rebate_rate_percent: 60,
+    required_invitees: 50,
+    next_required_invitees: 100,
+  },
+  {
+    level: "cocreate",
+    name: "Co-create",
+    rebate_rate_percent: 70,
+    required_invitees: 100,
+    next_required_invitees: null,
+  },
+];
 
 const paymentGuideHref = computed(() =>
   locale.value.startsWith("zh")
@@ -7291,6 +7518,9 @@ const form = reactive<SettingsForm>({
   affiliate_rebate_duration_days: 0,
   affiliate_rebate_per_invitee_cap: 0,
   affiliate_group_profit_rates: {},
+  affiliate_partner_tiers: DEFAULT_AFFILIATE_PARTNER_TIERS.map((tier) => ({
+    ...tier,
+  })),
   default_concurrency: 1,
   default_subscriptions: [],
   force_email_on_third_party_signup: false,
@@ -7339,6 +7569,7 @@ const form = reactive<SettingsForm>({
   table_default_page_size: tablePageSizeDefault,
   table_page_size_options: [10, 20, 50, 100],
   marketing_nav_items: [...DEFAULT_MARKETING_NAV_ITEMS],
+  user_menu_items: [...DEFAULT_USER_MENU_ITEMS],
   custom_menu_items: [] as Array<{
     id: string;
     label: string;
@@ -8023,6 +8254,82 @@ function marketingNavItemsFromSelection(): MarketingNavItem[] {
   return DEFAULT_MARKETING_NAV_ITEMS.filter((item) => marketingNavSelection[item]);
 }
 
+function isUserMenuItemSelected(item: UserMenuItem): boolean {
+  return userMenuSelection[item];
+}
+
+function toggleUserMenuItem(item: UserMenuItem) {
+  userMenuSelection[item] = !userMenuSelection[item];
+  form.user_menu_items = userMenuItemsFromSelection();
+}
+
+function setUserMenuItems(value: unknown) {
+  const selected = new Set(normalizeUserMenuItems(value));
+  for (const item of DEFAULT_USER_MENU_ITEMS) {
+    userMenuSelection[item] = selected.has(item);
+  }
+  form.user_menu_items = userMenuItemsFromSelection();
+}
+
+function userMenuItemsFromSelection(): UserMenuItem[] {
+  return DEFAULT_USER_MENU_ITEMS.filter((item) => userMenuSelection[item]);
+}
+
+function normalizeAffiliatePartnerTierRate(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(100, Math.max(0, parsed));
+}
+
+function normalizeAffiliatePartnerTierInvitees(value: unknown, min: number): number {
+  const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed) || parsed < min) return min;
+  return parsed;
+}
+
+function normalizeAffiliatePartnerTiers(value: unknown): AffiliatePartnerTier[] {
+  const rawTiers = Array.isArray(value) ? value : [];
+  const byLevel = new Map(
+    rawTiers
+      .filter((tier): tier is AffiliatePartnerTier => Boolean(tier) && typeof tier === "object")
+      .map((tier) => [tier.level, tier]),
+  );
+  let minInvitees = 0;
+  const normalized = DEFAULT_AFFILIATE_PARTNER_TIERS.map((defaults) => {
+    const raw = byLevel.get(defaults.level);
+    const requiredInvitees = normalizeAffiliatePartnerTierInvitees(
+      raw?.required_invitees ?? defaults.required_invitees,
+      minInvitees,
+    );
+    minInvitees = requiredInvitees + 1;
+    return {
+      ...defaults,
+      name: String(raw?.name || defaults.name).trim() || defaults.name,
+      rebate_rate_percent: normalizeAffiliatePartnerTierRate(
+        raw?.rebate_rate_percent ?? defaults.rebate_rate_percent,
+      ),
+      required_invitees: requiredInvitees,
+      next_required_invitees: null,
+    };
+  });
+  return normalized.map((tier, index) => ({
+    ...tier,
+    next_required_invitees: normalized[index + 1]?.required_invitees ?? null,
+  }));
+}
+
+function affiliatePartnerTiersPayload(): AffiliatePartnerTier[] {
+  const normalized = normalizeAffiliatePartnerTiers(form.affiliate_partner_tiers);
+  form.affiliate_partner_tiers = normalized;
+  return normalized;
+}
+
+function resetAffiliatePartnerTiers(): void {
+  form.affiliate_partner_tiers = normalizeAffiliatePartnerTiers(
+    DEFAULT_AFFILIATE_PARTNER_TIERS,
+  );
+}
+
 // Custom endpoint management
 function addEndpoint() {
   form.custom_endpoints.push({ name: "", endpoint: "", description: "" });
@@ -8114,6 +8421,7 @@ async function loadSettings() {
       }
     }
     setMarketingNavItems(settings.marketing_nav_items);
+    setUserMenuItems(settings.user_menu_items);
     form.payment_marketplace_group_multipliers =
       await fetchPersistedMarketplaceGroupMultipliers(
         settings.payment_marketplace_group_multipliers,
@@ -8125,6 +8433,9 @@ async function loadSettings() {
       settings.affiliate_group_profit_rates,
     );
     syncAffiliateGroupProfitRateInputs(form.affiliate_group_profit_rates);
+    form.affiliate_partner_tiers = normalizeAffiliatePartnerTiers(
+      settings.affiliate_partner_tiers,
+    );
     form.login_agreement_mode =
       settings.login_agreement_mode === "checkbox" ? "checkbox" : "modal";
     form.login_agreement_updated_at =
@@ -8457,6 +8768,8 @@ async function saveSettings() {
       form.wechat_connect_mode,
     );
     const requestedMarketingNavItems = marketingNavItemsFromSelection();
+    const requestedUserMenuItems = userMenuItemsFromSelection();
+    const requestedAffiliatePartnerTiers = affiliatePartnerTiersPayload();
 
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
@@ -8482,6 +8795,7 @@ async function saveSettings() {
       affiliate_rebate_duration_days: Math.max(0, Math.min(3650, Math.floor(Number(form.affiliate_rebate_duration_days) || 0))),
       affiliate_rebate_per_invitee_cap: Math.max(0, Number(form.affiliate_rebate_per_invitee_cap) || 0),
       affiliate_group_profit_rates: affiliateGroupProfitRatesPayload(),
+      affiliate_partner_tiers: requestedAffiliatePartnerTiers,
       default_concurrency: form.default_concurrency,
       default_subscriptions: normalizedDefaultSubscriptions,
       force_email_on_third_party_signup: form.force_email_on_third_party_signup,
@@ -8499,6 +8813,7 @@ async function saveSettings() {
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,
       marketing_nav_items: requestedMarketingNavItems,
+      user_menu_items: requestedUserMenuItems,
       custom_endpoints: form.custom_endpoints,
       frontend_url: form.frontend_url,
       smtp_host: form.smtp_host,
@@ -8722,6 +9037,11 @@ async function saveSettings() {
         ? updated.marketing_nav_items
         : requestedMarketingNavItems,
     );
+    setUserMenuItems(
+      Array.isArray(updated.user_menu_items)
+        ? updated.user_menu_items
+        : requestedUserMenuItems,
+    );
     form.payment_marketplace_group_multipliers =
       await fetchPersistedMarketplaceGroupMultipliers(
         updated.payment_marketplace_group_multipliers ??
@@ -8734,6 +9054,11 @@ async function saveSettings() {
       updated.affiliate_group_profit_rates,
     );
     syncAffiliateGroupProfitRateInputs(form.affiliate_group_profit_rates);
+    form.affiliate_partner_tiers = normalizeAffiliatePartnerTiers(
+      Array.isArray(updated.affiliate_partner_tiers)
+        ? updated.affiliate_partner_tiers
+        : requestedAffiliatePartnerTiers,
+    );
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(updated));
     registrationEmailSuffixWhitelistTags.value =
       normalizeRegistrationEmailSuffixDomains(
