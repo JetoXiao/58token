@@ -72,8 +72,31 @@
           </nav>
         </div>
 
+        <!-- Codex Import Script -->
+        <div
+          v-if="activeClientTab === 'codex-import'"
+          class="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-700/60 dark:bg-amber-900/10"
+        >
+          <div class="space-y-2 text-sm leading-6 text-gray-700 dark:text-gray-300 [&>p:nth-last-child(-n+3)]:rounded-md [&>p:nth-last-child(-n+3)]:border [&>p:nth-last-child(-n+3)]:border-amber-200 [&>p:nth-last-child(-n+3)]:bg-amber-100/80 [&>p:nth-last-child(-n+3)]:px-3 [&>p:nth-last-child(-n+3)]:py-2 [&>p:nth-last-child(-n+3)]:font-semibold [&>p:nth-last-child(-n+3)]:text-amber-900 dark:[&>p:nth-last-child(-n+3)]:border-amber-700/70 dark:[&>p:nth-last-child(-n+3)]:bg-amber-900/30 dark:[&>p:nth-last-child(-n+3)]:text-amber-100">
+            <p class="font-medium text-gray-900 dark:text-gray-100">Codex 一键导入脚本</p>
+            <p>下载后双击运行 BAT 文件，根据窗口提示输入选项即可完成导入。</p>
+            <p>选项 1：导入配置文件至用户目录%USERPROFILE%\.codex，已有文件备份为.bak。</p>
+            <p>选项 2：只适用于配置文件导入后仍报错，且用户目录包含中文路径时。</p>
+            <p>💡 温馨提示：本脚本安全无毒</p>
+            <p>💡 如果弹出 “Windows 已保护你的电脑” 提示框，请不要惊慌，这是所有浏览器下载脚本的常规安全提醒。</p>
+            <p>👉 解决方法：点击隐藏的 「更多信息」 链接，然后点击 「仍要运行」 按钮即可安全导入。</p>
+          </div>
+          <button
+            type="button"
+            class="btn w-fit bg-primary-600 text-white shadow-sm hover:bg-primary-700 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-dark-900"
+            @click="downloadCodexImportScript"
+          >
+            下载导入脚本
+          </button>
+        </div>
+
         <!-- Code Blocks (Stacked for multi-file platforms) -->
-        <div class="space-y-4">
+        <div v-else class="space-y-4">
           <div
             v-for="(file, index) in currentFiles"
             :key="index"
@@ -271,6 +294,7 @@ const clientTabs = computed((): TabConfig[] => {
       const tabs: TabConfig[] = [
         { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
         { id: 'codex-ws', label: t('keys.useKeyModal.cliTabs.codexCliWs'), icon: TerminalIcon },
+        { id: 'codex-import', label: 'Codex 一键导入', icon: TerminalIcon },
       ]
       if (props.allowMessagesDispatch) {
         tabs.push({ id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon })
@@ -310,7 +334,7 @@ const openaiTabs: TabConfig[] = [
   { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
-const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
+const showShellTabs = computed(() => activeClientTab.value !== 'opencode' && activeClientTab.value !== 'codex-import')
 
 const currentTabs = computed(() => {
   if (!showShellTabs.value) return []
@@ -323,6 +347,9 @@ const currentTabs = computed(() => {
 const platformDescription = computed(() => {
   switch (props.platform) {
     case 'openai':
+      if (activeClientTab.value === 'codex-import') {
+        return '下载 Windows 一键导入脚本，适用于 Codex CLI 和 Codex App。'
+      }
       if (activeClientTab.value === 'claude') {
         return t('keys.useKeyModal.description')
       }
@@ -356,7 +383,7 @@ const platformNote = computed(() => {
   }
 })
 
-const showPlatformNote = computed(() => activeClientTab.value !== 'opencode')
+const showPlatformNote = computed(() => activeClientTab.value !== 'opencode' && activeClientTab.value !== 'codex-import')
 
 const escapeHtml = (value: string) => value
   .replace(/&/g, '&amp;')
@@ -598,27 +625,7 @@ function generateOpenAIFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
 
-  // config.toml content
-  const configContent = `model_provider = "OpenAI"
-model = "${CODEX_DEFAULT_MODEL}"
-review_model = "${CODEX_REVIEW_MODEL}"
-model_reasoning_effort = "${CODEX_REASONING_EFFORT}"
-disable_response_storage = true
-network_access = "enabled"
-windows_wsl_setup_acknowledged = true
-model_context_window = 1000000
-model_auto_compact_token_limit = 900000
-
-[model_providers.OpenAI]
-name = "OpenAI"
-base_url = "${baseUrl}"
-wire_api = "responses"
-requires_openai_auth = true`
-
-  // auth.json content
-  const authContent = `{
-  "OPENAI_API_KEY": "${apiKey}"
-}`
+  const { configContent, authContent } = buildCodexConfigFiles(baseUrl, apiKey, false)
 
   return [
     {
@@ -636,8 +643,23 @@ requires_openai_auth = true`
 function generateOpenAIWsFiles(baseUrl: string, apiKey: string): FileConfig[] {
   const isWindows = activeTab.value === 'windows'
   const configDir = isWindows ? '%userprofile%\\.codex' : '~/.codex'
+  const { configContent, authContent } = buildCodexConfigFiles(baseUrl, apiKey, true)
 
-  // config.toml content with Responses WebSocket support
+  return [
+    {
+      path: `${configDir}/config.toml`,
+      content: configContent,
+      hint: t('keys.useKeyModal.openai.configTomlHint')
+    },
+    {
+      path: `${configDir}/auth.json`,
+      content: authContent
+    }
+  ]
+}
+
+function buildCodexConfigFiles(baseUrl: string, apiKey: string, supportsWebsockets: boolean) {
+  const websocketLine = supportsWebsockets ? 'supports_websockets = true\n' : ''
   const configContent = `model_provider = "OpenAI"
 model = "${CODEX_DEFAULT_MODEL}"
 review_model = "${CODEX_REVIEW_MODEL}"
@@ -652,25 +674,13 @@ model_auto_compact_token_limit = 900000
 name = "OpenAI"
 base_url = "${baseUrl}"
 wire_api = "responses"
-supports_websockets = true
-requires_openai_auth = true`
+${websocketLine}requires_openai_auth = true`
 
-  // auth.json content
   const authContent = `{
   "OPENAI_API_KEY": "${apiKey}"
 }`
 
-  return [
-    {
-      path: `${configDir}/config.toml`,
-      content: configContent,
-      hint: t('keys.useKeyModal.openai.configTomlHint')
-    },
-    {
-      path: `${configDir}/auth.json`,
-      content: authContent
-    }
-  ]
+  return { configContent, authContent }
 }
 
 function generateOpenAIImageFiles(
@@ -1265,5 +1275,194 @@ const copyContent = async (content: string, index: number) => {
       copiedIndex.value = null
     }, 2000)
   }
+}
+
+function encodeUtf8Base64(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+  return btoa(binary)
+}
+
+function getCodexImportScriptContent(): string {
+  const baseUrl = props.baseUrl || window.location.origin
+  const apiKey = props.apiKey
+  const { configContent, authContent } = buildCodexConfigFiles(baseUrl, apiKey, false)
+  const configBase64 = encodeUtf8Base64(configContent)
+  const authBase64 = encodeUtf8Base64(authContent)
+
+  return `@echo off
+chcp 65001 >nul
+set "CODEX_IMPORT_BAT=%~f0"
+powershell.exe -NoLogo -NoProfile -Command "try { $ErrorActionPreference='Stop'; $p=$env:CODEX_IMPORT_BAT; $c=[System.IO.File]::ReadAllText($p,[System.Text.Encoding]::UTF8); $m='# POWERSHELL-CODE-START'; $i=$c.LastIndexOf($m); if($i -lt 0){ throw 'PowerShell script block was not found.' }; $s=$c.Substring($i+$m.Length); $block=[scriptblock]::Create($s); $block.Invoke() } catch { Write-Host ''; Write-Host ('启动失败：' + $_.Exception.Message); exit 1 }"
+set "CODEX_IMPORT_EXIT=%ERRORLEVEL%"
+if not "%CODEX_IMPORT_EXIT%"=="0" (
+  echo.
+  echo PowerShell 启动或解析失败，请将本窗口错误信息截图反馈给管理员。
+  pause
+)
+exit /b %CODEX_IMPORT_EXIT%
+
+# POWERSHELL-CODE-START
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
+$ConfigBase64 = '${configBase64}'
+$AuthBase64 = '${authBase64}'
+
+function Decode-Base64Text {
+  param([string]$Value)
+  return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+}
+
+function Write-Utf8NoBomFile {
+  param(
+    [string]$Path,
+    [string]$Content
+  )
+  $dir = Split-Path -Parent $Path
+  if (-not (Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  $bytes = [System.Text.Encoding]::UTF8.GetBytes($Content)
+  [IO.File]::WriteAllBytes($Path, $bytes)
+}
+
+function Backup-FileIfExists {
+  param([string]$Path)
+  if (Test-Path -LiteralPath $Path) {
+    Copy-Item -LiteralPath $Path -Destination "$Path.bak" -Force
+    Write-Host "已备份：$Path.bak"
+  }
+}
+
+function Write-CodexFiles {
+  param(
+    [string]$ConfigDir,
+    [bool]$BackupExisting
+  )
+  if (-not (Test-Path -LiteralPath $ConfigDir)) {
+    New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
+    Write-Host "已创建目录：$ConfigDir"
+  }
+
+  $configPath = Join-Path $ConfigDir 'config.toml'
+  $authPath = Join-Path $ConfigDir 'auth.json'
+  if ($BackupExisting) {
+    Backup-FileIfExists $configPath
+    Backup-FileIfExists $authPath
+  }
+
+  Write-Utf8NoBomFile $configPath (Decode-Base64Text $ConfigBase64)
+  Write-Utf8NoBomFile $authPath (Decode-Base64Text $AuthBase64)
+  Write-Host "已写入：$configPath"
+  Write-Host "已写入：$authPath"
+}
+
+function Test-ReparsePath {
+  param([string]$Path)
+  $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+  return $null -ne $item -and (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)
+}
+
+function Move-ExistingDefaultPath {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return $false
+  }
+  if (Test-ReparsePath $Path) {
+    Write-Host "检测到默认路径已是目录联接：$Path"
+    return $true
+  }
+
+  $parent = Split-Path -Parent $Path
+  $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+  $backupName = ".codex.local-$stamp"
+  Rename-Item -LiteralPath $Path -NewName $backupName
+  Write-Host "已将原默认目录重命名为：$(Join-Path $parent $backupName)"
+  return $false
+}
+
+function Ensure-Junction {
+  param(
+    [string]$LinkPath,
+    [string]$TargetPath
+  )
+  $alreadyLinked = Move-ExistingDefaultPath $LinkPath
+  if ($alreadyLinked) {
+    Write-Host "目录联接已存在，未重复创建。"
+    return
+  }
+
+  $output = cmd.exe /d /c "mklink /J ""$LinkPath"" ""$TargetPath""" 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    $message = ($output | Out-String).Trim()
+    throw "创建目录联接失败：$message"
+  }
+  $output | ForEach-Object { Write-Host $_ }
+}
+
+function Import-DefaultCodexConfig {
+  $defaultDir = Join-Path $env:USERPROFILE '.codex'
+  Write-CodexFiles $defaultDir $true
+  Write-Host ''
+  Write-Host '默认路径导入完成。请重新打开 Codex 后测试。'
+}
+
+function Import-EnglishCodexConfig {
+  Write-Host '选项 2 用于默认路径导入后仍报错，尤其是用户目录包含中文路径时。'
+  Write-Host '将写入 C:\\CodexConfig\\.codex，并把用户目录下的 .codex 创建为目录联接。'
+  Write-Host '如果用户目录下已有普通 .codex 文件夹，会重命名为 .codex.local-时间戳，不会删除其中内容。'
+  $confirm = Read-Host '确认执行请输入 y'
+  if ($confirm -ne 'y') {
+    Write-Host '已取消。'
+    return
+  }
+
+  $targetDir = 'C:\\CodexConfig\\.codex'
+  $linkDir = Join-Path $env:USERPROFILE '.codex'
+  Write-CodexFiles $targetDir $false
+  Ensure-Junction $linkDir $targetDir
+  Write-Host ''
+  Write-Host '英文路径导入完成。请重新打开 Codex 后测试。'
+}
+
+try {
+  Write-Host 'Codex 一键导入脚本'
+  Write-Host '===================='
+  Write-Host '1. 默认路径导入：写入 %USERPROFILE%\\.codex，已有文件备份为 .bak 后覆盖'
+  Write-Host '2. 英文路径修复：写入 C:\\CodexConfig\\.codex，并创建目录联接'
+  Write-Host ''
+  $choice = Read-Host '请输入选项 1 或 2'
+
+  switch ($choice) {
+    '1' { Import-DefaultCodexConfig }
+    '2' { Import-EnglishCodexConfig }
+    default { Write-Host '无效选项，未执行任何操作。' }
+  }
+} catch {
+  Write-Host ''
+  Write-Host "执行失败：$($_.Exception.Message)"
+} finally {
+  Write-Host ''
+  Read-Host '按回车退出'
+}
+`
+}
+
+function downloadCodexImportScript() {
+  const content = getCodexImportScriptContent().replace(/\r?\n/g, '\r\n')
+  const blob = new Blob([content], { type: 'application/x-bat;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'codex-import.bat'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
 }
 </script>
