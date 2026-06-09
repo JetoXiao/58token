@@ -617,10 +617,10 @@ func (s *PaymentService) affiliateRebateBaseAmountUSD(ctx context.Context, o *db
 	}
 	currency := PaymentOrderCurrency(o)
 	if paymentOrderIsUSDT(o) || strings.EqualFold(currency, payment.TypeUSDT) {
-		return roundTo(eligiblePayAmount, 8), "USD", true
+		return roundTo(eligiblePayAmount*s.affiliateRebateCNYPerUSD(ctx), 8), "USD", true
 	}
 	if paymentOrderIsRMB(o) || strings.EqualFold(currency, payment.DefaultPaymentCurrency) {
-		return roundTo(eligiblePayAmount/s.affiliateRebateCNYPerUSD(ctx), 8), "USD", true
+		return roundTo(eligiblePayAmount, 8), "USD", true
 	}
 	return 0, "", false
 }
@@ -633,7 +633,7 @@ func affiliateEligiblePaidAmount(o *dbent.PaymentOrder) float64 {
 	if math.IsNaN(feeRate) || math.IsInf(feeRate, 0) || feeRate <= 0 {
 		return o.PayAmount
 	}
-	return o.PayAmount / (1 + feeRate/100)
+	return o.PayAmount
 }
 
 func (s *PaymentService) affiliateRebateCNYPerUSD(ctx context.Context) float64 {

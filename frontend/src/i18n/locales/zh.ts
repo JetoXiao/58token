@@ -299,7 +299,7 @@ export default {
     },
     history: {
       title: '最近生成',
-      subtitle: '仅保存在当前浏览器，方便快速复用。',
+      subtitle: '我们不存储图片，仅保存在当前浏览器本地；清理缓存会丢失，最多保留最近 8 张。',
       clear: '清空',
       empty: '还没有最近生成记录。'
     },

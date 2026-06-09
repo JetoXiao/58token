@@ -1,5 +1,5 @@
 <template>
-  <header class="sticky top-0 z-30 border-b border-gray-200/60 bg-white/75 backdrop-blur-2xl dark:border-white/10 dark:bg-[#05060a]/70">
+  <header class="sticky top-0 z-30 border-b border-gray-200/60 bg-white/75 backdrop-blur-2xl dark:border-white/10 dark:bg-[#05060a]/70 lg:z-[80]">
     <div class="flex h-16 items-center justify-between px-4 md:px-6">
       <!-- Left: Mobile Menu Toggle + Page Title -->
       <div class="flex items-center gap-4">

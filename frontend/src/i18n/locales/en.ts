@@ -299,7 +299,7 @@ export default {
     },
     history: {
       title: 'Recent generations',
-      subtitle: 'Saved locally in this browser for quick reuse.',
+      subtitle: 'We do not store your images. They are saved locally in this browser only; clearing site data removes them. Up to 8 recent images are kept.',
       clear: 'Clear',
       empty: 'No recent images yet.'
     },

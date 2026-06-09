@@ -1,33 +1,33 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-7xl space-y-6">
-      <section class="relative overflow-hidden rounded-[1.75rem] border border-gray-200/70 bg-white/75 p-5 text-gray-950 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:p-6">
+    <div class="mx-auto min-w-0 max-w-7xl space-y-4 overflow-x-hidden sm:space-y-6">
+      <section class="relative min-w-0 overflow-hidden rounded-[1.25rem] border border-gray-200/70 bg-white/75 p-4 text-gray-950 shadow-[0_24px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/70 dark:text-white dark:shadow-[0_24px_90px_rgba(0,0,0,0.32)] sm:rounded-[1.75rem] sm:p-6">
         <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent dark:via-cyan-200/40"></div>
-        <div class="relative">
-          <div class="max-w-3xl">
+        <div class="relative min-w-0">
+          <div class="min-w-0 max-w-3xl">
             <div class="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200/70 bg-cyan-50/80 px-3 py-1 text-xs font-semibold text-cyan-700 dark:border-cyan-300/20 dark:bg-cyan-300/10 dark:text-cyan-200">
               <Icon name="sparkles" size="xs" />
               <span>{{ t('imageGeneration.eyebrow') }}</span>
             </div>
-            <h2 class="text-3xl font-semibold sm:text-4xl">
+            <h2 class="text-2xl font-semibold sm:text-4xl">
               {{ t('imageGeneration.title') }}
             </h2>
-            <p class="mt-3 max-w-2xl text-sm leading-6 text-gray-600 dark:text-slate-400">
+            <p class="mt-3 max-w-2xl break-words text-sm leading-6 text-gray-600 dark:text-slate-400">
               {{ t('imageGeneration.description') }}
             </p>
           </div>
         </div>
       </section>
 
-      <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <section class="space-y-4">
-          <div class="rounded-[1.5rem] border border-gray-200/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:p-6">
-            <div class="mb-5 flex items-start justify-between gap-4">
-              <div>
+      <div class="grid min-w-0 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <section class="min-w-0 space-y-4">
+          <div class="min-w-0 overflow-hidden rounded-[1.25rem] border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:rounded-[1.5rem] sm:p-6">
+            <div class="mb-5 flex min-w-0 items-start justify-between gap-3 sm:gap-4">
+              <div class="min-w-0">
                 <h3 class="text-lg font-semibold text-gray-950 dark:text-white">{{ t('imageGeneration.compose.title') }}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">{{ t('imageGeneration.compose.subtitle') }}</p>
+                <p class="mt-1 break-words text-sm text-gray-500 dark:text-slate-400">{{ t('imageGeneration.compose.subtitle') }}</p>
               </div>
-              <button type="button" class="btn btn-ghost btn-icon" :title="t('common.refresh')" @click="loadKeys">
+              <button type="button" class="btn btn-ghost btn-icon shrink-0" :title="t('common.refresh')" @click="loadKeys">
                 <Icon name="refresh" size="sm" :class="{ 'animate-spin': loadingKeys }" />
               </button>
             </div>
@@ -35,24 +35,24 @@
             <div class="space-y-5">
               <div>
                 <label class="input-label">{{ t('imageGeneration.form.apiKey') }}</label>
-                <div v-if="imageKeys.length > 0" class="flex flex-col gap-2 sm:flex-row">
-                  <select v-model.number="selectedKeyId" class="input min-w-0 flex-1">
+                <div v-if="imageKeys.length > 0" class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                  <select v-model.number="selectedKeyId" class="input min-w-0 flex-1 truncate">
                     <option v-for="key in imageKeys" :key="key.id" :value="key.id">
                       {{ formatApiKeyOption(key) }}
                     </option>
                   </select>
-                  <router-link to="/keys" class="btn btn-secondary shrink-0 justify-center">
+                  <router-link to="/keys" class="btn btn-secondary w-full shrink-0 justify-center sm:w-auto">
                     <Icon name="key" size="xs" />
                     {{ t('imageGeneration.emptyKeys.action') }}
                   </router-link>
                 </div>
-                <div v-if="imageKeys.length > 0 && selectedKey" class="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
-                  <span>{{ selectedKey.group?.name || t('imageGeneration.form.noGroup') }}</span>
+                <div v-if="imageKeys.length > 0 && selectedKey" class="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                  <span class="max-w-full break-words">{{ selectedKey.group?.name || t('imageGeneration.form.noGroup') }}</span>
                   <span class="text-gray-300 dark:text-slate-600">/</span>
-                  <span>{{ maskApiKey(selectedKey.key) }}</span>
+                  <span class="max-w-full break-all">{{ maskApiKey(selectedKey.key) }}</span>
                   <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">OpenAI</span>
                 </div>
-                <div v-if="imageKeys.length === 0" class="rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-5 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300">
+                <div v-if="imageKeys.length === 0" class="min-w-0 rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-5 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300">
                   <p class="font-medium text-gray-900 dark:text-white">{{ t('imageGeneration.emptyKeys.title') }}</p>
                   <p class="mt-1 leading-6">{{ loadingKeys ? t('common.loading') : t('imageGeneration.emptyKeys.description') }}</p>
                   <router-link to="/keys" class="btn btn-secondary btn-sm mt-4">
@@ -64,7 +64,7 @@
 
               <div>
                 <label class="input-label">{{ t('imageGeneration.form.model') }}</label>
-                <select v-model="model" class="input" :disabled="modelOptions.length === 0">
+                <select v-model="model" class="input min-w-0" :disabled="modelOptions.length === 0">
                   <option v-if="modelOptions.length === 0" value="">
                     {{ t('imageGeneration.form.noSupportedModels') }}
                   </option>
@@ -82,8 +82,8 @@
                 rows="8"
               />
 
-              <div class="grid gap-4 sm:grid-cols-2">
-                <div>
+              <div class="grid min-w-0 gap-4 sm:grid-cols-2">
+                <div class="min-w-0">
                   <div class="mb-1.5 flex items-center gap-1.5">
                     <label class="input-label !mb-0">{{ t('imageGeneration.form.size') }}</label>
                     <HelpTooltip trigger="both" width-class="w-80 max-w-[calc(100vw-2rem)]">
@@ -110,7 +110,7 @@
                       </div>
                     </HelpTooltip>
                   </div>
-                  <select :value="sizeSelectValue" class="input" @change="handleSizeSelect">
+                  <select :value="sizeSelectValue" class="input min-w-0 truncate" @change="handleSizeSelect">
                     <option v-for="option in sizeOptions" :key="option.value" :value="option.value">
                       {{ option.label }}
                     </option>
@@ -118,9 +118,9 @@
                   <p class="input-hint">
                     {{ t('imageGeneration.customSize.current', { size: displaySizeWithTier(size) }) }}
                   </p>
-                  <div v-if="showCustomSizeEditor" class="mt-3 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-3 dark:border-cyan-300/20 dark:bg-cyan-300/10">
-                    <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
-                      <div>
+                  <div v-if="showCustomSizeEditor" class="mt-3 min-w-0 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-3 dark:border-cyan-300/20 dark:bg-cyan-300/10">
+                    <div class="grid min-w-0 grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2">
+                      <div class="min-w-0">
                         <label class="input-label text-xs">{{ t('imageGeneration.customSize.width') }}</label>
                         <input
                           v-model.trim="customWidth"
@@ -128,13 +128,13 @@
                           min="1"
                           step="16"
                           inputmode="numeric"
-                          class="input"
+                          class="input min-w-0"
                           :class="{ 'input-error': customSizeError }"
                           placeholder="1024"
                         />
                       </div>
                       <span class="pb-3 text-sm font-semibold text-gray-400 dark:text-slate-500">x</span>
-                      <div>
+                      <div class="min-w-0">
                         <label class="input-label text-xs">{{ t('imageGeneration.customSize.height') }}</label>
                         <input
                           v-model.trim="customHeight"
@@ -142,7 +142,7 @@
                           min="1"
                           step="16"
                           inputmode="numeric"
-                          class="input"
+                          class="input min-w-0"
                           :class="{ 'input-error': customSizeError }"
                           placeholder="1024"
                         />
@@ -150,20 +150,20 @@
                     </div>
                     <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-slate-400">{{ t('imageGeneration.customSize.hint') }}</p>
                     <p v-if="customSizeError" class="input-error-text">{{ customSizeError }}</p>
-                    <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <div class="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
                       <button type="button" class="btn btn-primary btn-sm flex-1" @click="saveCustomSize">
                         <Icon name="check" size="xs" />
                         {{ t('common.save') }}
                       </button>
-                      <button type="button" class="btn btn-secondary btn-sm" @click="cancelCustomSize">
+                      <button type="button" class="btn btn-secondary btn-sm w-full sm:w-auto" @click="cancelCustomSize">
                         {{ t('common.cancel') }}
                       </button>
                     </div>
                   </div>
                 </div>
-                <div>
+                <div class="min-w-0">
                   <label class="input-label">{{ t('imageGeneration.form.quality') }}</label>
-                  <select v-model="quality" class="input">
+                  <select v-model="quality" class="input min-w-0">
                     <option v-for="option in qualityOptions" :key="option.value" :value="option.value">
                       {{ option.label }}
                     </option>
@@ -173,12 +173,12 @@
 
               <div>
                 <label class="input-label">{{ t('imageGeneration.form.count') }}</label>
-                <div class="grid grid-cols-4 gap-2">
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <button
                     v-for="count in countOptions"
                     :key="count"
                     type="button"
-                    class="rounded-xl border px-3 py-2 text-sm font-semibold transition"
+                    class="min-w-0 rounded-xl border px-3 py-2 text-sm font-semibold transition"
                     :class="n === count ? 'border-gray-950 bg-gray-950 text-white dark:border-white dark:bg-white dark:text-slate-950' : 'border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300 dark:hover:border-cyan-300/30 dark:hover:text-white'"
                     @click="n = count"
                   >
@@ -187,32 +187,32 @@
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 dark:border-cyan-300/20 dark:bg-cyan-300/10">
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <div>
+              <div class="min-w-0 rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4 dark:border-cyan-300/20 dark:bg-cyan-300/10">
+                <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0">
                     <p class="text-sm font-semibold text-gray-950 dark:text-white">{{ t('imageGeneration.pricing.title') }}</p>
-                    <p class="mt-1 text-xs leading-5 text-gray-600 dark:text-slate-300">{{ pricePreview.description }}</p>
+                    <p class="mt-1 break-words text-xs leading-5 text-gray-600 dark:text-slate-300">{{ pricePreview.description }}</p>
                   </div>
-                  <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
+                  <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-cyan-700 shadow-sm dark:bg-white/10 dark:text-cyan-200">
                     {{ pricePreview.tierLabel }}
                   </span>
                 </div>
-                <div v-if="pricePreview.rows.length > 0" class="mt-3 grid gap-2 sm:grid-cols-3">
-                  <div v-for="row in pricePreview.rows" :key="row.label" class="rounded-xl bg-white/75 px-3 py-2 dark:bg-white/[0.06]">
+                <div v-if="pricePreview.rows.length > 0" class="mt-3 grid min-w-0 gap-2 sm:grid-cols-3">
+                  <div v-for="row in pricePreview.rows" :key="row.label" class="min-w-0 rounded-xl bg-white/75 px-3 py-2 dark:bg-white/[0.06]">
                     <p class="text-[11px] font-medium uppercase text-gray-400 dark:text-slate-500">{{ row.label }}</p>
-                    <p class="mt-1 text-sm font-semibold text-gray-950 dark:text-white">{{ row.value }}</p>
+                    <p class="mt-1 break-words text-sm font-semibold text-gray-950 dark:text-white">{{ row.value }}</p>
                   </div>
                 </div>
               </div>
 
               <div>
                 <label class="input-label">{{ t('imageGeneration.form.templates') }}</label>
-                <div class="grid gap-2 sm:grid-cols-2">
+                <div class="grid min-w-0 gap-2 sm:grid-cols-2">
                   <button
                     v-for="template in templates"
                     :key="template.key"
                     type="button"
-                    class="rounded-2xl border border-gray-200 bg-white/65 px-4 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50/60 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-cyan-300/30 dark:hover:bg-white/[0.06]"
+                    class="min-w-0 rounded-2xl border border-gray-200 bg-white/65 px-4 py-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50/60 dark:border-white/10 dark:bg-white/[0.035] dark:hover:border-cyan-300/30 dark:hover:bg-white/[0.06]"
                     @click="applyTemplate(template.prompt)"
                   >
                     <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ template.title }}</span>
@@ -221,13 +221,13 @@
                 </div>
               </div>
 
-              <div class="flex flex-col gap-3 border-t border-gray-100 pt-5 dark:border-white/10 sm:flex-row">
+              <div class="flex min-w-0 flex-col gap-3 border-t border-gray-100 pt-5 dark:border-white/10 sm:flex-row">
                 <button type="button" class="btn btn-primary btn-lg flex-1" :disabled="!canGenerate" @click="startGenerate">
                   <span v-if="generating" class="spinner h-4 w-4"></span>
                   <Icon v-else name="sparkles" size="sm" />
                   {{ generating ? t('imageGeneration.actions.generating') : t('imageGeneration.actions.generate') }}
                 </button>
-                <button type="button" class="btn btn-secondary btn-lg" :disabled="generating" @click="resetForm">
+                <button type="button" class="btn btn-secondary btn-lg w-full sm:w-auto" :disabled="generating" @click="resetForm">
                   <Icon name="refresh" size="sm" />
                   {{ t('common.reset') }}
                 </button>
@@ -236,16 +236,16 @@
           </div>
         </section>
 
-        <section class="space-y-4">
-          <div class="rounded-[1.5rem] border border-gray-200/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:p-6">
-            <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <div>
+        <section class="min-w-0 space-y-4">
+          <div class="min-w-0 overflow-hidden rounded-[1.25rem] border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:rounded-[1.5rem] sm:p-6">
+            <div class="mb-5 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0">
                 <h3 class="text-lg font-semibold text-gray-950 dark:text-white">{{ t('imageGeneration.preview.title') }}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">{{ statusText }}</p>
+                <p class="mt-1 break-words text-sm text-gray-500 dark:text-slate-400">{{ statusText }}</p>
                 <button
                   v-if="activeClientRequestId && !generating"
                   type="button"
-                  class="mt-2 max-w-full truncate rounded-full bg-cyan-50 px-2.5 py-1 text-left font-mono text-[11px] font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:bg-cyan-300/10 dark:text-cyan-200 dark:hover:bg-cyan-300/15"
+                  class="mt-2 block max-w-full overflow-hidden truncate rounded-full bg-cyan-50 px-2.5 py-1 text-left font-mono text-[11px] font-semibold text-cyan-700 transition hover:bg-cyan-100 dark:bg-cyan-300/10 dark:text-cyan-200 dark:hover:bg-cyan-300/15"
                   :title="activeClientRequestId"
                   @click="copyClientRequestId"
                 >
@@ -254,7 +254,7 @@
               </div>
               <button
                 type="button"
-                class="btn btn-secondary btn-sm"
+                class="btn btn-secondary btn-sm w-full sm:w-auto sm:shrink-0"
                 :disabled="generatedImages.length === 0"
                 @click="downloadAll"
               >
@@ -265,7 +265,7 @@
 
             <div
               v-if="generating"
-              class="relative flex min-h-[32rem] flex-col items-center justify-center overflow-hidden rounded-[1.25rem] border border-cyan-200/80 bg-cyan-50/70 p-6 text-center dark:border-cyan-300/20 dark:bg-cyan-300/10"
+              class="relative flex min-h-[24rem] min-w-0 flex-col items-center justify-center overflow-hidden rounded-[1.25rem] border border-cyan-200/80 bg-cyan-50/70 p-4 text-center dark:border-cyan-300/20 dark:bg-cyan-300/10 sm:min-h-[32rem] sm:p-6"
             >
               <div class="absolute inset-x-8 top-8 h-24 rounded-full bg-cyan-200/35 blur-3xl dark:bg-cyan-300/10"></div>
               <div class="relative mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-white text-cyan-700 shadow-sm ring-1 ring-cyan-100 dark:bg-slate-950/80 dark:text-cyan-200 dark:ring-cyan-300/20">
@@ -275,20 +275,20 @@
               <p class="relative mt-2 max-w-md text-sm leading-6 text-gray-600 dark:text-slate-300">
                 {{ t('imageGeneration.preview.runningDescription') }}
               </p>
-              <div class="relative mt-5 w-full max-w-md">
+              <div class="relative mt-5 w-full min-w-0 max-w-md">
                 <div class="progress h-2.5 bg-white/80 dark:bg-slate-900/80">
                   <div class="progress-bar h-full rounded-full" :style="{ width: `${generationProgress}%` }"></div>
                 </div>
-                <div class="mt-3 grid gap-2 text-left sm:grid-cols-2">
-                  <div class="rounded-xl bg-white/80 px-3 py-2 text-xs shadow-sm dark:bg-slate-950/55">
+                <div class="mt-3 grid min-w-0 gap-2 text-left sm:grid-cols-2">
+                  <div class="min-w-0 rounded-xl bg-white/80 px-3 py-2 text-xs shadow-sm dark:bg-slate-950/55">
                     <p class="font-medium text-gray-400 dark:text-slate-500">{{ t('imageGeneration.preview.elapsed') }}</p>
                     <p class="mt-1 font-semibold text-gray-950 dark:text-white">{{ t('imageGeneration.preview.elapsedSeconds', { seconds: generationElapsedSeconds }) }}</p>
                   </div>
-                  <div class="rounded-xl bg-white/80 px-3 py-2 text-xs shadow-sm dark:bg-slate-950/55">
+                  <div class="min-w-0 rounded-xl bg-white/80 px-3 py-2 text-xs shadow-sm dark:bg-slate-950/55">
                     <p class="font-medium text-gray-400 dark:text-slate-500">{{ t('imageGeneration.preview.requestId') }}</p>
                     <button
                       type="button"
-                      class="mt-1 max-w-full truncate font-mono font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-200 dark:hover:text-cyan-100"
+                      class="mt-1 max-w-full break-all text-left font-mono font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-200 dark:hover:text-cyan-100"
                       :title="activeClientRequestId || ''"
                       @click="copyClientRequestId"
                     >
@@ -304,7 +304,7 @@
 
             <div
               v-else-if="generatedImages.length === 0"
-              class="flex min-h-[32rem] flex-col items-center justify-center rounded-[1.25rem] border border-dashed border-gray-300 bg-gray-50/80 p-6 text-center dark:border-white/10 dark:bg-white/[0.025]"
+              class="flex min-h-[24rem] min-w-0 flex-col items-center justify-center rounded-[1.25rem] border border-dashed border-gray-300 bg-gray-50/80 p-4 text-center dark:border-white/10 dark:bg-white/[0.025] sm:min-h-[32rem] sm:p-6"
             >
               <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-300/10 dark:text-cyan-200">
                 <Icon name="sparkles" size="xl" />
@@ -313,20 +313,20 @@
               <p class="mt-2 max-w-md text-sm leading-6 text-gray-500 dark:text-slate-400">{{ t('imageGeneration.preview.emptyDescription') }}</p>
             </div>
 
-            <div v-else class="grid gap-4 sm:grid-cols-2">
+            <div v-else class="grid min-w-0 gap-4 sm:grid-cols-2">
               <figure
                 v-for="(image, index) in generatedImages"
                 :key="`${image.url}-${index}`"
-                class="group overflow-hidden rounded-[1.25rem] border border-gray-200 bg-white shadow-sm transition hover:border-cyan-300 dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-cyan-300/30"
+                class="group min-w-0 overflow-hidden rounded-[1.25rem] border border-gray-200 bg-white shadow-sm transition hover:border-cyan-300 dark:border-white/10 dark:bg-slate-950/60 dark:hover:border-cyan-300/30"
               >
-                <button type="button" class="block w-full bg-gray-100 dark:bg-slate-900" @click="previewImage = image.url">
-                  <img :src="image.url" :alt="t('imageGeneration.preview.imageAlt', { number: index + 1 })" class="aspect-square w-full object-contain" />
+                <button type="button" class="block w-full max-w-full overflow-hidden bg-gray-100 dark:bg-slate-900" @click="previewImage = image.url">
+                  <img :src="image.url" :alt="t('imageGeneration.preview.imageAlt', { number: index + 1 })" class="block aspect-square h-auto w-full max-w-full object-contain" />
                 </button>
-                <figcaption class="flex items-center justify-between gap-3 p-3">
-                  <span class="text-xs font-medium text-gray-500 dark:text-slate-400">
+                <figcaption class="flex min-w-0 items-center justify-between gap-3 p-3">
+                  <span class="min-w-0 truncate text-xs font-medium text-gray-500 dark:text-slate-400">
                     {{ t('imageGeneration.preview.imageNumber', { number: index + 1 }) }}
                   </span>
-                  <div class="flex items-center gap-1">
+                  <div class="flex shrink-0 items-center gap-1">
                     <button type="button" class="btn btn-ghost btn-icon !p-2" :title="t('common.copy')" @click="copyImage(image.url)">
                       <Icon name="copy" size="xs" />
                     </button>
@@ -343,13 +343,13 @@
             </div>
           </div>
 
-          <div class="rounded-[1.5rem] border border-gray-200/70 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:p-6">
-            <div class="mb-4 flex items-center justify-between gap-3">
-              <div>
+          <div class="min-w-0 overflow-hidden rounded-[1.25rem] border border-gray-200/70 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045] sm:rounded-[1.5rem] sm:p-6">
+            <div class="mb-4 flex min-w-0 items-center justify-between gap-3">
+              <div class="min-w-0">
                 <h3 class="text-lg font-semibold text-gray-950 dark:text-white">{{ t('imageGeneration.history.title') }}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">{{ t('imageGeneration.history.subtitle') }}</p>
+                <p class="mt-1 break-words text-sm text-gray-500 dark:text-slate-400">{{ t('imageGeneration.history.subtitle') }}</p>
               </div>
-              <button type="button" class="btn btn-ghost btn-sm" :disabled="history.length === 0" @click="clearHistory">
+              <button type="button" class="btn btn-ghost btn-sm shrink-0" :disabled="history.length === 0" @click="clearHistory">
                 {{ t('imageGeneration.history.clear') }}
               </button>
             </div>
@@ -424,6 +424,11 @@ interface GenerateRequestedImagesParams {
 }
 
 const HISTORY_KEY = 'sub2api_image_generation_history'
+const HISTORY_DB_NAME = 'sub2api_image_generation'
+const HISTORY_DB_VERSION = 1
+const HISTORY_STORE_NAME = 'history'
+const HISTORY_RECORD_KEY = 'items'
+const HISTORY_LIMIT = 8
 const CUSTOM_SIZES_KEY = 'sub2api_image_generation_custom_sizes'
 const CUSTOM_SIZE_SELECT_VALUE = '__custom__'
 const MIN_IMAGE_PIXELS = 655360
@@ -433,6 +438,7 @@ const IMAGE_SIZE_STEP = 16
 const MAX_IMAGE_RATIO = 3
 
 type ImageSizeTier = '1K' | '2K' | '4K'
+const imageGenerationQualities: ImageGenerationQuality[] = ['low', 'medium', 'high', 'auto']
 
 interface SizeOption {
   value: ImageGenerationSize
@@ -1022,7 +1028,7 @@ function pushHistory(images: string[]) {
       }).format(new Date())
     },
     ...history.value
-  ].slice(0, 8)
+  ].slice(0, HISTORY_LIMIT)
   saveHistory()
 }
 
@@ -1036,23 +1042,155 @@ function restoreHistory(item: HistoryItem) {
   errorMessage.value = ''
 }
 
-function loadHistory() {
+async function openHistoryDatabase(): Promise<IDBDatabase | null> {
+  if (typeof window === 'undefined' || !window.indexedDB) return null
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(HISTORY_DB_NAME, HISTORY_DB_VERSION)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(HISTORY_STORE_NAME)) {
+        db.createObjectStore(HISTORY_STORE_NAME)
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => resolve(null)
+  })
+}
+
+function readHistoryFromDatabase(db: IDBDatabase): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(HISTORY_STORE_NAME, 'readonly')
+    const store = transaction.objectStore(HISTORY_STORE_NAME)
+    const request = store.get(HISTORY_RECORD_KEY)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+function writeHistoryToDatabase(db: IDBDatabase, items: HistoryItem[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(HISTORY_STORE_NAME, 'readwrite')
+    const store = transaction.objectStore(HISTORY_STORE_NAME)
+    store.put(items, HISTORY_RECORD_KEY)
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+    transaction.onabort = () => reject(transaction.error)
+  })
+}
+
+function clearHistoryDatabase(db: IDBDatabase): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(HISTORY_STORE_NAME, 'readwrite')
+    const store = transaction.objectStore(HISTORY_STORE_NAME)
+    store.delete(HISTORY_RECORD_KEY)
+    transaction.oncomplete = () => resolve()
+    transaction.onerror = () => reject(transaction.error)
+    transaction.onabort = () => reject(transaction.error)
+  })
+}
+
+function normalizeHistoryItems(value: unknown): HistoryItem[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item): HistoryItem | null => {
+      if (!item || typeof item !== 'object') return null
+      const candidate = item as Partial<HistoryItem>
+      const images = Array.isArray(candidate.images)
+        ? candidate.images.filter((url): url is string => typeof url === 'string' && url.trim().length > 0)
+        : []
+      const thumbnail = typeof candidate.thumbnail === 'string' && candidate.thumbnail.trim()
+        ? candidate.thumbnail
+        : images[0]
+      const quality = imageGenerationQualities.includes(candidate.quality as ImageGenerationQuality)
+        ? candidate.quality as ImageGenerationQuality
+        : 'high'
+      if (
+        typeof candidate.id !== 'string' ||
+        typeof candidate.prompt !== 'string' ||
+        typeof candidate.model !== 'string' ||
+        typeof candidate.size !== 'string' ||
+        typeof candidate.createdAt !== 'string' ||
+        !thumbnail ||
+        images.length === 0
+      ) {
+        return null
+      }
+      return {
+        id: candidate.id,
+        prompt: candidate.prompt,
+        model: candidate.model,
+        size: candidate.size,
+        quality,
+        thumbnail,
+        images,
+        createdAt: candidate.createdAt
+      }
+    })
+    .filter((item): item is HistoryItem => item !== null)
+    .slice(0, HISTORY_LIMIT)
+}
+
+function loadHistoryFromLocalStorage(): HistoryItem[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY)
-    if (!raw) return
+    if (!raw) return []
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return
-    history.value = parsed.filter((item) => item?.id && item?.thumbnail && Array.isArray(item?.images)).slice(0, 8)
+    return normalizeHistoryItems(parsed)
   } catch {
-    history.value = []
+    return []
   }
 }
 
-function saveHistory() {
+async function loadHistory() {
   try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.value))
+    const db = await openHistoryDatabase()
+    if (db) {
+      try {
+        const storedItems = normalizeHistoryItems(await readHistoryFromDatabase(db))
+        if (storedItems.length > 0) {
+          history.value = storedItems
+          return
+        }
+
+        const legacyItems = loadHistoryFromLocalStorage()
+        history.value = legacyItems
+        if (legacyItems.length > 0) {
+          await writeHistoryToDatabase(db, legacyItems)
+          localStorage.removeItem(HISTORY_KEY)
+        }
+        return
+      } finally {
+        db.close()
+      }
+    }
+
+    history.value = loadHistoryFromLocalStorage()
   } catch {
-    // Data URLs can be large; silently skip persistence when storage is full.
+    history.value = loadHistoryFromLocalStorage()
+  }
+}
+
+async function saveHistory() {
+  const items = history.value.slice(0, HISTORY_LIMIT)
+  try {
+    const db = await openHistoryDatabase()
+    if (db) {
+      try {
+        await writeHistoryToDatabase(db, items)
+        localStorage.removeItem(HISTORY_KEY)
+        return
+      } finally {
+        db.close()
+      }
+    }
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
+  } catch {
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
+    } catch {
+      // Data URLs can exceed localStorage; the current in-memory history remains usable.
+    }
   }
 }
 
@@ -1090,9 +1228,20 @@ function rememberCustomSize(value: ImageGenerationSize) {
   saveCustomSizes()
 }
 
-function clearHistory() {
+async function clearHistory() {
   history.value = []
   localStorage.removeItem(HISTORY_KEY)
+  try {
+    const db = await openHistoryDatabase()
+    if (!db) return
+    try {
+      await clearHistoryDatabase(db)
+    } finally {
+      db.close()
+    }
+  } catch {
+    // Clearing local state is enough if persistent storage is temporarily unavailable.
+  }
 }
 
 async function copyImage(url: string) {
@@ -1151,7 +1300,7 @@ watch(selectedKey, (key) => {
 
 onMounted(() => {
   loadCustomSizes()
-  loadHistory()
+  void loadHistory()
   loadKeys()
 })
 
