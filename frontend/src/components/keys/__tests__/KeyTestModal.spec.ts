@@ -87,23 +87,18 @@ describe('KeyTestModal', () => {
     vi.restoreAllMocks()
   })
 
-  it('uses marketplace pricing alias as request model while displaying model name', async () => {
+  it('loads supported models through the API key model endpoint', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: {
-            items: [
-              {
-                model_name: 'claude-opus-4.8',
-                pricing_aliases: ['claude-opus-4-8'],
-                vendor_name: 'Anthropic',
-                groups: ['Claude Max'],
-                sort_order: 5,
-                enabled: true
-              }
-            ]
-          }
+          object: 'list',
+          data: [
+            {
+              id: 'claude-opus-4-8',
+              display_name: 'Claude Opus 4.8'
+            }
+          ]
         })
       } as any)
       .mockResolvedValueOnce({
@@ -140,6 +135,8 @@ describe('KeyTestModal', () => {
     await flushPromises()
 
     expect(global.fetch).toHaveBeenCalledTimes(2)
+    expect((global.fetch as any).mock.calls[0][0]).toBe('/v1/models')
+    expect((global.fetch as any).mock.calls[0][1].headers.Authorization).toBe('Bearer sk-test')
     const [url, options] = (global.fetch as any).mock.calls[1]
     expect(url).toBe('/v1/messages')
     expect(JSON.parse(options.body)).toMatchObject({
@@ -147,34 +144,26 @@ describe('KeyTestModal', () => {
     })
   })
 
-  it('tests Codex with latest marketplace model through Chat Completions API', async () => {
-    const codexMarketplaceResponse = {
+  it('tests Codex with account-supported models through Chat Completions API', async () => {
+    const codexModelsResponse = {
       ok: true,
       json: async () => ({
-        data: {
-          items: [
-            {
-              model_name: 'gpt-5.5',
-              vendor_name: 'OpenAI',
-              groups: ['Codex Pro'],
-              sort_order: 50,
-              enabled: true
-            },
-            {
-              model_name: 'gpt-5.4',
-              vendor_name: 'OpenAI',
-              groups: ['Codex Pro'],
-              sort_order: 60,
-              enabled: true
-            }
-          ]
-        }
+        object: 'list',
+        data: [
+          { id: 'gpt-5.5', display_name: 'GPT-5.5' },
+          { id: 'gpt-5.4', display_name: 'GPT-5.4' },
+          { id: 'gpt-5.4-mini', display_name: 'GPT-5.4 Mini' },
+          { id: 'gpt-5.3-codex', display_name: 'GPT-5.3 Codex' },
+          { id: 'gpt-5.3-codex-spark', display_name: 'GPT-5.3 Codex Spark' },
+          { id: 'gpt-5.2', display_name: 'GPT-5.2' },
+          { id: 'gpt-image-2', display_name: 'GPT Image 2' }
+        ]
       })
     } as any
 
     global.fetch = vi.fn()
-      .mockResolvedValueOnce(codexMarketplaceResponse)
-      .mockResolvedValueOnce(codexMarketplaceResponse)
+      .mockResolvedValueOnce(codexModelsResponse)
+      .mockResolvedValueOnce(codexModelsResponse)
       .mockResolvedValueOnce({
         ok: true,
         body: {
@@ -202,6 +191,15 @@ describe('KeyTestModal', () => {
     await flushPromises()
 
     expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('gpt-5.5')
+    expect(wrapper.findAll('option').map((option) => option.attributes('value'))).toEqual([
+      'gpt-5.5',
+      'gpt-5.4',
+      'gpt-5.4-mini',
+      'gpt-5.3-codex',
+      'gpt-5.3-codex-spark',
+      'gpt-5.2',
+      'gpt-image-2'
+    ])
 
     await wrapper.find('select').setValue('gpt-5.4')
     expect((wrapper.find('select').element as HTMLSelectElement).value).toBe('gpt-5.4')
@@ -216,6 +214,8 @@ describe('KeyTestModal', () => {
     await flushPromises()
 
     expect(global.fetch).toHaveBeenCalledTimes(3)
+    expect((global.fetch as any).mock.calls[0][0]).toBe('/v1/models')
+    expect((global.fetch as any).mock.calls[0][1].headers.Authorization).toBe('Bearer sk-codex')
     const [url, options] = (global.fetch as any).mock.calls[2]
     expect(url).toBe('/v1/chat/completions')
     expect(JSON.parse(options.body)).toMatchObject({
@@ -226,22 +226,16 @@ describe('KeyTestModal', () => {
     })
   })
 
-  it('defaults image-enabled OpenAI groups to image generation test mode', async () => {
+  it('supports image generation test mode for image-capable OpenAI models', async () => {
     global.fetch = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          data: {
-            items: [
-              {
-                model_name: 'gpt-5.5',
-                vendor_name: 'OpenAI',
-                groups: ['Codex Pro'],
-                sort_order: 50,
-                enabled: true
-              }
-            ]
-          }
+          object: 'list',
+          data: [
+            { id: 'gpt-5.5', display_name: 'GPT-5.5' },
+            { id: 'gpt-image-2', display_name: 'GPT Image 2' }
+          ]
         })
       } as any)
       .mockResolvedValueOnce({
@@ -269,7 +263,11 @@ describe('KeyTestModal', () => {
     await flushPromises()
 
     const modelSelect = wrapper.find('select').element as HTMLSelectElement
-    expect(modelSelect.value).toBe('gpt-image-2')
+    expect(modelSelect.value).toBe('gpt-5.5')
+
+    await wrapper.find('select').setValue('gpt-image-2')
+    await flushPromises()
+
     expect(wrapper.text()).toContain('keys.testModal.imagePromptLabel')
     expect(wrapper.text()).toContain('keys.testModal.imageSizeLabel')
 

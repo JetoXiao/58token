@@ -65,8 +65,8 @@
         <Select
           v-model="selectedModelId"
           :options="availableModels"
-          :disabled="status === 'connecting' || marketplaceLoading || !canTest || availableModels.length === 0"
-          :placeholder="marketplaceLoading ? t('common.loading') : t('keys.testModal.selectModel')"
+          :disabled="status === 'connecting' || modelsLoading || !canTest || availableModels.length === 0"
+          :placeholder="modelsLoading ? t('common.loading') : t('keys.testModal.selectModel')"
         />
       </div>
 
@@ -273,7 +273,7 @@ import TextArea from '@/components/common/TextArea.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { maskApiKey } from '@/utils/maskApiKey'
-import type { ApiKey, GroupPlatform } from '@/types'
+import type { ApiKey } from '@/types'
 
 interface OutputLine {
   text: string
@@ -292,18 +292,16 @@ type ModelOption = Record<string, unknown> & {
 
 type ImageSizeTier = '1K' | '2K' | '4K'
 
-interface MarketplaceItemResponse {
-  model_name: string
-  pricing_aliases?: string[]
-  vendor_name?: string
-  groups?: string[]
-  endpoints?: string[]
-  sort_order?: number
-  enabled?: boolean
+interface GatewayModelResponse {
+  id?: string
+  name?: string
+  display_name?: string
+  displayName?: string
 }
 
-interface MarketplaceResponse {
-  items: MarketplaceItemResponse[]
+interface GatewayModelsResponse {
+  data?: GatewayModelResponse[]
+  models?: GatewayModelResponse[]
 }
 
 const props = defineProps<{
@@ -324,8 +322,8 @@ const status = ref<'idle' | 'connecting' | 'success' | 'error'>('idle')
 const outputLines = ref<OutputLine[]>([])
 const streamingContent = ref('')
 const errorMessage = ref('')
-const marketplaceItems = ref<MarketplaceItemResponse[]>([])
-const marketplaceLoading = ref(false)
+const availableModels = ref<ModelOption[]>([])
+const modelsLoading = ref(false)
 const testPrompt = ref('')
 const selectedImageSizeTier = ref<ImageSizeTier>('1K')
 const generatedImages = ref<PreviewImage[]>([])
@@ -333,7 +331,6 @@ const previewImageUrl = ref('')
 let abortController: AbortController | null = null
 
 const platform = computed(() => props.apiKey?.group?.platform ?? null)
-const groupName = computed(() => props.apiKey?.group?.name ?? '')
 const canTest = computed(() => !!props.apiKey?.group && props.apiKey.status === 'active')
 const normalizedSelectedModelId = computed(() => normalizeModelId(selectedModelId.value))
 const groupAllowsImageGeneration = computed(() => props.apiKey?.group?.allow_image_generation === true)
@@ -358,62 +355,6 @@ const imageSizeOptions = computed(() => [
   { value: '2K', label: t('keys.testModal.imageSize2k') },
   { value: '4K', label: t('keys.testModal.imageSize4k') }
 ])
-const imageFallbackModelOptions = computed<ModelOption[]>(() => {
-  if (!groupAllowsImageGeneration.value) return []
-
-  switch (platform.value) {
-    case 'openai':
-      return [{
-        value: 'gpt-image-2',
-        label: 'GPT Image 2',
-        source: 'image-fallback'
-      }]
-    case 'gemini':
-    case 'antigravity':
-      return [{
-        value: 'gemini-2.5-flash-image',
-        label: 'Gemini 2.5 Flash Image',
-        source: 'image-fallback'
-      }]
-    default:
-      return []
-  }
-})
-
-const marketplaceModelOptions = computed<ModelOption[]>(() => {
-  const enabledItems = marketplaceItems.value.filter((item) => item.enabled !== false && item.model_name)
-  if (enabledItems.length === 0) return []
-
-  const groupMatchedItems = groupName.value
-    ? enabledItems.filter((item) => includesNormalized(item.groups, groupName.value))
-    : []
-  const scopedItems = groupMatchedItems.length > 0
-    ? groupMatchedItems
-    : enabledItems.filter((item) => isMarketplaceItemForPlatform(item, platform.value))
-
-  const seen = new Set<string>()
-  return scopedItems
-    .slice()
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.model_name.localeCompare(b.model_name))
-    .flatMap((item) => {
-      const modelName = item.model_name.trim()
-      const requestModelName = marketplaceRequestModelName(item)
-      if (!modelName || !requestModelName || seen.has(requestModelName)) return []
-      seen.add(requestModelName)
-      return [{
-        value: requestModelName,
-        label: humanizeModelName(modelName),
-        marketplaceModelName: modelName,
-        vendorName: item.vendor_name,
-        pricingAliases: item.pricing_aliases ?? []
-      }]
-    })
-})
-
-const availableModels = computed(() => mergeModelOptions([
-  ...imageFallbackModelOptions.value,
-  ...marketplaceModelOptions.value
-]))
 
 watch(
   () => props.show,
@@ -423,7 +364,7 @@ watch(
       selectedModelId.value = ''
       testPrompt.value = ''
       selectedImageSizeTier.value = '1K'
-      loadMarketplaceModels()
+      loadAvailableModels()
     } else {
       abortStream()
     }
@@ -431,15 +372,10 @@ watch(
 )
 
 watch(platform, () => {
-  selectDefaultModel()
-})
-
-watch(groupName, () => {
-  selectDefaultModel()
-})
-
-watch(availableModels, () => {
-  selectDefaultModel()
+  if (props.show) {
+    selectedModelId.value = ''
+    loadAvailableModels()
+  }
 })
 
 watch([selectedModelId, supportsImageTest], () => {
@@ -457,33 +393,52 @@ const selectDefaultModel = () => {
   selectedModelId.value = availableModels.value[0]?.value ?? ''
 }
 
-const loadMarketplaceModels = async () => {
-  marketplaceLoading.value = true
+const loadAvailableModels = async () => {
+  if (!props.apiKey?.key || !canTest.value) {
+    availableModels.value = []
+    selectedModelId.value = ''
+    return
+  }
+
+  modelsLoading.value = true
   try {
-    const response = await fetch('/api/v1/public/model-marketplace', {
-      headers: { Accept: 'application/json' }
+    const response = await fetch(modelListEndpoint(), {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${props.apiKey.key}`
+      }
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const payload = unwrapMarketplacePayload(await response.json())
-    marketplaceItems.value = payload.items
+    availableModels.value = mergeModelOptions(unwrapGatewayModelsPayload(await response.json()).map(modelToOption))
   } catch (error) {
-    console.error('Failed to load model marketplace items:', error)
-    marketplaceItems.value = []
+    console.error('Failed to load API key available models:', error)
+    availableModels.value = []
   } finally {
-    marketplaceLoading.value = false
+    modelsLoading.value = false
     selectDefaultModel()
   }
 }
 
-const unwrapMarketplacePayload = (payload: unknown): MarketplaceResponse => {
-  if (!payload || typeof payload !== 'object') return { items: [] }
-  const record = payload as Record<string, unknown>
-  const data = record.data
-  if (data && typeof data === 'object') {
-    const dataRecord = data as Record<string, unknown>
-    return { items: Array.isArray(dataRecord.items) ? dataRecord.items as MarketplaceItemResponse[] : [] }
+const modelListEndpoint = () => {
+  if (platform.value === 'antigravity') return '/antigravity/v1/models'
+  return '/v1/models'
+}
+
+const unwrapGatewayModelsPayload = (payload: unknown): GatewayModelResponse[] => {
+  if (!payload || typeof payload !== 'object') return []
+  const record = payload as GatewayModelsResponse
+  if (Array.isArray(record.data)) return record.data
+  if (Array.isArray(record.models)) return record.models
+  return []
+}
+
+const modelToOption = (model: GatewayModelResponse): ModelOption => {
+  const rawModelName = asString(model.id) || asString(model.name)
+  const modelName = stripModelPrefix(rawModelName)
+  return {
+    value: modelName,
+    label: asString(model.display_name) || asString(model.displayName) || humanizeModelName(modelName)
   }
-  return { items: Array.isArray(record.items) ? record.items as MarketplaceItemResponse[] : [] }
 }
 
 function normalizeText(value: string) {
@@ -494,16 +449,7 @@ function normalizeModelId(value: string) {
   return normalizeText(value).replace(/^models\//, '')
 }
 
-const includesNormalized = (values: string[] | undefined, target: string) => {
-  const normalizedTarget = normalizeText(target)
-  return !!normalizedTarget && (values ?? []).some((value) => normalizeText(value) === normalizedTarget)
-}
-
-const marketplaceRequestModelName = (item: MarketplaceItemResponse) => {
-  const aliases = Array.isArray(item.pricing_aliases) ? item.pricing_aliases : []
-  const alias = aliases.map((value) => value.trim()).find(Boolean)
-  return alias || item.model_name.trim()
-}
+const stripModelPrefix = (value: string) => value.trim().replace(/^models\//i, '')
 
 function mergeModelOptions(options: ModelOption[]) {
   const seen = new Set<string>()
@@ -513,22 +459,6 @@ function mergeModelOptions(options: ModelOption[]) {
     seen.add(value)
     return true
   })
-}
-
-const isMarketplaceItemForPlatform = (item: MarketplaceItemResponse, currentPlatform: GroupPlatform | null) => {
-  const vendorName = normalizeText(item.vendor_name ?? '')
-  switch (currentPlatform) {
-    case 'anthropic':
-      return vendorName === 'anthropic'
-    case 'openai':
-      return vendorName === 'openai'
-    case 'gemini':
-      return vendorName === 'google' || vendorName === 'gemini'
-    case 'antigravity':
-      return vendorName === 'anthropic' || vendorName === 'gemini' || vendorName === 'google'
-    default:
-      return false
-  }
 }
 
 const titleCaseWords = (value: string) => value.replace(/\b[a-z]/g, (char) => char.toUpperCase())
