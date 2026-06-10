@@ -1303,6 +1303,7 @@ export default {
       cny: 'CNY'
     },
     modelDescriptions: {
+      claudeFable5: 'Claude Fable 5 is Anthropic\'s most capable widely released model for demanding reasoning and long-horizon agentic work. It supports a 1M context window, up to 128K output tokens, adaptive thinking, tools, and vision.',
       claudeOpus48: 'Claude Opus 4.8 is Anthropic\'s latest Opus model for complex reasoning, agentic coding, tool use, computer use, vision/PDF input, prompt caching, and long-context workflows. It supports a 1M input context window and up to 128K output tokens.',
       openai: 'OpenAI-compatible model for reasoning, tools, coding, and multimodal workloads.',
       anthropic: 'Claude-family model with strong long-context reasoning, coding, and tool use.',

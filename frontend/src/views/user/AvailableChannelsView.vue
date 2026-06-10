@@ -302,6 +302,7 @@ const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fal
 
 const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {}
 const MARKETPLACE_MODEL_DESCRIPTION_KEYS: Record<string, string> = {
+  'claude-fable-5': 'claudeFable5',
   'claude-opus-4.8': 'claudeOpus48'
 }
 const MARKETPLACE_CAPABILITY_KEYS: Record<string, string> = {

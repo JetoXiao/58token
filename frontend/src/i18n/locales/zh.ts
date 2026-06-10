@@ -1307,6 +1307,7 @@ export default {
       cny: '人民币'
     },
     modelDescriptions: {
+      claudeFable5: 'Claude Fable 5 是 Anthropic 面向高难度推理和长程智能体任务开放的高能力模型。支持 1M 上下文窗口、最高 128K 输出 Token、自适应思考、工具调用和视觉输入。',
       claudeOpus48: 'Claude Opus 4.8 是 Anthropic 最新的 Opus 模型，适合复杂推理、智能体编码、工具调用、电脑操作、视觉/PDF 输入、提示词缓存和长上下文工作流。支持 1M 输入上下文窗口，最高 128K 输出 Token。',
       openai: '兼容 OpenAI 接口的模型，适合推理、工具调用、代码与多模态任务。',
       anthropic: 'Claude 系列模型，适合长上下文推理、代码生成与工具调用。',
