@@ -55,9 +55,10 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 	limitAmount := req.Amount
 	paymentBaseAmount := req.Amount
 	if plan != nil {
-		orderAmount = plan.Price
-		limitAmount = plan.Price
-		paymentBaseAmount = plan.Price
+		effectivePlanPrice := EffectivePlanPrice(plan, time.Now())
+		orderAmount = effectivePlanPrice
+		limitAmount = effectivePlanPrice
+		paymentBaseAmount = effectivePlanPrice
 	} else if req.OrderType == payment.OrderTypeBalance {
 		orderAmount = calculateCreditedBalance(req.Amount, cfg.BalanceRechargeMultiplier, cfg.RechargeBonusThreshold, cfg.RechargeBonusAmount)
 		if req.PaymentAmount > 0 {
@@ -75,6 +76,9 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			return nil, err
 		}
 	}
+	if plan != nil && methodCurrency == payment.TypeUSDT {
+		paymentBaseAmount = calculateUSDTAmountFromCNY(orderAmount, cfg.UsdtCnyExchangeRate)
+	}
 	payAmountStr, payAmount, err := calculateCreateOrderPayAmount(paymentBaseAmount, feeRate, methodCurrency)
 	if err != nil {
 		return nil, err
@@ -91,6 +95,11 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		selectedCurrency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 	}
 	if selectedCurrency != methodCurrency {
+		if plan != nil && selectedCurrency == payment.TypeUSDT {
+			paymentBaseAmount = calculateUSDTAmountFromCNY(orderAmount, cfg.UsdtCnyExchangeRate)
+		} else if plan != nil {
+			paymentBaseAmount = orderAmount
+		}
 		payAmountStr, payAmount, err = calculateCreateOrderPayAmount(paymentBaseAmount, feeRate, selectedCurrency)
 		if err != nil {
 			return nil, err

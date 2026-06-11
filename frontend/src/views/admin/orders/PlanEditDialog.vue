@@ -38,6 +38,22 @@
         <div><label class="input-label">{{ t('payment.admin.price') }} <span class="text-red-500">*</span></label><input v-model.number="planForm.price" type="number" step="0.01" min="0.01" class="input" required /></div>
         <div><label class="input-label">{{ t('payment.admin.originalPrice') }}</label><input v-model.number="planForm.original_price" type="number" step="0.01" min="0" class="input" /></div>
       </div>
+      <div class="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/50 dark:bg-emerald-900/20">
+        <div class="mb-3 flex flex-col gap-1">
+          <label class="text-sm font-semibold text-emerald-800 dark:text-emerald-200">{{ t('payment.admin.limitedOffer') }}</label>
+          <p class="text-xs leading-5 text-emerald-700/80 dark:text-emerald-200/80">{{ t('payment.admin.limitedOfferHint') }}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="input-label">{{ t('payment.admin.limitedOfferPrice') }}</label>
+            <input v-model.number="planForm.limited_offer_price" type="number" step="0.01" min="0" class="input" :placeholder="t('payment.admin.limitedOfferPricePlaceholder')" />
+          </div>
+          <div>
+            <label class="input-label">{{ t('payment.admin.limitedOfferExpiresAt') }}</label>
+            <input v-model="planForm.limited_offer_expires_at" type="datetime-local" class="input" />
+          </div>
+        </div>
+      </div>
       <div class="grid grid-cols-2 gap-4">
         <div><label class="input-label">{{ t('payment.admin.validityDays') }} <span class="text-red-500">*</span></label><input v-model.number="planForm.validity_days" type="number" min="1" class="input" required /></div>
         <div><label class="input-label">{{ t('payment.admin.validityUnit') }} <span class="text-red-500">*</span></label><Select v-model="planForm.validity_unit" :options="validityUnitOptions" /></div>
@@ -105,7 +121,19 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const saving = ref(false)
-const planForm = reactive({ name: '', group_id: null as number | null, description: '', price: 0, original_price: 0, validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
+const planForm = reactive({
+  name: '',
+  group_id: null as number | null,
+  description: '',
+  price: 0,
+  original_price: 0,
+  limited_offer_price: 0,
+  limited_offer_expires_at: '',
+  validity_days: 30,
+  validity_unit: 'days',
+  sort_order: 0,
+  for_sale: true,
+})
 const planFeaturesText = ref('')
 
 const validityUnitOptions = computed(() => [
@@ -133,23 +161,66 @@ const selectedGroupInfo = computed(() => {
 watch(() => props.show, (visible) => {
   if (!visible) return
   if (props.plan) {
-    Object.assign(planForm, { name: props.plan.name, group_id: props.plan.group_id, description: props.plan.description, price: props.plan.price, original_price: props.plan.original_price || 0, validity_days: props.plan.validity_days, validity_unit: props.plan.validity_unit || 'days', sort_order: props.plan.sort_order || 0, for_sale: props.plan.for_sale })
+    Object.assign(planForm, {
+      name: props.plan.name,
+      group_id: props.plan.group_id,
+      description: props.plan.description,
+      price: props.plan.regular_price || props.plan.price,
+      original_price: props.plan.original_price || 0,
+      limited_offer_price: props.plan.limited_offer_price || 0,
+      limited_offer_expires_at: toDateTimeLocalValue(props.plan.limited_offer_expires_at),
+      validity_days: props.plan.validity_days,
+      validity_unit: props.plan.validity_unit || 'days',
+      sort_order: props.plan.sort_order || 0,
+      for_sale: props.plan.for_sale,
+    })
     planFeaturesText.value = (props.plan.features || []).join('\n')
   } else {
-    Object.assign(planForm, { name: '', group_id: null, description: '', price: 0, original_price: 0, validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
+    Object.assign(planForm, { name: '', group_id: null, description: '', price: 0, original_price: 0, limited_offer_price: 0, limited_offer_expires_at: '', validity_days: 30, validity_unit: 'days', sort_order: 0, for_sale: true })
     planFeaturesText.value = ''
   }
 })
 
+function toDateTimeLocalValue(value: string | null | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+function toISOStringOrNull(value: string): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function validateLimitedOffer(): boolean {
+  const limitedOfferPrice = Number(planForm.limited_offer_price || 0)
+  if (limitedOfferPrice <= 0) return true
+  if (limitedOfferPrice >= Number(planForm.price || 0)) {
+    appStore.showError(t('payment.admin.limitedOfferPriceMustBeLower'))
+    return false
+  }
+  if (!toISOStringOrNull(planForm.limited_offer_expires_at)) {
+    appStore.showError(t('payment.admin.limitedOfferExpiresRequired'))
+    return false
+  }
+  return true
+}
+
 /** Build request payload with snake_case keys matching backend JSON tags */
 function buildPlanPayload() {
   const features = planFeaturesText.value.split('\n').map(f => f.trim()).filter(Boolean).join('\n')
+  const limitedOfferPrice = Number(planForm.limited_offer_price || 0)
   return {
     name: planForm.name,
     group_id: planForm.group_id,
     description: planForm.description,
     price: planForm.price,
     original_price: planForm.original_price || 0,
+    limited_offer_price: limitedOfferPrice > 0 ? limitedOfferPrice : 0,
+    limited_offer_expires_at: limitedOfferPrice > 0 ? toISOStringOrNull(planForm.limited_offer_expires_at) : null,
     validity_days: planForm.validity_days,
     validity_unit: planForm.validity_unit,
     sort_order: planForm.sort_order,
@@ -171,6 +242,7 @@ async function handleSavePlan() {
     appStore.showError(t('payment.admin.validityDaysRequired'))
     return
   }
+  if (!validateLimitedOffer()) return
   saving.value = true
   try {
     const data = buildPlanPayload()

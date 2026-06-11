@@ -9,7 +9,7 @@ import (
 
 const expiryCheckTimeout = 30 * time.Second
 
-// PaymentOrderExpiryService periodically expires timed-out payment orders.
+// PaymentOrderExpiryService periodically reconciles and cancels timed-out payment orders.
 type PaymentOrderExpiryService struct {
 	paymentSvc *PaymentService
 	interval   time.Duration
@@ -70,12 +70,12 @@ func (s *PaymentOrderExpiryService) runOnce() {
 
 	expireCtx, cancel := context.WithTimeout(context.Background(), expiryCheckTimeout)
 	defer cancel()
-	expired, err := s.paymentSvc.ExpireTimedOutOrders(expireCtx)
+	cancelled, err := s.paymentSvc.ExpireTimedOutOrders(expireCtx)
 	if err != nil {
-		slog.Error("[PaymentOrderExpiry] failed to expire orders", "error", err)
+		slog.Error("[PaymentOrderExpiry] failed to cancel timed-out orders", "error", err)
 		return
 	}
-	if expired > 0 {
-		slog.Info("[PaymentOrderExpiry] expired timed-out orders", "count", expired)
+	if cancelled > 0 {
+		slog.Info("[PaymentOrderExpiry] cancelled timed-out orders", "count", cancelled)
 	}
 }

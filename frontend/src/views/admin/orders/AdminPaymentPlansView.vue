@@ -29,8 +29,26 @@
         </template>
         <template #cell-price="{ value, row }">
           <div class="text-sm">
-            <span class="font-medium text-gray-900 dark:text-white">${{ (value ?? 0).toFixed(2) }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">${{ (effectiveAdminPlanPrice(row) ?? value ?? 0).toFixed(2) }}</span>
             <span v-if="row.original_price" class="ml-1 text-xs text-gray-400 line-through">${{ row.original_price.toFixed(2) }}</span>
+            <div v-if="row.limited_offer_price && row.limited_offer_expires_at" class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+              <span
+                :class="[
+                  'rounded-full px-2 py-0.5 font-semibold',
+                  isLimitedOfferActive(row)
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300'
+                    : 'bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-gray-400',
+                ]"
+              >
+                {{ isLimitedOfferActive(row) ? t('payment.admin.limitedOfferActive') : t('payment.admin.limitedOfferExpired') }}
+              </span>
+              <span class="text-gray-400">
+                {{ t('payment.admin.limitedOfferUntil', { time: formatLimitedOfferDate(row.limited_offer_expires_at) }) }}
+              </span>
+              <span v-if="row.regular_price || row.price" class="text-gray-400">
+                {{ t('payment.admin.restorePrice', { price: formatUsd(row.regular_price || row.price) }) }}
+              </span>
+            </div>
           </div>
         </template>
         <template #cell-validity_days="{ value, row }">
@@ -117,6 +135,27 @@ function getPlanNameClass(groupId: number): string {
   return group ? platformTextClass(group.platform) : 'text-gray-900 dark:text-white'
 }
 
+function isLimitedOfferActive(plan: SubscriptionPlan): boolean {
+  if (plan.limited_offer_active != null) return plan.limited_offer_active
+  if (!plan.limited_offer_price || !plan.limited_offer_expires_at) return false
+  return new Date(plan.limited_offer_expires_at).getTime() > Date.now()
+}
+
+function effectiveAdminPlanPrice(plan: SubscriptionPlan): number {
+  return isLimitedOfferActive(plan) && plan.limited_offer_price
+    ? plan.limited_offer_price
+    : plan.price
+}
+
+function formatLimitedOfferDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+function formatUsd(value: number): string {
+  return `$${Number(value || 0).toFixed(2)}`
+}
 
 // ==================== Plans ====================
 

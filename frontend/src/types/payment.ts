@@ -120,6 +120,10 @@ export interface SubscriptionPlan {
   description: string
   price: number
   original_price?: number
+  regular_price?: number
+  limited_offer_price?: number | null
+  limited_offer_expires_at?: string | null
+  limited_offer_active?: boolean
   validity_days: number
   validity_unit: string
   /** Stored as JSON string in backend; API layer should parse before use */

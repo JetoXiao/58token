@@ -383,9 +383,9 @@ func (s *PaymentService) ExpireTimedOutOrders(ctx context.Context) (int, error) 
 	}
 	n := 0
 	for _, o := range orders {
-		// Check upstream payment status before expiring — the user may have
+		// Check upstream payment status before cancelling; the user may have
 		// paid just before timeout and the webhook hasn't arrived yet.
-		outcome, _ := s.cancelCore(ctx, o, OrderStatusExpired, "system", "order expired")
+		outcome, _ := s.cancelCore(ctx, o, OrderStatusCancelled, "system", "order timed out and was auto-cancelled")
 		if outcome == checkPaidResultAlreadyPaid {
 			slog.Info("order was paid during expiry", "orderID", o.ID)
 			continue

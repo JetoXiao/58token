@@ -39,6 +39,15 @@ func TestCalculateCreditedBalanceIncludesRechargeBonus(t *testing.T) {
 	}
 }
 
+func TestCalculateUSDTAmountFromCNYRoundsUpToFourDecimals(t *testing.T) {
+	t.Parallel()
+
+	got := calculateUSDTAmountFromCNY(99, 7)
+	if got != 14.1429 {
+		t.Fatalf("calculateUSDTAmountFromCNY() = %v, want 14.1429", got)
+	}
+}
+
 func TestComputeSubscriptionPlanValidityDays(t *testing.T) {
 	t.Parallel()
 

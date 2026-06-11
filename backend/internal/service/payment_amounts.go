@@ -65,6 +65,17 @@ func calculateCreditedBalance(paymentAmount, multiplier, bonusThreshold, bonusAm
 		InexactFloat64()
 }
 
+func calculateUSDTAmountFromCNY(cnyAmount, exchangeRate float64) float64 {
+	if cnyAmount <= 0 {
+		return 0
+	}
+	rate := normalizeUsdtCnyExchangeRate(exchangeRate)
+	return decimal.NewFromFloat(cnyAmount).
+		Div(decimal.NewFromFloat(rate)).
+		RoundUp(4).
+		InexactFloat64()
+}
+
 func calculateGatewayRefundAmount(orderAmount, payAmount, refundAmount float64, currency string) float64 {
 	if orderAmount <= 0 || payAmount <= 0 || refundAmount <= 0 {
 		return 0

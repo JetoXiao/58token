@@ -27,6 +27,10 @@ type SubscriptionPlan struct {
 	Price float64 `json:"price,omitempty"`
 	// OriginalPrice holds the value of the "original_price" field.
 	OriginalPrice *float64 `json:"original_price,omitempty"`
+	// LimitedOfferPrice holds the value of the "limited_offer_price" field.
+	LimitedOfferPrice *float64 `json:"limited_offer_price,omitempty"`
+	// LimitedOfferExpiresAt holds the value of the "limited_offer_expires_at" field.
+	LimitedOfferExpiresAt *time.Time `json:"limited_offer_expires_at,omitempty"`
 	// ValidityDays holds the value of the "validity_days" field.
 	ValidityDays int `json:"validity_days,omitempty"`
 	// ValidityUnit holds the value of the "validity_unit" field.
@@ -53,13 +57,13 @@ func (*SubscriptionPlan) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case subscriptionplan.FieldForSale:
 			values[i] = new(sql.NullBool)
-		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice:
+		case subscriptionplan.FieldPrice, subscriptionplan.FieldOriginalPrice, subscriptionplan.FieldLimitedOfferPrice:
 			values[i] = new(sql.NullFloat64)
 		case subscriptionplan.FieldID, subscriptionplan.FieldGroupID, subscriptionplan.FieldValidityDays, subscriptionplan.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
 		case subscriptionplan.FieldName, subscriptionplan.FieldDescription, subscriptionplan.FieldValidityUnit, subscriptionplan.FieldFeatures, subscriptionplan.FieldProductName:
 			values[i] = new(sql.NullString)
-		case subscriptionplan.FieldCreatedAt, subscriptionplan.FieldUpdatedAt:
+		case subscriptionplan.FieldLimitedOfferExpiresAt, subscriptionplan.FieldCreatedAt, subscriptionplan.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -112,6 +116,20 @@ func (_m *SubscriptionPlan) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OriginalPrice = new(float64)
 				*_m.OriginalPrice = value.Float64
+			}
+		case subscriptionplan.FieldLimitedOfferPrice:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field limited_offer_price", values[i])
+			} else if value.Valid {
+				_m.LimitedOfferPrice = new(float64)
+				*_m.LimitedOfferPrice = value.Float64
+			}
+		case subscriptionplan.FieldLimitedOfferExpiresAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field limited_offer_expires_at", values[i])
+			} else if value.Valid {
+				_m.LimitedOfferExpiresAt = new(time.Time)
+				*_m.LimitedOfferExpiresAt = value.Time
 			}
 		case subscriptionplan.FieldValidityDays:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -212,6 +230,16 @@ func (_m *SubscriptionPlan) String() string {
 	if v := _m.OriginalPrice; v != nil {
 		builder.WriteString("original_price=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.LimitedOfferPrice; v != nil {
+		builder.WriteString("limited_offer_price=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.LimitedOfferExpiresAt; v != nil {
+		builder.WriteString("limited_offer_expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("validity_days=")

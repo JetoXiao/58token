@@ -143,6 +143,44 @@ function checkoutInfoWithPlansFixture() {
   }
 }
 
+function checkoutInfoWithUsdtAndAlipayPlansFixture() {
+  const base = checkoutInfoWithPlansFixture().data
+  return {
+    data: {
+      ...base,
+      methods: {
+        usdt: {
+          currency: 'USDT',
+          daily_limit: 0,
+          daily_used: 0,
+          daily_remaining: 0,
+          single_min: 0,
+          single_max: 0,
+          fee_rate: 0,
+          available: true,
+        },
+        alipay: {
+          currency: 'CNY',
+          daily_limit: 0,
+          daily_used: 0,
+          daily_remaining: 0,
+          single_min: 0,
+          single_max: 0,
+          fee_rate: 0,
+          available: true,
+        },
+      },
+      usdt_cny_exchange_rate: 7,
+      plans: [
+        {
+          ...base.plans[0],
+          price: 99,
+        },
+      ],
+    },
+  }
+}
+
 function jsapiOrderFixture(resumeToken: string) {
   return {
     order_id: 123,
@@ -417,5 +455,50 @@ describe('PaymentView WeChat JSAPI flow', () => {
     expect(showWarning).toHaveBeenCalledWith('payment.errors.mobilePaymentFallbackToQr')
     expect(showError).not.toHaveBeenCalled()
     expect(window.localStorage.getItem(PAYMENT_RECOVERY_STORAGE_KEY)).toContain('weixin://wxpay/bizpayurl?pr=fallback-native')
+  })
+
+  it('keeps subscription payment method independent and submits USDT converted amount', async () => {
+    routeState.query = { tab: 'subscription' }
+    getCheckoutInfo.mockResolvedValue(checkoutInfoWithUsdtAndAlipayPlansFixture())
+    createOrder.mockResolvedValue({
+      order_id: 901,
+      amount: 99,
+      pay_amount: 14.1429,
+      fee_rate: 0,
+      expires_at: '2099-01-01T00:10:00.000Z',
+      payment_type: 'usdt',
+      qr_code: 'usdt:order-901',
+      payment_mode: 'qrcode',
+      result_type: 'order_created' as const,
+    })
+
+    const wrapper = shallowMount(PaymentView, {
+      global: {
+        stubs: {
+          AppLayout: {
+            template: '<div><slot /></div>',
+          },
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    })
+    await flushPromises()
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'SubscriptionPlanCard' }).vm.$emit('select', checkoutInfoWithUsdtAndAlipayPlansFixture().data.plans[0])
+    await flushPromises()
+    wrapper.findComponent({ name: 'PaymentMethodSelector' }).vm.$emit('select', 'usdt')
+    await flushPromises()
+    await wrapper.find('button.btn').trigger('click')
+    await flushPromises()
+
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({
+      amount: 99,
+      payment_amount: 14.1429,
+      payment_type: 'usdt',
+      order_type: 'subscription',
+      plan_id: 7,
+    }))
   })
 })

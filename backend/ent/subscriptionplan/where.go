@@ -79,6 +79,16 @@ func OriginalPrice(v float64) predicate.SubscriptionPlan {
 	return predicate.SubscriptionPlan(sql.FieldEQ(FieldOriginalPrice, v))
 }
 
+// LimitedOfferPrice applies equality check predicate on the "limited_offer_price" field. It's identical to LimitedOfferPriceEQ.
+func LimitedOfferPrice(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldEQ(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferExpiresAt applies equality check predicate on the "limited_offer_expires_at" field. It's identical to LimitedOfferExpiresAtEQ.
+func LimitedOfferExpiresAt(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldEQ(FieldLimitedOfferExpiresAt, v))
+}
+
 // ValidityDays applies equality check predicate on the "validity_days" field. It's identical to ValidityDaysEQ.
 func ValidityDays(v int) predicate.SubscriptionPlan {
 	return predicate.SubscriptionPlan(sql.FieldEQ(FieldValidityDays, v))
@@ -377,6 +387,106 @@ func OriginalPriceIsNil() predicate.SubscriptionPlan {
 // OriginalPriceNotNil applies the NotNil predicate on the "original_price" field.
 func OriginalPriceNotNil() predicate.SubscriptionPlan {
 	return predicate.SubscriptionPlan(sql.FieldNotNull(FieldOriginalPrice))
+}
+
+// LimitedOfferPriceEQ applies the EQ predicate on the "limited_offer_price" field.
+func LimitedOfferPriceEQ(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldEQ(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceNEQ applies the NEQ predicate on the "limited_offer_price" field.
+func LimitedOfferPriceNEQ(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNEQ(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceIn applies the In predicate on the "limited_offer_price" field.
+func LimitedOfferPriceIn(vs ...float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldIn(FieldLimitedOfferPrice, vs...))
+}
+
+// LimitedOfferPriceNotIn applies the NotIn predicate on the "limited_offer_price" field.
+func LimitedOfferPriceNotIn(vs ...float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNotIn(FieldLimitedOfferPrice, vs...))
+}
+
+// LimitedOfferPriceGT applies the GT predicate on the "limited_offer_price" field.
+func LimitedOfferPriceGT(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldGT(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceGTE applies the GTE predicate on the "limited_offer_price" field.
+func LimitedOfferPriceGTE(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldGTE(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceLT applies the LT predicate on the "limited_offer_price" field.
+func LimitedOfferPriceLT(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldLT(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceLTE applies the LTE predicate on the "limited_offer_price" field.
+func LimitedOfferPriceLTE(v float64) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldLTE(FieldLimitedOfferPrice, v))
+}
+
+// LimitedOfferPriceIsNil applies the IsNil predicate on the "limited_offer_price" field.
+func LimitedOfferPriceIsNil() predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldIsNull(FieldLimitedOfferPrice))
+}
+
+// LimitedOfferPriceNotNil applies the NotNil predicate on the "limited_offer_price" field.
+func LimitedOfferPriceNotNil() predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNotNull(FieldLimitedOfferPrice))
+}
+
+// LimitedOfferExpiresAtEQ applies the EQ predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtEQ(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldEQ(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtNEQ applies the NEQ predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtNEQ(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNEQ(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtIn applies the In predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtIn(vs ...time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldIn(FieldLimitedOfferExpiresAt, vs...))
+}
+
+// LimitedOfferExpiresAtNotIn applies the NotIn predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtNotIn(vs ...time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNotIn(FieldLimitedOfferExpiresAt, vs...))
+}
+
+// LimitedOfferExpiresAtGT applies the GT predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtGT(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldGT(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtGTE applies the GTE predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtGTE(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldGTE(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtLT applies the LT predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtLT(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldLT(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtLTE applies the LTE predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtLTE(v time.Time) predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldLTE(FieldLimitedOfferExpiresAt, v))
+}
+
+// LimitedOfferExpiresAtIsNil applies the IsNil predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtIsNil() predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldIsNull(FieldLimitedOfferExpiresAt))
+}
+
+// LimitedOfferExpiresAtNotNil applies the NotNil predicate on the "limited_offer_expires_at" field.
+func LimitedOfferExpiresAtNotNil() predicate.SubscriptionPlan {
+	return predicate.SubscriptionPlan(sql.FieldNotNull(FieldLimitedOfferExpiresAt))
 }
 
 // ValidityDaysEQ applies the EQ predicate on the "validity_days" field.

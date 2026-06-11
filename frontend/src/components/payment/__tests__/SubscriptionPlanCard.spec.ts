@@ -31,10 +31,14 @@ const i18n = createI18n({
           originalPrice: msg("Original"),
           quota: msg("Quota"),
           rate: msg("Rate"),
+          restorePrice: msg("Restores to"),
           saveAmount: (ctx: { named: (key: string) => unknown }) => `Save ${named(ctx, "amount")}`,
           unlimited: msg("Unlimited"),
           validFor: (ctx: { named: (key: string) => unknown }) => `Valid for ${named(ctx, "duration")}`,
           weeklyLimit: msg("Weekly"),
+          limitedOffer: msg("Limited-time offer"),
+          limitedOfferUntil: (ctx: { named: (key: string) => unknown }) =>
+            `Offer ends ${named(ctx, "time")}; then restores to ${named(ctx, "price")}.`,
           workdayFriendly: msg("Workday-friendly quota"),
           workdayFriendlyDesc: (ctx: { named: (key: string) => unknown }) =>
             `${named(ctx, "daily")} per day and ${named(ctx, "weekly")} per week, tuned for Monday-Friday usage.`,
@@ -119,5 +123,50 @@ describe("SubscriptionPlanCard", () => {
     expect(text).toContain("$300");
     expect(text).toContain("Workday-friendly quota");
     expect(text).toContain("$15 per day and $70 per week");
+  });
+
+  it("shows workday-friendly quota messaging for every plan with daily and weekly limits", () => {
+    const text = mountPlanCard("openai", {
+      name: "Codex Pro",
+      daily_limit_usd: 20,
+      weekly_limit_usd: 105,
+      monthly_limit_usd: 450,
+    }).text();
+
+    expect(text).toContain("Workday-friendly quota");
+    expect(text).toContain("$20 per day and $105 per week");
+  });
+
+  it("highlights active limited-time offers", () => {
+    const text = mountPlanCard("openai", {
+      price: 99,
+      regular_price: 129,
+      original_price: 0,
+      limited_offer_price: 99,
+      limited_offer_expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      limited_offer_active: true,
+    }).text();
+
+    expect(text).toContain("Limited-time offer");
+    expect(text).toContain("Restores to");
+    expect(text).toContain("$129");
+    expect(text).toContain("Offer ends");
+  });
+
+  it("calculates limited-time offer savings against configured original price", () => {
+    const text = mountPlanCard("openai", {
+      price: 99,
+      regular_price: 129,
+      original_price: 400,
+      limited_offer_price: 99,
+      limited_offer_expires_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+      limited_offer_active: true,
+    }).text();
+
+    expect(text).toContain("75% off");
+    expect(text).toContain("Save $301");
+    expect(text).toContain("Restores to");
+    expect(text).toContain("$129");
+    expect(text).toContain("Originally $400, now $99 to start.");
   });
 });

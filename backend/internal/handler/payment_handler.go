@@ -54,26 +54,33 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 	// Enrich plans with group platform for frontend color coding
 	type planWithPlatform struct {
-		ID            int64    `json:"id"`
-		GroupID       int64    `json:"group_id"`
-		GroupPlatform string   `json:"group_platform"`
-		Name          string   `json:"name"`
-		Description   string   `json:"description"`
-		Price         float64  `json:"price"`
-		OriginalPrice *float64 `json:"original_price,omitempty"`
-		ValidityDays  int      `json:"validity_days"`
-		ValidityUnit  string   `json:"validity_unit"`
-		Features      string   `json:"features"`
-		ProductName   string   `json:"product_name"`
-		ForSale       bool     `json:"for_sale"`
-		SortOrder     int      `json:"sort_order"`
+		ID                    int64      `json:"id"`
+		GroupID               int64      `json:"group_id"`
+		GroupPlatform         string     `json:"group_platform"`
+		Name                  string     `json:"name"`
+		Description           string     `json:"description"`
+		Price                 float64    `json:"price"`
+		OriginalPrice         *float64   `json:"original_price,omitempty"`
+		RegularPrice          float64    `json:"regular_price"`
+		LimitedOfferPrice     *float64   `json:"limited_offer_price,omitempty"`
+		LimitedOfferExpiresAt *time.Time `json:"limited_offer_expires_at,omitempty"`
+		LimitedOfferActive    bool       `json:"limited_offer_active"`
+		ValidityDays          int        `json:"validity_days"`
+		ValidityUnit          string     `json:"validity_unit"`
+		Features              string     `json:"features"`
+		ProductName           string     `json:"product_name"`
+		ForSale               bool       `json:"for_sale"`
+		SortOrder             int        `json:"sort_order"`
 	}
 	platformMap := h.configService.GetGroupPlatformMap(c.Request.Context(), plans)
 	result := make([]planWithPlatform, 0, len(plans))
+	now := time.Now()
 	for _, p := range plans {
+		offerActive := service.IsPlanLimitedOfferActive(p, now)
 		result = append(result, planWithPlatform{
 			ID: int64(p.ID), GroupID: p.GroupID, GroupPlatform: platformMap[p.GroupID],
-			Name: p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
+			Name: p.Name, Description: p.Description, Price: service.EffectivePlanPrice(p, now), OriginalPrice: p.OriginalPrice,
+			RegularPrice: p.Price, LimitedOfferPrice: p.LimitedOfferPrice, LimitedOfferExpiresAt: p.LimitedOfferExpiresAt, LimitedOfferActive: offerActive,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: p.Features,
 			ProductName: p.ProductName, ForSale: p.ForSale, SortOrder: p.SortOrder,
 		})
@@ -116,15 +123,18 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	plans, _ := h.configService.ListPlansForSale(ctx)
 	groupInfo := h.configService.GetGroupInfoMap(ctx, plans)
 	planList := make([]checkoutPlan, 0, len(plans))
+	now := time.Now()
 	for _, p := range plans {
 		gi := groupInfo[p.GroupID]
+		offerActive := service.IsPlanLimitedOfferActive(p, now)
 		planList = append(planList, checkoutPlan{
 			ID: int64(p.ID), GroupID: p.GroupID,
 			GroupPlatform: gi.Platform, GroupName: gi.Name,
 			RateMultiplier: gi.RateMultiplier, DailyLimitUSD: gi.DailyLimitUSD,
 			WeeklyLimitUSD: gi.WeeklyLimitUSD, MonthlyLimitUSD: gi.MonthlyLimitUSD,
 			ModelScopes: gi.ModelScopes,
-			Name:        p.Name, Description: p.Description, Price: p.Price, OriginalPrice: p.OriginalPrice,
+			Name:        p.Name, Description: p.Description, Price: service.EffectivePlanPrice(p, now), OriginalPrice: p.OriginalPrice,
+			RegularPrice: p.Price, LimitedOfferPrice: p.LimitedOfferPrice, LimitedOfferExpiresAt: p.LimitedOfferExpiresAt, LimitedOfferActive: offerActive,
 			ValidityDays: p.ValidityDays, ValidityUnit: p.ValidityUnit, Features: parseFeatures(p.Features),
 			ProductName: p.ProductName,
 		})
@@ -166,23 +176,27 @@ type checkoutInfoResponse struct {
 }
 
 type checkoutPlan struct {
-	ID              int64    `json:"id"`
-	GroupID         int64    `json:"group_id"`
-	GroupPlatform   string   `json:"group_platform"`
-	GroupName       string   `json:"group_name"`
-	RateMultiplier  float64  `json:"rate_multiplier"`
-	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
-	ModelScopes     []string `json:"supported_model_scopes"`
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	Price           float64  `json:"price"`
-	OriginalPrice   *float64 `json:"original_price,omitempty"`
-	ValidityDays    int      `json:"validity_days"`
-	ValidityUnit    string   `json:"validity_unit"`
-	Features        []string `json:"features"`
-	ProductName     string   `json:"product_name"`
+	ID                    int64      `json:"id"`
+	GroupID               int64      `json:"group_id"`
+	GroupPlatform         string     `json:"group_platform"`
+	GroupName             string     `json:"group_name"`
+	RateMultiplier        float64    `json:"rate_multiplier"`
+	DailyLimitUSD         *float64   `json:"daily_limit_usd"`
+	WeeklyLimitUSD        *float64   `json:"weekly_limit_usd"`
+	MonthlyLimitUSD       *float64   `json:"monthly_limit_usd"`
+	ModelScopes           []string   `json:"supported_model_scopes"`
+	Name                  string     `json:"name"`
+	Description           string     `json:"description"`
+	Price                 float64    `json:"price"`
+	OriginalPrice         *float64   `json:"original_price,omitempty"`
+	RegularPrice          float64    `json:"regular_price"`
+	LimitedOfferPrice     *float64   `json:"limited_offer_price,omitempty"`
+	LimitedOfferExpiresAt *time.Time `json:"limited_offer_expires_at,omitempty"`
+	LimitedOfferActive    bool       `json:"limited_offer_active"`
+	ValidityDays          int        `json:"validity_days"`
+	ValidityUnit          string     `json:"validity_unit"`
+	Features              []string   `json:"features"`
+	ProductName           string     `json:"product_name"`
 }
 
 // parseFeatures splits a newline-separated features string into a string slice.

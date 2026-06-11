@@ -68,6 +68,34 @@ func (_c *SubscriptionPlanCreate) SetNillableOriginalPrice(v *float64) *Subscrip
 	return _c
 }
 
+// SetLimitedOfferPrice sets the "limited_offer_price" field.
+func (_c *SubscriptionPlanCreate) SetLimitedOfferPrice(v float64) *SubscriptionPlanCreate {
+	_c.mutation.SetLimitedOfferPrice(v)
+	return _c
+}
+
+// SetNillableLimitedOfferPrice sets the "limited_offer_price" field if the given value is not nil.
+func (_c *SubscriptionPlanCreate) SetNillableLimitedOfferPrice(v *float64) *SubscriptionPlanCreate {
+	if v != nil {
+		_c.SetLimitedOfferPrice(*v)
+	}
+	return _c
+}
+
+// SetLimitedOfferExpiresAt sets the "limited_offer_expires_at" field.
+func (_c *SubscriptionPlanCreate) SetLimitedOfferExpiresAt(v time.Time) *SubscriptionPlanCreate {
+	_c.mutation.SetLimitedOfferExpiresAt(v)
+	return _c
+}
+
+// SetNillableLimitedOfferExpiresAt sets the "limited_offer_expires_at" field if the given value is not nil.
+func (_c *SubscriptionPlanCreate) SetNillableLimitedOfferExpiresAt(v *time.Time) *SubscriptionPlanCreate {
+	if v != nil {
+		_c.SetLimitedOfferExpiresAt(*v)
+	}
+	return _c
+}
+
 // SetValidityDays sets the "validity_days" field.
 func (_c *SubscriptionPlanCreate) SetValidityDays(v int) *SubscriptionPlanCreate {
 	_c.mutation.SetValidityDays(v)
@@ -353,6 +381,14 @@ func (_c *SubscriptionPlanCreate) createSpec() (*SubscriptionPlan, *sqlgraph.Cre
 		_spec.SetField(subscriptionplan.FieldOriginalPrice, field.TypeFloat64, value)
 		_node.OriginalPrice = &value
 	}
+	if value, ok := _c.mutation.LimitedOfferPrice(); ok {
+		_spec.SetField(subscriptionplan.FieldLimitedOfferPrice, field.TypeFloat64, value)
+		_node.LimitedOfferPrice = &value
+	}
+	if value, ok := _c.mutation.LimitedOfferExpiresAt(); ok {
+		_spec.SetField(subscriptionplan.FieldLimitedOfferExpiresAt, field.TypeTime, value)
+		_node.LimitedOfferExpiresAt = &value
+	}
 	if value, ok := _c.mutation.ValidityDays(); ok {
 		_spec.SetField(subscriptionplan.FieldValidityDays, field.TypeInt, value)
 		_node.ValidityDays = value
@@ -518,6 +554,48 @@ func (u *SubscriptionPlanUpsert) AddOriginalPrice(v float64) *SubscriptionPlanUp
 // ClearOriginalPrice clears the value of the "original_price" field.
 func (u *SubscriptionPlanUpsert) ClearOriginalPrice() *SubscriptionPlanUpsert {
 	u.SetNull(subscriptionplan.FieldOriginalPrice)
+	return u
+}
+
+// SetLimitedOfferPrice sets the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsert) SetLimitedOfferPrice(v float64) *SubscriptionPlanUpsert {
+	u.Set(subscriptionplan.FieldLimitedOfferPrice, v)
+	return u
+}
+
+// UpdateLimitedOfferPrice sets the "limited_offer_price" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsert) UpdateLimitedOfferPrice() *SubscriptionPlanUpsert {
+	u.SetExcluded(subscriptionplan.FieldLimitedOfferPrice)
+	return u
+}
+
+// AddLimitedOfferPrice adds v to the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsert) AddLimitedOfferPrice(v float64) *SubscriptionPlanUpsert {
+	u.Add(subscriptionplan.FieldLimitedOfferPrice, v)
+	return u
+}
+
+// ClearLimitedOfferPrice clears the value of the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsert) ClearLimitedOfferPrice() *SubscriptionPlanUpsert {
+	u.SetNull(subscriptionplan.FieldLimitedOfferPrice)
+	return u
+}
+
+// SetLimitedOfferExpiresAt sets the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsert) SetLimitedOfferExpiresAt(v time.Time) *SubscriptionPlanUpsert {
+	u.Set(subscriptionplan.FieldLimitedOfferExpiresAt, v)
+	return u
+}
+
+// UpdateLimitedOfferExpiresAt sets the "limited_offer_expires_at" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsert) UpdateLimitedOfferExpiresAt() *SubscriptionPlanUpsert {
+	u.SetExcluded(subscriptionplan.FieldLimitedOfferExpiresAt)
+	return u
+}
+
+// ClearLimitedOfferExpiresAt clears the value of the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsert) ClearLimitedOfferExpiresAt() *SubscriptionPlanUpsert {
+	u.SetNull(subscriptionplan.FieldLimitedOfferExpiresAt)
 	return u
 }
 
@@ -757,6 +835,55 @@ func (u *SubscriptionPlanUpsertOne) UpdateOriginalPrice() *SubscriptionPlanUpser
 func (u *SubscriptionPlanUpsertOne) ClearOriginalPrice() *SubscriptionPlanUpsertOne {
 	return u.Update(func(s *SubscriptionPlanUpsert) {
 		s.ClearOriginalPrice()
+	})
+}
+
+// SetLimitedOfferPrice sets the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertOne) SetLimitedOfferPrice(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetLimitedOfferPrice(v)
+	})
+}
+
+// AddLimitedOfferPrice adds v to the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertOne) AddLimitedOfferPrice(v float64) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddLimitedOfferPrice(v)
+	})
+}
+
+// UpdateLimitedOfferPrice sets the "limited_offer_price" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertOne) UpdateLimitedOfferPrice() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateLimitedOfferPrice()
+	})
+}
+
+// ClearLimitedOfferPrice clears the value of the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertOne) ClearLimitedOfferPrice() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearLimitedOfferPrice()
+	})
+}
+
+// SetLimitedOfferExpiresAt sets the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsertOne) SetLimitedOfferExpiresAt(v time.Time) *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetLimitedOfferExpiresAt(v)
+	})
+}
+
+// UpdateLimitedOfferExpiresAt sets the "limited_offer_expires_at" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertOne) UpdateLimitedOfferExpiresAt() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateLimitedOfferExpiresAt()
+	})
+}
+
+// ClearLimitedOfferExpiresAt clears the value of the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsertOne) ClearLimitedOfferExpiresAt() *SubscriptionPlanUpsertOne {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearLimitedOfferExpiresAt()
 	})
 }
 
@@ -1178,6 +1305,55 @@ func (u *SubscriptionPlanUpsertBulk) UpdateOriginalPrice() *SubscriptionPlanUpse
 func (u *SubscriptionPlanUpsertBulk) ClearOriginalPrice() *SubscriptionPlanUpsertBulk {
 	return u.Update(func(s *SubscriptionPlanUpsert) {
 		s.ClearOriginalPrice()
+	})
+}
+
+// SetLimitedOfferPrice sets the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertBulk) SetLimitedOfferPrice(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetLimitedOfferPrice(v)
+	})
+}
+
+// AddLimitedOfferPrice adds v to the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertBulk) AddLimitedOfferPrice(v float64) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.AddLimitedOfferPrice(v)
+	})
+}
+
+// UpdateLimitedOfferPrice sets the "limited_offer_price" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertBulk) UpdateLimitedOfferPrice() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateLimitedOfferPrice()
+	})
+}
+
+// ClearLimitedOfferPrice clears the value of the "limited_offer_price" field.
+func (u *SubscriptionPlanUpsertBulk) ClearLimitedOfferPrice() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearLimitedOfferPrice()
+	})
+}
+
+// SetLimitedOfferExpiresAt sets the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsertBulk) SetLimitedOfferExpiresAt(v time.Time) *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.SetLimitedOfferExpiresAt(v)
+	})
+}
+
+// UpdateLimitedOfferExpiresAt sets the "limited_offer_expires_at" field to the value that was provided on create.
+func (u *SubscriptionPlanUpsertBulk) UpdateLimitedOfferExpiresAt() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.UpdateLimitedOfferExpiresAt()
+	})
+}
+
+// ClearLimitedOfferExpiresAt clears the value of the "limited_offer_expires_at" field.
+func (u *SubscriptionPlanUpsertBulk) ClearLimitedOfferExpiresAt() *SubscriptionPlanUpsertBulk {
+	return u.Update(func(s *SubscriptionPlanUpsert) {
+		s.ClearLimitedOfferExpiresAt()
 	})
 }
 
