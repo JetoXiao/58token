@@ -38,3 +38,31 @@ func TestCalculateCreditedBalanceIncludesRechargeBonus(t *testing.T) {
 		t.Fatalf("calculateCreditedBalance() = %v, want 270", got)
 	}
 }
+
+func TestComputeSubscriptionPlanValidityDays(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		days int
+		unit string
+		want int
+	}{
+		{name: "days", days: 30, unit: "days", want: 30},
+		{name: "week singular", days: 2, unit: "week", want: 14},
+		{name: "week plural", days: 2, unit: "weeks", want: 14},
+		{name: "month singular", days: 1, unit: "month", want: 30},
+		{name: "month plural", days: 1, unit: "months", want: 30},
+		{name: "trimmed uppercase month", days: 1, unit: " MONTH ", want: 30},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := psComputeValidityDays(tt.days, tt.unit); got != tt.want {
+				t.Fatalf("psComputeValidityDays(%d, %q) = %d, want %d", tt.days, tt.unit, got, tt.want)
+			}
+		})
+	}
+}

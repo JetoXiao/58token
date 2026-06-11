@@ -274,17 +274,32 @@
                   <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ selectedPlan.name }}</h3>
                 </div>
                 <!-- Price -->
-                <div class="flex items-baseline gap-2">
+                <div class="flex flex-wrap items-baseline gap-2">
                   <span v-if="selectedPlan.original_price" class="text-sm text-gray-400 line-through dark:text-gray-500">
                     {{ formatSelectedPaymentAmount(selectedPlan.original_price) }}
                   </span>
                   <span :class="['text-3xl font-bold', planTextClass]">{{ formatSelectedPaymentAmount(selectedPlan.price) }}</span>
                   <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ planValiditySuffix }}</span>
+                  <span v-if="selectedPlanHasSavings" :class="['rounded-full px-2 py-0.5 text-xs font-semibold', planDiscountClass]">
+                    {{ selectedPlanDiscountText }}
+                  </span>
                 </div>
+                <p v-if="selectedPlanHasSavings" class="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-300">
+                  {{ selectedPlanSavingsText }}
+                </p>
                 <!-- Description -->
                 <p v-if="selectedPlan.description" class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                   {{ selectedPlan.description }}
                 </p>
+                <div
+                  v-if="selectedPlanWorkdayFriendly"
+                  class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200"
+                >
+                  <span class="font-semibold">{{ t('payment.planCard.workdayFriendly') }}</span>
+                  <span class="ml-1">
+                    {{ t('payment.planCard.workdayFriendlyDesc', { daily: formatUsdQuotaValue(selectedPlan.daily_limit_usd), weekly: formatUsdQuotaValue(selectedPlan.weekly_limit_usd) }) }}
+                  </span>
+                </div>
                 <!-- Rate + Limits grid -->
                 <div class="mt-3 grid grid-cols-2 gap-3">
                   <div>
@@ -443,7 +458,14 @@ import {
   type PaymentRecoverySnapshot,
   writePaymentRecoverySnapshot,
 } from '@/components/payment/paymentFlow'
-import { platformAccentBarClass, platformBadgeLightClass, platformBadgeClass, platformTextClass, platformLabel } from '@/utils/platformColors'
+import {
+  platformAccentBarClass,
+  platformBadgeLightClass,
+  platformBadgeClass,
+  platformDiscountClass,
+  platformTextClass,
+  platformLabel,
+} from '@/utils/platformColors'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -857,6 +879,12 @@ function formatSelectedPaymentAmount(value: number): string {
   return formatPaymentAmount(value, selectedCurrency.value, localeCode.value)
 }
 
+function formatUsdQuotaValue(value: number | null | undefined): string {
+  const amountValue = Number(value ?? 0)
+  if (!Number.isFinite(amountValue)) return '$0'
+  return `$${amountValue.toFixed(2).replace(/\.?0+$/, '')}`
+}
+
 const methodOptions = computed<PaymentMethodOption[]>(() =>
   rechargeMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
@@ -953,6 +981,7 @@ const paymentButtonClass = computed(() => {
 
 // Subscription confirm: platform accent colors (clean card, no gradient)
 const planBadgeClass = computed(() => platformBadgeClass(selectedPlan.value?.group_platform || ''))
+const planDiscountClass = computed(() => platformDiscountClass(selectedPlan.value?.group_platform || ''))
 const planTextClass = computed(() => platformTextClass(selectedPlan.value?.group_platform || ''))
 
 // Renewal modal state
@@ -965,10 +994,44 @@ const renewalPlans = computed(() => {
 
 const planValiditySuffix = computed(() => {
   if (!selectedPlan.value) return ''
-  const u = selectedPlan.value.validity_unit || 'day'
+  const u = normalizePlanValidityUnit(selectedPlan.value.validity_unit)
   if (u === 'month') return t('payment.perMonth')
   if (u === 'year') return t('payment.perYear')
   return `${selectedPlan.value.validity_days}${t('payment.days')}`
+})
+
+function normalizePlanValidityUnit(unit: string | undefined): string {
+  const value = (unit || 'day').toLowerCase()
+  if (value === 'days') return 'day'
+  if (value === 'weeks') return 'week'
+  if (value === 'months') return 'month'
+  if (value === 'years') return 'year'
+  return value
+}
+
+const selectedPlanHasSavings = computed(() => {
+  if (!selectedPlan.value?.original_price) return false
+  return selectedPlan.value.original_price > selectedPlan.value.price
+})
+
+const selectedPlanDiscountText = computed(() => {
+  if (!selectedPlanHasSavings.value || !selectedPlan.value?.original_price) return ''
+  const pct = Math.round((1 - selectedPlan.value.price / selectedPlan.value.original_price) * 100)
+  return pct > 0 ? t('payment.planCard.discountPercent', { percent: pct }) : ''
+})
+
+const selectedPlanSavingsText = computed(() => {
+  if (!selectedPlanHasSavings.value || !selectedPlan.value?.original_price) return ''
+  return t('payment.planCard.saveAmount', {
+    amount: formatSelectedPaymentAmount(selectedPlan.value.original_price - selectedPlan.value.price),
+  })
+})
+
+const selectedPlanWorkdayFriendly = computed(() => {
+  const daily = selectedPlan.value?.daily_limit_usd
+  const weekly = selectedPlan.value?.weekly_limit_usd
+  if (daily == null || weekly == null || daily <= 0 || weekly <= 0) return false
+  return weekly >= daily * 3 && weekly <= daily * 5
 })
 
 function selectPlan(plan: SubscriptionPlan) {
