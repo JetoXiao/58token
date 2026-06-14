@@ -47,6 +47,7 @@ type GatewayHandler struct {
 	usageRecordWorkerPool     *service.UsageRecordWorkerPool
 	errorPassthroughService   *service.ErrorPassthroughService
 	contentModerationService  *service.ContentModerationService
+	responseCache             *service.ResponseCache
 	concurrencyHelper         *ConcurrencyHelper
 	userMsgQueueHelper        *UserMsgQueueHelper
 	maxAccountSwitches        int
@@ -102,6 +103,7 @@ func NewGatewayHandler(
 		usageRecordWorkerPool:     usageRecordWorkerPool,
 		errorPassthroughService:   errorPassthroughService,
 		contentModerationService:  contentModerationService,
+		responseCache:             newResponseCacheForHandler(cfg),
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
 		userMsgQueueHelper:        umqHelper,
 		maxAccountSwitches:        maxAccountSwitches,
@@ -263,6 +265,18 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 设置请求所属分组 ID（用于渠道级功能判断，如 WebSearch 模拟）
 	parsedReq.GroupID = apiKey.GroupID
+
+	cacheReq := responseCacheRequest(c, "/v1/messages", "gateway_messages", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
 
 	// 计算粘性会话hash
 	parsedReq.SessionContext = &service.SessionContext{
@@ -439,6 +453,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
+			var cacheCaptureFinalize func() *service.ResponseCacheEntry
+			if cacheDecision.ExactEnabled && !reqStream {
+				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+			}
 			if account.Platform == service.PlatformAntigravity {
 				result, err = h.antigravityGatewayService.ForwardGemini(requestCtx, c, account, reqModel, "generateContent", reqStream, body, hasBoundSession)
 			} else {
@@ -446,6 +464,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
+			}
+			var cacheEntry *service.ResponseCacheEntry
+			if cacheCaptureFinalize != nil {
+				cacheEntry = cacheCaptureFinalize()
 			}
 			if err != nil {
 				var failoverErr *service.UpstreamFailoverError
@@ -487,6 +509,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
+			finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+			cacheInflightFinished = true
 
 			// RPM 计数递增（Forward 成功后）
 			// 注意：TOCTOU 竞态是已知且可接受的设计权衡，与 WindowCost 一致的 soft-limit 模式。
@@ -761,6 +785,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
+			var cacheCaptureFinalize func() *service.ResponseCacheEntry
+			if cacheDecision.ExactEnabled && !reqStream && !fallbackUsed {
+				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+			}
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 				result, err = h.antigravityGatewayService.Forward(requestCtx, c, account, body, hasBoundSession)
 			} else {
@@ -776,6 +804,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
+			}
+			var cacheEntry *service.ResponseCacheEntry
+			if cacheCaptureFinalize != nil {
+				cacheEntry = cacheCaptureFinalize()
 			}
 			if err != nil {
 				// Beta policy block: return 400 immediately, no failover
@@ -869,6 +901,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
+			}
+			finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner && !fallbackUsed)
+			if !fallbackUsed {
+				cacheInflightFinished = true
 			}
 
 			// RPM 计数递增（Forward 成功后）

@@ -9,39 +9,35 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// InitRedis 初始化 Redis 客户端
-//
-// 性能优化说明：
-// 原实现使用 go-redis 默认配置，未设置连接池和超时参数：
-// 1. 默认连接池大小可能不足以支撑高并发
-// 2. 无超时控制可能导致慢操作阻塞
-//
-// 新实现支持可配置的连接池和超时参数：
-// 1. PoolSize: 控制最大并发连接数（默认 128）
-// 2. MinIdleConns: 保持最小空闲连接，减少冷启动延迟（默认 10）
-// 3. DialTimeout/ReadTimeout/WriteTimeout: 精确控制各阶段超时
+// InitRedis initializes the primary business Redis client.
 func InitRedis(cfg *config.Config) *redis.Client {
-	return redis.NewClient(buildRedisOptions(cfg))
+	return redis.NewClient(buildRedisOptions(cfg.Redis))
 }
 
-// buildRedisOptions 构建 Redis 连接选项
-// 从配置文件读取连接池和超时参数，支持生产环境调优
-func buildRedisOptions(cfg *config.Config) *redis.Options {
+// InitResponseCacheRedis initializes the optional AI ResponseCache Redis client.
+func InitResponseCacheRedis(cfg *config.Config) *redis.Client {
+	if cfg == nil || (!cfg.ResponseCache.Enabled && !cfg.ResponseCache.ShadowEnabled && !cfg.ResponseCache.RecommendationEnabled) {
+		return nil
+	}
+	return redis.NewClient(buildRedisOptions(cfg.ResponseCache.Redis))
+}
+
+func buildRedisOptions(redisCfg config.RedisConfig) *redis.Options {
 	opts := &redis.Options{
-		Addr:         cfg.Redis.Address(),
-		Password:     cfg.Redis.Password,
-		DB:           cfg.Redis.DB,
-		DialTimeout:  time.Duration(cfg.Redis.DialTimeoutSeconds) * time.Second,  // 建连超时
-		ReadTimeout:  time.Duration(cfg.Redis.ReadTimeoutSeconds) * time.Second,  // 读取超时
-		WriteTimeout: time.Duration(cfg.Redis.WriteTimeoutSeconds) * time.Second, // 写入超时
-		PoolSize:     cfg.Redis.PoolSize,                                         // 连接池大小
-		MinIdleConns: cfg.Redis.MinIdleConns,                                     // 最小空闲连接
+		Addr:         redisCfg.Address(),
+		Password:     redisCfg.Password,
+		DB:           redisCfg.DB,
+		DialTimeout:  time.Duration(redisCfg.DialTimeoutSeconds) * time.Second,
+		ReadTimeout:  time.Duration(redisCfg.ReadTimeoutSeconds) * time.Second,
+		WriteTimeout: time.Duration(redisCfg.WriteTimeoutSeconds) * time.Second,
+		PoolSize:     redisCfg.PoolSize,
+		MinIdleConns: redisCfg.MinIdleConns,
 	}
 
-	if cfg.Redis.EnableTLS {
+	if redisCfg.EnableTLS {
 		opts.TLSConfig = &tls.Config{
 			MinVersion: tls.VersionTLS12,
-			ServerName: cfg.Redis.Host,
+			ServerName: redisCfg.Host,
 		}
 	}
 

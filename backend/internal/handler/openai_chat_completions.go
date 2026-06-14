@@ -117,6 +117,18 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	cacheReq := responseCacheRequest(c, "/v1/chat/completions", "openai_chat_completions", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
+
 	sessionHash := h.gatewayService.GenerateSessionHash(c, body)
 	promptCacheKey := h.gatewayService.ExtractSessionID(c, body)
 
@@ -180,6 +192,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		writerSizeBeforeForward := c.Writer.Size()
+		var cacheCaptureFinalize func() *service.ResponseCacheEntry
+		if cacheDecision.ExactEnabled && !reqStream {
+			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+		}
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -188,6 +204,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			}()
 			return h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, "")
 		}()
+		var cacheEntry *service.ResponseCacheEntry
+		if cacheCaptureFinalize != nil {
+			cacheEntry = cacheCaptureFinalize()
+		}
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
@@ -268,6 +288,8 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
+		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		cacheInflightFinished = true
 
 		userAgent := c.GetHeader("User-Agent")
 		clientIP := ip.GetClientIP(c)

@@ -811,6 +811,78 @@ redis:
   enable_tls: false
 
 # =============================================================================
+# AI ResponseCache Configuration (Optional)
+# AI 响应缓存配置（可选）
+# =============================================================================
+response_cache:
+  # Serve exact cached responses. Keep false during first shadow rollout.
+  # 是否真实返回 exact 缓存响应。第一阶段建议保持 false。
+  enabled: false
+  # Collect duplicate-rate stats without serving cache hits.
+  # 只统计重复率，不真实返回缓存。
+  shadow_enabled: false
+  key_prefix: "uado:rc:"
+  # Use a second Redis isolated from business Redis.
+  # 使用独立第二 Redis，避免影响业务 Redis。
+  redis:
+    host: "redis-response-cache"
+    port: 6379
+    password: ""
+    db: 0
+    dial_timeout_seconds: 1
+    read_timeout_seconds: 1
+    write_timeout_seconds: 1
+    pool_size: 128
+    min_idle_conns: 8
+    enable_tls: false
+  ttl_seconds: 300
+  shadow_ttl_seconds: 3600
+  # Per Redis operation timeout. Keep very low so misses do not hurt latency.
+  # 单次 Redis 操作超时，保持很低，避免未命中拖慢用户请求。
+  redis_timeout_ms: 10
+  max_body_bytes: 65536
+  max_value_bytes: 1048576
+  # Short prompts such as hi/ping are bypassed to avoid hiding probes.
+  # 短 prompt 不缓存，避免遮蔽探活。
+  min_prompt_chars: 16
+  max_prompt_chars: 12000
+  # Empty allow lists mean global exact cache when enabled=true.
+  # 填写后只允许指定 API Key / 分组 / 模型使用 exact cache。
+  allowed_api_key_ids: []
+  allowed_group_ids: []
+  allowed_models: []
+  bypass_api_key_ids: []
+  bypass_group_ids: []
+  bypass_models: []
+  # Monitoring/probe keys are counted separately and excluded from enable recommendations.
+  # 探活/预警 Key 单独统计，不参与 exact cache 开启推荐。
+  monitor_api_key_ids: []
+  monitor_group_ids: []
+  # CSV form for environment variables, e.g. "101,102".
+  # 环境变量推荐使用逗号分隔字符串，例如 "101,102"。
+  allowed_api_key_id_list: ""
+  allowed_group_id_list: ""
+  allowed_model_list: ""
+  bypass_api_key_id_list: ""
+  bypass_group_id_list: ""
+  bypass_model_list: ""
+  monitor_api_key_id_list: ""
+  monitor_group_id_list: ""
+  singleflight_enabled: true
+  singleflight_wait_timeout_ms: 150
+  # Inject stable prompt_cache_key for supported OpenAI OAuth paths.
+  # 是否为支持的 OpenAI OAuth 路径注入稳定 prompt_cache_key。
+  prefix_cache_enabled: false
+  # Suggest exact cache rollout only; never auto-enable exact cache.
+  # 只给出开启建议，不自动开启 exact cache。
+  recommendation_enabled: true
+  recommendation_window_hours: 72
+  recommendation_hit_rate_threshold: 0.20
+  recommendation_min_candidates: 150
+  recommendation_min_observed_hours: 24
+  recommendation_max_spike_ratio: 5.0
+
+# =============================================================================
 # Ops Monitoring (Optional)
 # 运维监控 (可选)
 # =============================================================================

@@ -1238,6 +1238,35 @@ func (s *OpenAIGatewayService) GenerateSessionHashWithFallback(c *gin.Context, b
 	return currentHash
 }
 
+func (s *OpenAIGatewayService) responsePrefixCacheEnabled() bool {
+	return s != nil && s.cfg != nil && s.cfg.ResponseCache.PrefixCacheEnabled
+}
+
+func deriveOpenAIResponsesPrefixCacheKey(reqBody map[string]any, upstreamModel string) string {
+	if len(reqBody) == 0 {
+		return ""
+	}
+	if existing, ok := reqBody["prompt_cache_key"].(string); ok && strings.TrimSpace(existing) != "" {
+		return strings.TrimSpace(existing)
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil || len(body) == 0 {
+		return ""
+	}
+	seed := deriveOpenAIContentSessionSeed(body)
+	if seed == "" {
+		return ""
+	}
+	model := normalizeCodexModel(strings.TrimSpace(upstreamModel))
+	if model == "" {
+		model = strings.TrimSpace(upstreamModel)
+	}
+	if model != "" {
+		seed = "model=" + model + "|" + seed
+	}
+	return "uado_prefix_" + hashSensitiveValueForLog(seed)
+}
+
 func resolveOpenAIUpstreamOriginator(c *gin.Context, isOfficialClient bool) string {
 	if c != nil {
 		if originator := strings.TrimSpace(c.GetHeader("originator")); originator != "" {
@@ -2373,6 +2402,19 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		if codexResult.PromptCacheKey != "" {
 			promptCacheKey = codexResult.PromptCacheKey
+		}
+	}
+	if account.Type == AccountTypeOAuth && promptCacheKey == "" && s.responsePrefixCacheEnabled() && !IsImageGenerationIntentMap(openAIResponsesEndpoint, reqModel, reqBody) {
+		if stableKey := deriveOpenAIResponsesPrefixCacheKey(reqBody, upstreamModel); stableKey != "" {
+			reqBody["prompt_cache_key"] = stableKey
+			promptCacheKey = stableKey
+			bodyModified = true
+			disablePatch()
+			logger.L().Debug("openai responses: prefix prompt_cache_key injected",
+				zap.Int64("account_id", account.ID),
+				zap.String("model", upstreamModel),
+				zap.String("prompt_cache_key_sha256", hashSensitiveValueForLog(stableKey)),
+			)
 		}
 	}
 

@@ -214,6 +214,30 @@ func TestLoadIdempotencyConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadResponseCacheListsFromEnv(t *testing.T) {
+	resetViperWithJWTSecret(t)
+	t.Setenv("RESPONSE_CACHE_ALLOWED_API_KEY_ID_LIST", "101, 102,101,invalid")
+	t.Setenv("RESPONSE_CACHE_ALLOWED_GROUP_ID_LIST", "8,9")
+	t.Setenv("RESPONSE_CACHE_ALLOWED_MODEL_LIST", "gpt-4o-mini, gpt-4o-mini, gpt-4.1-mini")
+	t.Setenv("RESPONSE_CACHE_BYPASS_API_KEY_ID_LIST", "201")
+	t.Setenv("RESPONSE_CACHE_BYPASS_GROUP_ID_LIST", "18, 19")
+	t.Setenv("RESPONSE_CACHE_BYPASS_MODEL_LIST", "o3,o4-mini")
+	t.Setenv("RESPONSE_CACHE_MONITOR_API_KEY_ID_LIST", "301")
+	t.Setenv("RESPONSE_CACHE_MONITOR_GROUP_ID_LIST", "28")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	require.Equal(t, []int64{101, 102}, cfg.ResponseCache.AllowedAPIKeyIDs)
+	require.Equal(t, []int64{8, 9}, cfg.ResponseCache.AllowedGroupIDs)
+	require.Equal(t, []string{"gpt-4o-mini", "gpt-4.1-mini"}, cfg.ResponseCache.AllowedModels)
+	require.Equal(t, []int64{201}, cfg.ResponseCache.BypassAPIKeyIDs)
+	require.Equal(t, []int64{18, 19}, cfg.ResponseCache.BypassGroupIDs)
+	require.Equal(t, []string{"o3", "o4-mini"}, cfg.ResponseCache.BypassModels)
+	require.Equal(t, []int64{301}, cfg.ResponseCache.MonitorAPIKeyIDs)
+	require.Equal(t, []int64{28}, cfg.ResponseCache.MonitorGroupIDs)
+}
+
 func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING", "5")

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -67,6 +68,7 @@ type Config struct {
 	Turnstile               TurnstileConfig               `mapstructure:"turnstile"`
 	Database                DatabaseConfig                `mapstructure:"database"`
 	Redis                   RedisConfig                   `mapstructure:"redis"`
+	ResponseCache           ResponseCacheConfig           `mapstructure:"response_cache"`
 	Ops                     OpsConfig                     `mapstructure:"ops"`
 	JWT                     JWTConfig                     `mapstructure:"jwt"`
 	Totp                    TotpConfig                    `mapstructure:"totp"`
@@ -670,6 +672,50 @@ type ImageConcurrencyConfig struct {
 	MaxWaitingRequests int `mapstructure:"max_waiting_requests"`
 }
 
+type ResponseCacheConfig struct {
+	Enabled       bool        `mapstructure:"enabled"`
+	ShadowEnabled bool        `mapstructure:"shadow_enabled"`
+	KeyPrefix     string      `mapstructure:"key_prefix"`
+	Redis         RedisConfig `mapstructure:"redis"`
+
+	TTLSeconds       int `mapstructure:"ttl_seconds"`
+	ShadowTTLSeconds int `mapstructure:"shadow_ttl_seconds"`
+	RedisTimeoutMs   int `mapstructure:"redis_timeout_ms"`
+
+	MaxBodyBytes   int `mapstructure:"max_body_bytes"`
+	MaxValueBytes  int `mapstructure:"max_value_bytes"`
+	MinPromptChars int `mapstructure:"min_prompt_chars"`
+	MaxPromptChars int `mapstructure:"max_prompt_chars"`
+
+	AllowedAPIKeyIDs    []int64  `mapstructure:"allowed_api_key_ids"`
+	AllowedGroupIDs     []int64  `mapstructure:"allowed_group_ids"`
+	AllowedModels       []string `mapstructure:"allowed_models"`
+	BypassAPIKeyIDs     []int64  `mapstructure:"bypass_api_key_ids"`
+	BypassGroupIDs      []int64  `mapstructure:"bypass_group_ids"`
+	BypassModels        []string `mapstructure:"bypass_models"`
+	MonitorAPIKeyIDs    []int64  `mapstructure:"monitor_api_key_ids"`
+	MonitorGroupIDs     []int64  `mapstructure:"monitor_group_ids"`
+	AllowedAPIKeyIDList string   `mapstructure:"allowed_api_key_id_list"`
+	AllowedGroupIDList  string   `mapstructure:"allowed_group_id_list"`
+	AllowedModelList    string   `mapstructure:"allowed_model_list"`
+	BypassAPIKeyIDList  string   `mapstructure:"bypass_api_key_id_list"`
+	BypassGroupIDList   string   `mapstructure:"bypass_group_id_list"`
+	BypassModelList     string   `mapstructure:"bypass_model_list"`
+	MonitorAPIKeyIDList string   `mapstructure:"monitor_api_key_id_list"`
+	MonitorGroupIDList  string   `mapstructure:"monitor_group_id_list"`
+
+	SingleflightEnabled       bool `mapstructure:"singleflight_enabled"`
+	SingleflightWaitTimeoutMs int  `mapstructure:"singleflight_wait_timeout_ms"`
+	PrefixCacheEnabled        bool `mapstructure:"prefix_cache_enabled"`
+
+	RecommendationEnabled          bool    `mapstructure:"recommendation_enabled"`
+	RecommendationWindowHours      int     `mapstructure:"recommendation_window_hours"`
+	RecommendationHitRateThreshold float64 `mapstructure:"recommendation_hit_rate_threshold"`
+	RecommendationMinCandidates    int64   `mapstructure:"recommendation_min_candidates"`
+	RecommendationMinObservedHours int     `mapstructure:"recommendation_min_observed_hours"`
+	RecommendationMaxSpikeRatio    float64 `mapstructure:"recommendation_max_spike_ratio"`
+}
+
 const (
 	ImageConcurrencyOverflowModeReject = "reject"
 	ImageConcurrencyOverflowModeWait   = "wait"
@@ -1123,6 +1169,194 @@ type RedisConfig struct {
 
 func (r *RedisConfig) Address() string {
 	return fmt.Sprintf("%s:%d", r.Host, r.Port)
+}
+
+func validateResponseCacheConfig(c *ResponseCacheConfig) error {
+	if c == nil {
+		return nil
+	}
+	if strings.TrimSpace(c.KeyPrefix) == "" {
+		c.KeyPrefix = "uado:rc:"
+	}
+	if c.TTLSeconds <= 0 {
+		return fmt.Errorf("response_cache.ttl_seconds must be positive")
+	}
+	if c.ShadowTTLSeconds <= 0 {
+		return fmt.Errorf("response_cache.shadow_ttl_seconds must be positive")
+	}
+	if c.RedisTimeoutMs <= 0 || c.RedisTimeoutMs > 1000 {
+		return fmt.Errorf("response_cache.redis_timeout_ms must be between 1 and 1000")
+	}
+	if c.MaxBodyBytes <= 0 {
+		return fmt.Errorf("response_cache.max_body_bytes must be positive")
+	}
+	if c.MaxValueBytes <= 0 {
+		return fmt.Errorf("response_cache.max_value_bytes must be positive")
+	}
+	if c.MinPromptChars < 0 {
+		return fmt.Errorf("response_cache.min_prompt_chars must be non-negative")
+	}
+	if c.MaxPromptChars <= 0 {
+		return fmt.Errorf("response_cache.max_prompt_chars must be positive")
+	}
+	if c.MinPromptChars > c.MaxPromptChars {
+		return fmt.Errorf("response_cache.min_prompt_chars cannot exceed max_prompt_chars")
+	}
+	if c.SingleflightWaitTimeoutMs < 0 {
+		return fmt.Errorf("response_cache.singleflight_wait_timeout_ms must be non-negative")
+	}
+	c.AllowedAPIKeyIDs = appendUniqueInt64(c.AllowedAPIKeyIDs, parseInt64CSV(c.AllowedAPIKeyIDList)...)
+	c.AllowedGroupIDs = appendUniqueInt64(c.AllowedGroupIDs, parseInt64CSV(c.AllowedGroupIDList)...)
+	c.BypassAPIKeyIDs = appendUniqueInt64(c.BypassAPIKeyIDs, parseInt64CSV(c.BypassAPIKeyIDList)...)
+	c.BypassGroupIDs = appendUniqueInt64(c.BypassGroupIDs, parseInt64CSV(c.BypassGroupIDList)...)
+	c.MonitorAPIKeyIDs = appendUniqueInt64(c.MonitorAPIKeyIDs, parseInt64CSV(c.MonitorAPIKeyIDList)...)
+	c.MonitorGroupIDs = appendUniqueInt64(c.MonitorGroupIDs, parseInt64CSV(c.MonitorGroupIDList)...)
+	c.AllowedModels = appendUniqueStrings(c.AllowedModels, parseStringCSV(c.AllowedModelList)...)
+	c.BypassModels = appendUniqueStrings(c.BypassModels, parseStringCSV(c.BypassModelList)...)
+	if c.RecommendationWindowHours <= 0 {
+		return fmt.Errorf("response_cache.recommendation_window_hours must be positive")
+	}
+	if c.RecommendationWindowHours > 168 {
+		return fmt.Errorf("response_cache.recommendation_window_hours must be <= 168")
+	}
+	if c.RecommendationHitRateThreshold < 0 || c.RecommendationHitRateThreshold > 1 {
+		return fmt.Errorf("response_cache.recommendation_hit_rate_threshold must be between 0 and 1")
+	}
+	if c.RecommendationMinCandidates < 0 {
+		return fmt.Errorf("response_cache.recommendation_min_candidates must be non-negative")
+	}
+	if c.RecommendationMinObservedHours <= 0 {
+		return fmt.Errorf("response_cache.recommendation_min_observed_hours must be positive")
+	}
+	if c.RecommendationMinObservedHours > c.RecommendationWindowHours {
+		c.RecommendationMinObservedHours = c.RecommendationWindowHours
+	}
+	if c.RecommendationMaxSpikeRatio < 0 {
+		return fmt.Errorf("response_cache.recommendation_max_spike_ratio must be non-negative")
+	}
+	if c.Redis.Host == "" {
+		c.Redis.Host = "redis-response-cache"
+	}
+	if c.Redis.Port <= 0 {
+		return fmt.Errorf("response_cache.redis.port must be positive")
+	}
+	if c.Redis.DialTimeoutSeconds <= 0 {
+		return fmt.Errorf("response_cache.redis.dial_timeout_seconds must be positive")
+	}
+	if c.Redis.ReadTimeoutSeconds <= 0 {
+		return fmt.Errorf("response_cache.redis.read_timeout_seconds must be positive")
+	}
+	if c.Redis.WriteTimeoutSeconds <= 0 {
+		return fmt.Errorf("response_cache.redis.write_timeout_seconds must be positive")
+	}
+	if c.Redis.PoolSize <= 0 {
+		return fmt.Errorf("response_cache.redis.pool_size must be positive")
+	}
+	if c.Redis.MinIdleConns < 0 {
+		return fmt.Errorf("response_cache.redis.min_idle_conns must be non-negative")
+	}
+	if c.Redis.MinIdleConns > c.Redis.PoolSize {
+		return fmt.Errorf("response_cache.redis.min_idle_conns cannot exceed response_cache.redis.pool_size")
+	}
+	return nil
+}
+
+func parseInt64CSV(raw string) []int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		v, err := strconv.ParseInt(p, 10, 64)
+		if err == nil && v > 0 {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func parseStringCSV(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		v := strings.TrimSpace(part)
+		if v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func appendUniqueInt64(base []int64, values ...int64) []int64 {
+	if len(values) == 0 {
+		return base
+	}
+	seen := make(map[int64]struct{}, len(base)+len(values))
+	out := make([]int64, 0, len(base)+len(values))
+	for _, v := range base {
+		if v <= 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	for _, v := range values {
+		if v <= 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
+func appendUniqueStrings(base []string, values ...string) []string {
+	if len(values) == 0 {
+		return base
+	}
+	seen := make(map[string]struct{}, len(base)+len(values))
+	out := make([]string, 0, len(base)+len(values))
+	for _, v := range base {
+		normalized := strings.TrimSpace(v)
+		if normalized == "" {
+			continue
+		}
+		key := strings.ToLower(normalized)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, normalized)
+	}
+	for _, v := range values {
+		normalized := strings.TrimSpace(v)
+		if normalized == "" {
+			continue
+		}
+		key := strings.ToLower(normalized)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out
 }
 
 type OpsConfig struct {
@@ -1642,6 +1876,45 @@ func setDefaults() {
 	viper.SetDefault("redis.pool_size", 1024)
 	viper.SetDefault("redis.min_idle_conns", 128)
 	viper.SetDefault("redis.enable_tls", false)
+
+	// ResponseCache Redis is intentionally separate from the business Redis.
+	viper.SetDefault("response_cache.enabled", false)
+	viper.SetDefault("response_cache.shadow_enabled", false)
+	viper.SetDefault("response_cache.key_prefix", "uado:rc:")
+	viper.SetDefault("response_cache.redis.host", "redis-response-cache")
+	viper.SetDefault("response_cache.redis.port", 6379)
+	viper.SetDefault("response_cache.redis.password", "")
+	viper.SetDefault("response_cache.redis.db", 0)
+	viper.SetDefault("response_cache.redis.dial_timeout_seconds", 1)
+	viper.SetDefault("response_cache.redis.read_timeout_seconds", 1)
+	viper.SetDefault("response_cache.redis.write_timeout_seconds", 1)
+	viper.SetDefault("response_cache.redis.pool_size", 128)
+	viper.SetDefault("response_cache.redis.min_idle_conns", 8)
+	viper.SetDefault("response_cache.redis.enable_tls", false)
+	viper.SetDefault("response_cache.ttl_seconds", 300)
+	viper.SetDefault("response_cache.shadow_ttl_seconds", 3600)
+	viper.SetDefault("response_cache.redis_timeout_ms", 10)
+	viper.SetDefault("response_cache.max_body_bytes", 64*1024)
+	viper.SetDefault("response_cache.max_value_bytes", 1024*1024)
+	viper.SetDefault("response_cache.min_prompt_chars", 16)
+	viper.SetDefault("response_cache.max_prompt_chars", 12000)
+	viper.SetDefault("response_cache.singleflight_enabled", true)
+	viper.SetDefault("response_cache.singleflight_wait_timeout_ms", 150)
+	viper.SetDefault("response_cache.prefix_cache_enabled", false)
+	viper.SetDefault("response_cache.allowed_api_key_id_list", "")
+	viper.SetDefault("response_cache.allowed_group_id_list", "")
+	viper.SetDefault("response_cache.allowed_model_list", "")
+	viper.SetDefault("response_cache.bypass_api_key_id_list", "")
+	viper.SetDefault("response_cache.bypass_group_id_list", "")
+	viper.SetDefault("response_cache.bypass_model_list", "")
+	viper.SetDefault("response_cache.monitor_api_key_id_list", "")
+	viper.SetDefault("response_cache.monitor_group_id_list", "")
+	viper.SetDefault("response_cache.recommendation_enabled", true)
+	viper.SetDefault("response_cache.recommendation_window_hours", 72)
+	viper.SetDefault("response_cache.recommendation_hit_rate_threshold", 0.20)
+	viper.SetDefault("response_cache.recommendation_min_candidates", 150)
+	viper.SetDefault("response_cache.recommendation_min_observed_hours", 24)
+	viper.SetDefault("response_cache.recommendation_max_spike_ratio", 5.0)
 
 	// Ops (vNext)
 	viper.SetDefault("ops.enabled", true)
@@ -2355,6 +2628,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Idempotency.CleanupBatchSize <= 0 {
 		return fmt.Errorf("idempotency.cleanup_batch_size must be positive")
+	}
+	if err := validateResponseCacheConfig(&c.ResponseCache); err != nil {
+		return err
 	}
 	if c.Gateway.MaxBodySize <= 0 {
 		return fmt.Errorf("gateway.max_body_size must be positive")

@@ -14,7 +14,8 @@ import (
 )
 
 type OpsHandler struct {
-	opsService *service.OpsService
+	opsService    *service.OpsService
+	responseCache *service.ResponseCache
 }
 
 // GetErrorLogByID returns ops error log detail.
@@ -68,8 +69,98 @@ func parseOpsViewParam(c *gin.Context) string {
 	}
 }
 
+func parsePositiveIntQuery(c *gin.Context, key string) int {
+	if c == nil {
+		return 0
+	}
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+func parsePositiveInt64Query(c *gin.Context, key string) int64 {
+	if c == nil {
+		return 0
+	}
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+func parseFloatQuery(c *gin.Context, key string) float64 {
+	if c == nil {
+		return 0
+	}
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil || v < 0 {
+		return 0
+	}
+	return v
+}
+
+func parseRatioQuery(c *gin.Context, key string) float64 {
+	v := parseFloatQuery(c, key)
+	if v > 1 {
+		v = v / 100
+	}
+	if v < 0 || v > 1 {
+		return 0
+	}
+	return v
+}
+
 func NewOpsHandler(opsService *service.OpsService) *OpsHandler {
 	return &OpsHandler{opsService: opsService}
+}
+
+func (h *OpsHandler) SetResponseCache(responseCache *service.ResponseCache) {
+	if h == nil {
+		return
+	}
+	h.responseCache = responseCache
+}
+
+// GetResponseCacheRecommendation returns the shadow-mode recommendation for exact cache rollout.
+// GET /api/v1/admin/ops/response-cache/recommendation
+func (h *OpsHandler) GetResponseCacheRecommendation(c *gin.Context) {
+	if h == nil || h.responseCache == nil {
+		response.Success(c, gin.H{
+			"enabled":     false,
+			"recommended": false,
+			"decision":    "not_available",
+			"reasons":     []string{"response_cache_not_configured"},
+		})
+		return
+	}
+	opts := service.ResponseCacheRecommendationOptions{
+		WindowHours:      parsePositiveIntQuery(c, "window_hours"),
+		MinCandidates:    parsePositiveInt64Query(c, "min_candidates"),
+		HitRateThreshold: parseRatioQuery(c, "hit_rate_threshold"),
+		MinObservedHours: parsePositiveIntQuery(c, "min_observed_hours"),
+		MaxSpikeRatio:    parseFloatQuery(c, "max_spike_ratio"),
+	}
+	rec, err := h.responseCache.GetRecommendation(c.Request.Context(), opts)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, rec)
 }
 
 // GetErrorLogs lists ops error logs.

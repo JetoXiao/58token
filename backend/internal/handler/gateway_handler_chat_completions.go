@@ -151,6 +151,18 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
+	cacheReq := responseCacheRequest(c, "/v1/chat/completions", "gateway_chat_completions", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
+
 	// Parse request for session hash
 	parsedReq, _ := service.ParseGatewayRequest(body, "chat_completions")
 	if parsedReq == nil {
@@ -242,9 +254,16 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		var result *service.ForwardResult
+		var cacheCaptureFinalize func() *service.ResponseCacheEntry
+		if cacheDecision.ExactEnabled && !reqStream {
+			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+		}
 		if account.Platform == service.PlatformGemini {
 			if h.geminiCompatService == nil {
 				h.chatCompletionsErrorResponse(c, http.StatusBadGateway, "upstream_error", "Gemini compatibility service is not configured")
+				if cacheCaptureFinalize != nil {
+					_ = cacheCaptureFinalize()
+				}
 				if accountReleaseFunc != nil {
 					accountReleaseFunc()
 				}
@@ -257,6 +276,10 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
+		}
+		var cacheEntry *service.ResponseCacheEntry
+		if cacheCaptureFinalize != nil {
+			cacheEntry = cacheCaptureFinalize()
 		}
 
 		if err != nil {
@@ -284,6 +307,8 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			)
 			return
 		}
+		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		cacheInflightFinished = true
 
 		// 6. Record usage
 		userAgent := c.GetHeader("User-Agent")

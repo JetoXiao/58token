@@ -33,6 +33,7 @@ type OpenAIGatewayHandler struct {
 	usageRecordWorkerPool    *service.UsageRecordWorkerPool
 	errorPassthroughService  *service.ErrorPassthroughService
 	contentModerationService *service.ContentModerationService
+	responseCache            *service.ResponseCache
 	concurrencyHelper        *ConcurrencyHelper
 	imageLimiter             *imageConcurrencyLimiter
 	maxAccountSwitches       int
@@ -72,6 +73,7 @@ func NewOpenAIGatewayHandler(
 		usageRecordWorkerPool:    usageRecordWorkerPool,
 		errorPassthroughService:  errorPassthroughService,
 		contentModerationService: contentModerationService,
+		responseCache:            newResponseCacheForHandler(cfg),
 		concurrencyHelper:        NewConcurrencyHelper(concurrencyService, SSEPingFormatComment, pingInterval),
 		imageLimiter:             &imageConcurrencyLimiter{},
 		maxAccountSwitches:       maxAccountSwitches,
@@ -255,6 +257,18 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	cacheReq := responseCacheRequest(c, "/v1/responses", "openai_responses", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
+
 	// Generate session hash (header first; fallback to prompt_cache_key)
 	sessionHash := h.gatewayService.GenerateSessionHash(c, sessionHashBody)
 	requireCompact := isOpenAIRemoteCompactPath(c)
@@ -335,6 +349,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		writerSizeBeforeForward := c.Writer.Size()
+		var cacheCaptureFinalize func() *service.ResponseCacheEntry
+		if cacheDecision.ExactEnabled && !reqStream {
+			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+		}
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -343,6 +361,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			}()
 			return h.gatewayService.Forward(c.Request.Context(), c, account, forwardBody)
 		}()
+		var cacheEntry *service.ResponseCacheEntry
+		if cacheCaptureFinalize != nil {
+			cacheEntry = cacheCaptureFinalize()
+		}
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
 		responseLatencyMs := forwardDurationMs
@@ -430,6 +452,8 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
+		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		cacheInflightFinished = true
 
 		// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
 		userAgent := c.GetHeader("User-Agent")
@@ -663,6 +687,18 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
+	cacheReq := responseCacheRequest(c, "/v1/messages", "openai_anthropic_messages", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
+
 	sessionHash := h.gatewayService.GenerateSessionHash(c, body)
 	promptCacheKey := h.gatewayService.ExtractSessionID(c, body)
 	sessionHash, promptCacheKey = resolveOpenAIMessagesMetadataSession(sessionHash, promptCacheKey, reqModel, body)
@@ -735,6 +771,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if channelMappingMsg.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMappingMsg.MappedModel)
 		}
+		var cacheCaptureFinalize func() *service.ResponseCacheEntry
+		if cacheDecision.ExactEnabled && !reqStream {
+			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+		}
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -743,6 +783,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			}()
 			return h.gatewayService.ForwardAsAnthropic(c.Request.Context(), c, account, forwardBody, promptCacheKey, defaultMappedModel)
 		}()
+		var cacheEntry *service.ResponseCacheEntry
+		if cacheCaptureFinalize != nil {
+			cacheEntry = cacheCaptureFinalize()
+		}
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
@@ -819,6 +863,8 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
+		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		cacheInflightFinished = true
 
 		userAgent := c.GetHeader("User-Agent")
 		clientIP := ip.GetClientIP(c)

@@ -6,6 +6,7 @@
 data/
 postgres_data/
 redis_data/
+redis_response_cache_data/
 
 # Environment configuration (contains sensitive information)
 .env
