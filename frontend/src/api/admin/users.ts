@@ -57,7 +57,7 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     status?: 'active' | 'disabled'
-    role?: 'admin' | 'user'
+    role?: 'admin' | 'sub_admin' | 'user'
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     attributes?: Record<number, string>  // attributeId -> value
@@ -115,9 +115,14 @@ export async function getById(id: number): Promise<AdminUser> {
 export async function create(userData: {
   email: string
   password: string
+  username?: string
+  notes?: string
   balance?: number
   concurrency?: number
+  rpm_limit?: number
   allowed_groups?: number[] | null
+  role?: 'admin' | 'sub_admin' | 'user'
+  admin_menu_permissions?: string[]
 }): Promise<AdminUser> {
   const { data } = await apiClient.post<AdminUser>('/admin/users', userData)
   return data

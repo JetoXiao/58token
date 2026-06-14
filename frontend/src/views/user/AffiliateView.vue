@@ -136,11 +136,20 @@
 
               <div class="space-y-2">
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('affiliate.inviteLink') }}</p>
-                <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-dark-700 dark:bg-dark-900">
-                  <code class="flex-1 truncate text-sm text-gray-700 dark:text-gray-300">{{ inviteLink }}</code>
-                  <button class="btn btn-secondary btn-sm" @click="copyInviteLink">
+                <div class="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-dark-700 dark:bg-dark-900">
+                  <code class="min-w-[160px] flex-1 truncate text-sm text-gray-700 dark:text-gray-300">{{ inviteLink }}</code>
+                  <button class="btn btn-secondary btn-sm shrink-0" @click="copyInviteLink">
                     <Icon name="copy" size="sm" />
                     <span>{{ t('affiliate.copyLink') }}</span>
+                  </button>
+                  <button
+                    class="btn btn-primary btn-sm shrink-0"
+                    :disabled="generatingPoster || !inviteLink"
+                    @click="generateInvitePoster"
+                  >
+                    <Icon v-if="generatingPoster" name="refresh" size="sm" class="animate-spin" />
+                    <Icon v-else name="download" size="sm" />
+                    <span>{{ generatingPoster ? t('affiliate.generatingPoster') : t('affiliate.sharePoster') }}</span>
                   </button>
                 </div>
               </div>
@@ -271,13 +280,45 @@
         </div>
       </template>
     </div>
+
+    <BaseDialog
+      :show="posterPreviewVisible"
+      :title="t('affiliate.posterPreviewTitle')"
+      width="normal"
+      @close="closePosterPreview"
+    >
+      <div class="space-y-4">
+        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900">
+          <img
+            v-if="posterPreviewUrl"
+            :src="posterPreviewUrl"
+            :alt="t('affiliate.posterAlt')"
+            class="mx-auto max-h-[70vh] w-auto max-w-full rounded-xl shadow-sm"
+          />
+        </div>
+        <p class="text-sm leading-6 text-gray-500 dark:text-dark-400">
+          {{ t('affiliate.posterPreviewHint') }}
+        </p>
+      </div>
+
+      <template #footer>
+        <button type="button" class="btn btn-secondary" @click="closePosterPreview">
+          {{ t('common.close') }}
+        </button>
+        <button type="button" class="btn btn-primary" :disabled="!posterBlob" @click="downloadPoster">
+          <Icon name="download" size="sm" />
+          <span>{{ t('affiliate.downloadPoster') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import userAPI from '@/api/user'
 import type {
@@ -292,6 +333,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { formatCurrency, formatDateTime } from '@/utils/format'
 import { extractApiErrorMessage } from '@/utils/apiError'
+import { buildAffiliatePosterFilename, downloadBlob, generateAffiliatePoster } from '@/utils/affiliatePoster'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -301,6 +343,10 @@ const { copyToClipboard } = useClipboard()
 const loading = ref(true)
 const transferring = ref(false)
 const submittingApplication = ref(false)
+const generatingPoster = ref(false)
+const posterBlob = ref<Blob | null>(null)
+const posterPreviewUrl = ref('')
+const posterFilename = ref('')
 const detail = ref<UserAffiliateDetail | null>(null)
 
 const sourceOptions = ['twitter', 'discord', 'telegram', 'community', 'other'] as const
@@ -336,6 +382,7 @@ const inviteLink = computed(() => {
   if (typeof window === 'undefined') return `/register?aff=${encodeURIComponent(detail.value.aff_code)}`
   return `${window.location.origin}/register?aff=${encodeURIComponent(detail.value.aff_code)}`
 })
+const posterPreviewVisible = computed(() => Boolean(posterPreviewUrl.value))
 
 const applicationStatusText = computed(() => {
   const app = latestApplication.value
@@ -423,6 +470,49 @@ async function copyInviteLink(): Promise<void> {
   await copyToClipboard(inviteLink.value, t('affiliate.linkCopied'))
 }
 
+async function generateInvitePoster(): Promise<void> {
+  if (!detail.value?.aff_code || !inviteLink.value || generatingPoster.value) return
+  generatingPoster.value = true
+  try {
+    const blob = await generateAffiliatePoster({
+      inviteLink: inviteLink.value,
+      affiliateCode: detail.value.aff_code,
+    })
+    replacePosterPreview(blob, buildAffiliatePosterFilename(detail.value.aff_code))
+    appStore.showSuccess(t('affiliate.posterGenerated'))
+  } catch (error) {
+    console.error('Failed to generate affiliate poster:', error)
+    appStore.showError(t('affiliate.posterFailed'))
+  } finally {
+    generatingPoster.value = false
+  }
+}
+
+function replacePosterPreview(blob: Blob, filename: string): void {
+  revokePosterPreview()
+  posterBlob.value = blob
+  posterFilename.value = filename
+  posterPreviewUrl.value = URL.createObjectURL(blob)
+}
+
+function revokePosterPreview(): void {
+  if (posterPreviewUrl.value) {
+    URL.revokeObjectURL(posterPreviewUrl.value)
+  }
+  posterPreviewUrl.value = ''
+}
+
+function closePosterPreview(): void {
+  revokePosterPreview()
+  posterBlob.value = null
+  posterFilename.value = ''
+}
+
+function downloadPoster(): void {
+  if (!posterBlob.value || !posterFilename.value) return
+  downloadBlob(posterBlob.value, posterFilename.value)
+}
+
 async function submitPartnerApplication(): Promise<void> {
   if (hasPendingApplication.value || submittingApplication.value) return
   if (!applicationForm.portal_url.trim() || !applicationForm.strengths.trim()) {
@@ -472,5 +562,9 @@ async function transferQuota(): Promise<void> {
 
 onMounted(() => {
   void loadAffiliateDetail()
+})
+
+onUnmounted(() => {
+  revokePosterPreview()
 })
 </script>

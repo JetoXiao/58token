@@ -101,6 +101,20 @@ func (_c *UserCreate) SetNillableRole(v *string) *UserCreate {
 	return _c
 }
 
+// SetAdminMenuPermissions sets the "admin_menu_permissions" field.
+func (_c *UserCreate) SetAdminMenuPermissions(v string) *UserCreate {
+	_c.mutation.SetAdminMenuPermissions(v)
+	return _c
+}
+
+// SetNillableAdminMenuPermissions sets the "admin_menu_permissions" field if the given value is not nil.
+func (_c *UserCreate) SetNillableAdminMenuPermissions(v *string) *UserCreate {
+	if v != nil {
+		_c.SetAdminMenuPermissions(*v)
+	}
+	return _c
+}
+
 // SetBalance sets the "balance" field.
 func (_c *UserCreate) SetBalance(v float64) *UserCreate {
 	_c.mutation.SetBalance(v)
@@ -574,6 +588,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultRole
 		_c.mutation.SetRole(v)
 	}
+	if _, ok := _c.mutation.AdminMenuPermissions(); !ok {
+		v := user.DefaultAdminMenuPermissions
+		_c.mutation.SetAdminMenuPermissions(v)
+	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		v := user.DefaultBalance
 		_c.mutation.SetBalance(v)
@@ -656,6 +674,9 @@ func (_c *UserCreate) check() error {
 		if err := user.RoleValidator(v); err != nil {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.AdminMenuPermissions(); !ok {
+		return &ValidationError{Name: "admin_menu_permissions", err: errors.New(`ent: missing required field "User.admin_menu_permissions"`)}
 	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "User.balance"`)}
@@ -758,6 +779,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
 		_node.Role = value
+	}
+	if value, ok := _c.mutation.AdminMenuPermissions(); ok {
+		_spec.SetField(user.FieldAdminMenuPermissions, field.TypeString, value)
+		_node.AdminMenuPermissions = value
 	}
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
@@ -1138,6 +1163,18 @@ func (u *UserUpsert) SetRole(v string) *UserUpsert {
 // UpdateRole sets the "role" field to the value that was provided on create.
 func (u *UserUpsert) UpdateRole() *UserUpsert {
 	u.SetExcluded(user.FieldRole)
+	return u
+}
+
+// SetAdminMenuPermissions sets the "admin_menu_permissions" field.
+func (u *UserUpsert) SetAdminMenuPermissions(v string) *UserUpsert {
+	u.Set(user.FieldAdminMenuPermissions, v)
+	return u
+}
+
+// UpdateAdminMenuPermissions sets the "admin_menu_permissions" field to the value that was provided on create.
+func (u *UserUpsert) UpdateAdminMenuPermissions() *UserUpsert {
+	u.SetExcluded(user.FieldAdminMenuPermissions)
 	return u
 }
 
@@ -1524,6 +1561,20 @@ func (u *UserUpsertOne) SetRole(v string) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateRole() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetAdminMenuPermissions sets the "admin_menu_permissions" field.
+func (u *UserUpsertOne) SetAdminMenuPermissions(v string) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetAdminMenuPermissions(v)
+	})
+}
+
+// UpdateAdminMenuPermissions sets the "admin_menu_permissions" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateAdminMenuPermissions() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateAdminMenuPermissions()
 	})
 }
 
@@ -2120,6 +2171,20 @@ func (u *UserUpsertBulk) SetRole(v string) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateRole() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetAdminMenuPermissions sets the "admin_menu_permissions" field.
+func (u *UserUpsertBulk) SetAdminMenuPermissions(v string) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetAdminMenuPermissions(v)
+	})
+}
+
+// UpdateAdminMenuPermissions sets the "admin_menu_permissions" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateAdminMenuPermissions() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateAdminMenuPermissions()
 	})
 }
 

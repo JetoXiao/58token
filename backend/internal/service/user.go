@@ -1,28 +1,30 @@
 package service
 
 import (
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 type User struct {
-	ID             int64
-	Email          string
-	Username       string
-	Notes          string
-	AvatarURL      string
-	AvatarSource   string
-	AvatarMIME     string
-	AvatarByteSize int
-	AvatarSHA256   string
-	PasswordHash   string
-	Role           string
-	Balance        float64
-	Concurrency    int
-	Status         string
-	AllowedGroups  []int64
-	TokenVersion   int64 // Incremented on password change to invalidate existing tokens
+	ID                   int64
+	Email                string
+	Username             string
+	Notes                string
+	AvatarURL            string
+	AvatarSource         string
+	AvatarMIME           string
+	AvatarByteSize       int
+	AvatarSHA256         string
+	PasswordHash         string
+	Role                 string
+	AdminMenuPermissions []string
+	Balance              float64
+	Concurrency          int
+	Status               string
+	AllowedGroups        []int64
+	TokenVersion         int64 // Incremented on password change to invalidate existing tokens
 	// TokenVersionResolved indicates TokenVersion already contains the fingerprint-derived
 	// value expected in JWT claims and refresh-token state.
 	TokenVersionResolved bool
@@ -63,11 +65,61 @@ type User struct {
 }
 
 func (u *User) IsAdmin() bool {
+	return IsAdminRole(u.Role)
+}
+
+func (u *User) IsSuperAdmin() bool {
 	return u.Role == RoleAdmin
+}
+
+func (u *User) IsSubAdmin() bool {
+	return u.Role == RoleSubAdmin
 }
 
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
+}
+
+func IsAdminRole(role string) bool {
+	return role == RoleAdmin || role == RoleSubAdmin
+}
+
+func IsValidUserRole(role string) bool {
+	switch role {
+	case RoleAdmin, RoleSubAdmin, RoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
+func NormalizeUserRole(role string) string {
+	switch role {
+	case RoleAdmin, RoleSubAdmin, RoleUser:
+		return role
+	default:
+		return RoleUser
+	}
+}
+
+func NormalizeAdminMenuPermissions(items []string) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		normalized := strings.TrimSpace(item)
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		out = append(out, normalized)
+	}
+	return out
 }
 
 // CanBindGroup checks whether a user can bind to a given group.

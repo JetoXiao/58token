@@ -429,6 +429,9 @@ const HISTORY_DB_VERSION = 1
 const HISTORY_STORE_NAME = 'history'
 const HISTORY_RECORD_KEY = 'items'
 const HISTORY_LIMIT = 8
+const HISTORY_IMAGE_MAX_SIDE = 1024
+const HISTORY_IMAGE_QUALITY = 0.82
+const HISTORY_IMAGE_OPTIMIZE_THRESHOLD = 450_000
 const CUSTOM_SIZES_KEY = 'sub2api_image_generation_custom_sizes'
 const CUSTOM_SIZE_SELECT_VALUE = '__custom__'
 const MIN_IMAGE_PIXELS = 655360
@@ -483,6 +486,8 @@ const keyModelsLoaded = ref(false)
 let abortController: AbortController | null = null
 let keyModelsAbortController: AbortController | null = null
 let generationTimer: number | null = null
+let historyRevision = 0
+let historySaveQueue: Promise<void> = Promise.resolve()
 
 const countOptions = [1, 2, 3, 4]
 const allImageModelOptions = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1']
@@ -1011,6 +1016,7 @@ async function generateRequestedImages(params: GenerateRequestedImagesParams): P
 
 function pushHistory(images: string[]) {
   if (images.length === 0) return
+  historyRevision += 1
   history.value = [
     {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1029,7 +1035,7 @@ function pushHistory(images: string[]) {
     },
     ...history.value
   ].slice(0, HISTORY_LIMIT)
-  saveHistory()
+  scheduleHistorySave()
 }
 
 function restoreHistory(item: HistoryItem) {
@@ -1142,22 +1148,37 @@ function loadHistoryFromLocalStorage(): HistoryItem[] {
   }
 }
 
+function historyItemsNeedOptimization(items: HistoryItem[]): boolean {
+  return items.some((item) => item.images.some(shouldOptimizeHistoryImage))
+}
+
+function mergeHistoryItems(...collections: HistoryItem[][]): HistoryItem[] {
+  const seen = new Set<string>()
+  const merged: HistoryItem[] = []
+  collections.forEach((items) => {
+    items.forEach((item) => {
+      if (seen.has(item.id)) return
+      seen.add(item.id)
+      merged.push(item)
+    })
+  })
+  return merged.slice(0, HISTORY_LIMIT)
+}
+
 async function loadHistory() {
   try {
     const db = await openHistoryDatabase()
     if (db) {
       try {
         const storedItems = normalizeHistoryItems(await readHistoryFromDatabase(db))
-        if (storedItems.length > 0) {
-          history.value = storedItems
+        const localItems = loadHistoryFromLocalStorage()
+        const mergedItems = mergeHistoryItems(localItems, storedItems)
+        if (mergedItems.length > 0) {
+          history.value = mergedItems
+          if (localItems.length > 0 || historyItemsNeedOptimization(mergedItems)) {
+            scheduleHistorySave()
+          }
           return
-        }
-
-        const legacyItems = loadHistoryFromLocalStorage()
-        history.value = legacyItems
-        if (legacyItems.length > 0) {
-          await writeHistoryToDatabase(db, legacyItems)
-          localStorage.removeItem(HISTORY_KEY)
         }
         return
       } finally {
@@ -1171,27 +1192,146 @@ async function loadHistory() {
   }
 }
 
+function scheduleHistorySave(): void {
+  historySaveQueue = historySaveQueue
+    .catch(() => undefined)
+    .then(() => saveHistory())
+}
+
 async function saveHistory() {
-  const items = history.value.slice(0, HISTORY_LIMIT)
+  const revision = historyRevision
+  const items = await prepareHistoryItemsForStorage(history.value.slice(0, HISTORY_LIMIT))
+  if (revision !== historyRevision) return
+  history.value = mergePreparedHistoryItems(history.value, items)
   try {
     const db = await openHistoryDatabase()
+    if (revision !== historyRevision) {
+      db?.close()
+      return
+    }
     if (db) {
       try {
-        await writeHistoryToDatabase(db, items)
+        try {
+          await writeHistoryToDatabase(db, items)
+        } catch (error) {
+          try {
+            await clearHistoryDatabase(db)
+            await writeHistoryToDatabase(db, items)
+          } catch {
+            try {
+              await clearHistoryDatabase(db)
+            } catch {
+              // Keep falling back to localStorage below.
+            }
+            throw error
+          }
+        }
         localStorage.removeItem(HISTORY_KEY)
         return
       } finally {
         db.close()
       }
     }
+    if (revision !== historyRevision) return
     localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
   } catch {
     try {
+      if (revision !== historyRevision) return
       localStorage.setItem(HISTORY_KEY, JSON.stringify(items))
     } catch {
-      // Data URLs can exceed localStorage; the current in-memory history remains usable.
+      const reducedItems = items.slice(0, Math.max(1, Math.floor(items.length / 2)))
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(reducedItems))
+      } catch {
+        // The current in-memory history remains usable if persistent storage is temporarily full.
+      }
     }
   }
+}
+
+async function prepareHistoryItemsForStorage(items: HistoryItem[]): Promise<HistoryItem[]> {
+  const prepared = await Promise.all(items.map(async (item) => {
+    const images = await Promise.all(item.images.map(optimizeHistoryImage))
+    return {
+      ...item,
+      thumbnail: images[0] || item.thumbnail,
+      images
+    }
+  }))
+  return prepared.slice(0, HISTORY_LIMIT)
+}
+
+function mergePreparedHistoryItems(currentItems: HistoryItem[], preparedItems: HistoryItem[]): HistoryItem[] {
+  const preparedById = new Map(preparedItems.map((item) => [item.id, item]))
+  return currentItems
+    .slice(0, HISTORY_LIMIT)
+    .map((item) => preparedById.get(item.id) || item)
+}
+
+function shouldOptimizeHistoryImage(url: string): boolean {
+  return url.startsWith('data:image/') && url.length > HISTORY_IMAGE_OPTIMIZE_THRESHOLD
+}
+
+async function optimizeHistoryImage(url: string): Promise<string> {
+  if (!shouldOptimizeHistoryImage(url)) return url
+  try {
+    const optimized = await resizeHistoryImage(url)
+    return optimized.length < url.length ? optimized : url
+  } catch {
+    return url
+  }
+}
+
+async function resizeHistoryImage(url: string): Promise<string> {
+  const image = await loadHistoryImage(url)
+  const sourceWidth = image.naturalWidth || image.width
+  const sourceHeight = image.naturalHeight || image.height
+  if (sourceWidth <= 0 || sourceHeight <= 0) return url
+
+  const scale = Math.min(1, HISTORY_IMAGE_MAX_SIDE / Math.max(sourceWidth, sourceHeight))
+  const width = Math.max(1, Math.round(sourceWidth * scale))
+  const height = Math.max(1, Math.round(sourceHeight * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return url
+
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(image, 0, 0, width, height)
+  const blob = await canvasToHistoryBlob(canvas)
+  return blobToDataUrl(blob)
+}
+
+function loadHistoryImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error('Failed to load history image'))
+    image.src = url
+  })
+}
+
+function canvasToHistoryBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob)
+      } else {
+        reject(new Error('Failed to optimize history image'))
+      }
+    }, 'image/jpeg', HISTORY_IMAGE_QUALITY)
+  })
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error || new Error('Failed to read optimized image'))
+    reader.readAsDataURL(blob)
+  })
 }
 
 function loadCustomSizes() {

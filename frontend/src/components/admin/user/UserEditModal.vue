@@ -34,6 +34,20 @@
         <textarea v-model="form.notes" rows="3" class="input"></textarea>
       </div>
       <div>
+        <label class="input-label">{{ t('admin.users.form.roleLabel') }}</label>
+        <select v-model="form.role" class="input" :disabled="user?.role === 'admin'">
+          <option value="user">{{ t('admin.users.roles.user') }}</option>
+          <option value="sub_admin">{{ t('admin.users.roles.sub_admin') }}</option>
+          <option value="admin">{{ t('admin.users.roles.admin') }}</option>
+        </select>
+        <p v-if="user?.role === 'admin'" class="input-hint">{{ t('admin.users.form.superAdminProtectedHint') }}</p>
+        <p v-else-if="form.role === 'sub_admin'" class="input-hint">{{ t('admin.users.form.readonlyAdminHint') }}</p>
+      </div>
+      <AdminMenuPermissionPicker
+        v-if="form.role === 'sub_admin'"
+        v-model="form.admin_menu_permissions"
+      />
+      <div>
         <label class="input-label">{{ t('admin.users.form.partnerLevel') }}</label>
         <select v-model="form.partner_level" class="input">
           <option v-for="level in partnerLevelOptions" :key="level" :value="level">
@@ -80,6 +94,7 @@ import type { AdminUser, AffiliatePartnerLevel, UserAttributeValuesMap } from '@
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
+import AdminMenuPermissionPicker from './AdminMenuPermissionPicker.vue'
 
 const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
@@ -87,11 +102,33 @@ const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard
 
 const submitting = ref(false); const passwordCopied = ref(false)
 const partnerLevelOptions: AffiliatePartnerLevel[] = ['none', 'spark', 'voyage', 'summit', 'cocreate']
-const form = reactive({ email: '', password: '', username: '', notes: '', partner_level: 'none' as AffiliatePartnerLevel, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const form = reactive({
+  email: '',
+  password: '',
+  username: '',
+  notes: '',
+  role: 'user' as 'admin' | 'sub_admin' | 'user',
+  admin_menu_permissions: [] as string[],
+  partner_level: 'none' as AffiliatePartnerLevel,
+  concurrency: 1,
+  rpm_limit: 0,
+  customAttributes: {} as UserAttributeValuesMap
+})
 
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', partner_level: u.affiliate?.partner_level || 'none', concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, {
+      email: u.email,
+      password: '',
+      username: u.username || '',
+      notes: u.notes || '',
+      role: u.role,
+      admin_menu_permissions: [...(u.admin_menu_permissions ?? [])],
+      partner_level: u.affiliate?.partner_level || 'none',
+      concurrency: u.concurrency,
+      rpm_limit: u.rpm_limit ?? 0,
+      customAttributes: {}
+    })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -118,7 +155,15 @@ const handleUpdateUser = async () => {
   }
   submitting.value = true
   try {
-    const data: any = { email: form.email, username: form.username, notes: form.notes, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
+    const data: any = {
+      email: form.email,
+      username: form.username,
+      notes: form.notes,
+      role: form.role,
+      admin_menu_permissions: form.role === 'sub_admin' ? form.admin_menu_permissions : [],
+      concurrency: form.concurrency,
+      rpm_limit: form.rpm_limit
+    }
     if (form.password.trim()) data.password = form.password.trim()
     await adminAPI.users.update(props.user.id, data)
     if ((props.user.affiliate?.partner_level || 'none') !== form.partner_level) {

@@ -1791,6 +1791,14 @@ export default {
     copyLink: 'Copy Link',
     codeCopied: 'Affiliate code copied',
     linkCopied: 'Invite link copied',
+    sharePoster: 'Share Poster',
+    generatingPoster: 'Generating...',
+    posterPreviewTitle: 'Invite Poster',
+    posterAlt: 'Invite poster',
+    posterPreviewHint: 'The QR code is bound to your invite link. Download it and share it directly with friends.',
+    downloadPoster: 'Download Image',
+    posterGenerated: 'Invite poster generated',
+    posterFailed: 'Failed to generate poster. Please try again later.',
     loadFailed: 'Failed to load affiliate data',
     transferFailed: 'Failed to transfer affiliate quota',
     stats: {
@@ -1968,6 +1976,7 @@ export default {
     securityTitle: 'Security Settings',
     securityDescription: 'Password, two-factor authentication, and alerts live in the right rail.',
     administrator: 'Administrator',
+    superAdministrator: 'Super Administrator',
     user: 'User',
     username: 'Username',
     email: 'Email',
@@ -2657,6 +2666,14 @@ export default {
       creating: 'Creating...',
       updating: 'Updating...',
       form: {
+        roleLabel: 'Role',
+        selectRole: 'Select role',
+        readonlyAdminHint: 'Read-only administrators can only view authorized menus and cannot create, edit, or delete data.',
+        superAdminProtectedHint: 'Super administrators have full permissions and cannot be downgraded here.',
+        adminMenuPermissions: 'Accessible menus',
+        adminMenuPermissionsHint: 'Select the admin and user menus this administrator can view. All write operations are still blocked by the backend.',
+        adminMenus: 'Admin menus',
+        userMenus: 'User menus',
         partnerLevel: 'Partner Level',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
@@ -2800,7 +2817,8 @@ export default {
       createdAt: 'Created',
       totalRecharged: 'Total Recharged',
       roles: {
-        admin: 'Admin',
+        admin: 'Super Admin',
+        sub_admin: 'Read-only Admin',
         user: 'User'
       },
       // Settings Dropdowns

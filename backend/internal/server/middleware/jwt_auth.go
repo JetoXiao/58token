@@ -82,6 +82,7 @@ func jwtAuth(authService *service.AuthService, userService jwtUserReader, activi
 			Concurrency: user.Concurrency,
 		})
 		c.Set(string(ContextKeyUserRole), user.Role)
+		c.Set(string(ContextKeyAdminMenuPermissions), user.AdminMenuPermissions)
 		if activityToucher != nil {
 			activityToucher.TouchLastActiveForUser(c.Request.Context(), user)
 		}

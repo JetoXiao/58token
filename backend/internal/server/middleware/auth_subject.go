@@ -26,3 +26,12 @@ func GetUserRoleFromContext(c *gin.Context) (string, bool) {
 	role, ok := value.(string)
 	return role, ok
 }
+
+func GetAdminMenuPermissionsFromContext(c *gin.Context) ([]string, bool) {
+	value, exists := c.Get(string(ContextKeyAdminMenuPermissions))
+	if !exists {
+		return nil, false
+	}
+	items, ok := value.([]string)
+	return items, ok
+}

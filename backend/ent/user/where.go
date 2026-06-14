@@ -85,6 +85,11 @@ func Role(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRole, v))
 }
 
+// AdminMenuPermissions applies equality check predicate on the "admin_menu_permissions" field. It's identical to AdminMenuPermissionsEQ.
+func AdminMenuPermissions(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldAdminMenuPermissions, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v float64) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldBalance, v))
@@ -493,6 +498,71 @@ func RoleEqualFold(v string) predicate.User {
 // RoleContainsFold applies the ContainsFold predicate on the "role" field.
 func RoleContainsFold(v string) predicate.User {
 	return predicate.User(sql.FieldContainsFold(FieldRole, v))
+}
+
+// AdminMenuPermissionsEQ applies the EQ predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsEQ(v string) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsNEQ applies the NEQ predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsNEQ(v string) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsIn applies the In predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldIn(FieldAdminMenuPermissions, vs...))
+}
+
+// AdminMenuPermissionsNotIn applies the NotIn predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsNotIn(vs ...string) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldAdminMenuPermissions, vs...))
+}
+
+// AdminMenuPermissionsGT applies the GT predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsGT(v string) predicate.User {
+	return predicate.User(sql.FieldGT(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsGTE applies the GTE predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsGTE(v string) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsLT applies the LT predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsLT(v string) predicate.User {
+	return predicate.User(sql.FieldLT(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsLTE applies the LTE predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsLTE(v string) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsContains applies the Contains predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsContains(v string) predicate.User {
+	return predicate.User(sql.FieldContains(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsHasPrefix applies the HasPrefix predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsHasPrefix(v string) predicate.User {
+	return predicate.User(sql.FieldHasPrefix(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsHasSuffix applies the HasSuffix predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsHasSuffix(v string) predicate.User {
+	return predicate.User(sql.FieldHasSuffix(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsEqualFold applies the EqualFold predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsEqualFold(v string) predicate.User {
+	return predicate.User(sql.FieldEqualFold(FieldAdminMenuPermissions, v))
+}
+
+// AdminMenuPermissionsContainsFold applies the ContainsFold predicate on the "admin_menu_permissions" field.
+func AdminMenuPermissionsContainsFold(v string) predicate.User {
+	return predicate.User(sql.FieldContainsFold(FieldAdminMenuPermissions, v))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.

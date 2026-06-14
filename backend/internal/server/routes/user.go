@@ -18,6 +18,7 @@ func RegisterUserRoutes(
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
+	authenticated.Use(middleware.SubAdminUserPermissionGuard())
 	{
 		// 用户接口
 		user := authenticated.Group("/user")

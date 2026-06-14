@@ -27,6 +27,8 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldRole holds the string denoting the role field in the database.
 	FieldRole = "role"
+	// FieldAdminMenuPermissions holds the string denoting the admin_menu_permissions field in the database.
+	FieldAdminMenuPermissions = "admin_menu_permissions"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldConcurrency holds the string denoting the concurrency field in the database.
@@ -189,6 +191,7 @@ var Columns = []string{
 	FieldEmail,
 	FieldPasswordHash,
 	FieldRole,
+	FieldAdminMenuPermissions,
 	FieldBalance,
 	FieldConcurrency,
 	FieldStatus,
@@ -246,6 +249,8 @@ var (
 	DefaultRole string
 	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
 	RoleValidator func(string) error
+	// DefaultAdminMenuPermissions holds the default value on creation for the "admin_menu_permissions" field.
+	DefaultAdminMenuPermissions string
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
 	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
@@ -314,6 +319,11 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByRole orders the results by the role field.
 func ByRole(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRole, opts...).ToFunc()
+}
+
+// ByAdminMenuPermissions orders the results by the admin_menu_permissions field.
+func ByAdminMenuPermissions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAdminMenuPermissions, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

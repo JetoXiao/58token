@@ -193,6 +193,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { normalizeUserMenuItems, type UserMenuItem } from '@/utils/userMenuItems'
+import { hasAdminMenuPermission, type AdminPermissionKey } from '@/utils/adminMenuPermissions'
 import { BRAND_LOGO_URL } from '@/constants/brand'
 
 interface NavItem {
@@ -202,6 +203,7 @@ interface NavItem {
   iconSvg?: string
   hideInSimpleMode?: boolean
   menuKey?: UserMenuItem
+  permissionKey?: AdminPermissionKey
   children?: NavItem[]
   /**
    * When true, the parent item only toggles the expand/collapse state and
@@ -241,6 +243,21 @@ function applyUserMenuItems(items: NavItem[]): NavItem[] {
       out.push({ ...item, children: applyUserMenuItems(item.children) })
     } else {
       out.push(item)
+    }
+  }
+  return out
+}
+
+function applyReadonlyAdminPermissions(items: NavItem[]): NavItem[] {
+  if (!authStore.isReadonlyAdmin) {
+    return items
+  }
+  const out: NavItem[] = []
+  for (const item of items) {
+    const children = item.children ? applyReadonlyAdminPermissions(item.children) : undefined
+    const allowed = item.permissionKey ? hasAdminMenuPermission(authStore.user?.admin_menu_permissions, item.permissionKey) : false
+    if (allowed || (children && children.length > 0)) {
+      out.push({ ...item, children })
     }
   }
   return out
@@ -685,8 +702,8 @@ const flagChannelMonitor = makeSidebarFlag(FeatureFlags.channelMonitor)
 const flagPayment = makeSidebarFlag(FeatureFlags.payment)
 const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
-const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
-const flagAdminPayment = () => adminSettingsStore.paymentEnabled
+const flagOpsMonitoring = () => authStore.isReadonlyAdmin ? true : adminSettingsStore.opsMonitoringEnabled
+const flagAdminPayment = () => authStore.isReadonlyAdmin ? true : adminSettingsStore.paymentEnabled
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
@@ -696,24 +713,25 @@ const flagAdminPayment = () => adminSettingsStore.paymentEnabled
 function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   const items: NavItem[] = []
   if (withDashboard) {
-    items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon, menuKey: 'dashboard' })
+    items.push({ path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon, menuKey: 'dashboard', permissionKey: 'dashboard' })
   }
   items.push(
-    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon, menuKey: 'api_keys' },
-    { path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageGenerationIcon, menuKey: 'image_generation' },
-    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true, menuKey: 'usage' },
-    { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor, menuKey: 'channel_status' },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, menuKey: 'subscriptions' },
-    { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'purchase' },
-    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'orders' },
-    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, menuKey: 'redeem' },
-    { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate, menuKey: 'affiliate' },
-    { path: '/profile', label: t('nav.profile'), icon: UserIcon, menuKey: 'profile' },
+    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon, menuKey: 'api_keys', permissionKey: 'api_keys' },
+    { path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageGenerationIcon, menuKey: 'image_generation', permissionKey: 'image_generation' },
+    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true, menuKey: 'usage', permissionKey: 'usage' },
+    { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor, menuKey: 'channel_status', permissionKey: 'channel_status' },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, menuKey: 'subscriptions', permissionKey: 'subscriptions' },
+    { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'purchase', permissionKey: 'purchase' },
+    { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'orders', permissionKey: 'orders' },
+    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, menuKey: 'redeem', permissionKey: 'redeem' },
+    { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate, menuKey: 'affiliate', permissionKey: 'affiliate' },
+    { path: '/profile', label: t('nav.profile'), icon: UserIcon, menuKey: 'profile', permissionKey: 'profile' },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,
       label: item.label,
       icon: null,
       iconSvg: item.icon_svg,
+      permissionKey: `custom:user:${item.id}`,
     })),
   )
   return items
@@ -722,7 +740,8 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
 // finalizeNav 合并三重过滤：featureFlag 过滤 + simple 模式过滤。
 function finalizeNav(items: NavItem[]): NavItem[] {
   const visible = applyUserMenuItems(applyFeatureFlags(items))
-  return authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
+  const simpleFiltered = authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
+  return applyReadonlyAdminPermissions(simpleFiltered)
 }
 
 // User navigation items (for regular users)
@@ -750,12 +769,12 @@ const customMenuItemsForAdmin = computed(() => {
 // Admin navigation items
 const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
-    { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/ops/response-cache', label: t('nav.responseCache'), icon: ServerIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/requests', label: t('nav.requests'), icon: OrderListIcon, featureFlag: flagOpsMonitoring },
-    { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
-    { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
+    { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon, permissionKey: 'admin_dashboard' },
+    { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_ops' },
+    { path: '/admin/ops/response-cache', label: t('nav.responseCache'), icon: ServerIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_response_cache' },
+    { path: '/admin/requests', label: t('nav.requests'), icon: OrderListIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_requests' },
+    { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true, permissionKey: 'admin_users' },
+    { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true, permissionKey: 'admin_groups' },
     {
       path: '/admin/channels',
       label: t('nav.channelManagement'),
@@ -763,17 +782,17 @@ const adminNavItems = computed((): NavItem[] => {
       hideInSimpleMode: true,
       expandOnly: true,
       children: [
-        { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon },
-        { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor },
+        { path: '/admin/channels/pricing', label: t('nav.channelPricing'), icon: PriceTagIcon, permissionKey: 'admin_channel_pricing' },
+        { path: '/admin/channels/monitor', label: t('nav.channelMonitor'), icon: SignalIcon, featureFlag: flagChannelMonitor, permissionKey: 'admin_channel_monitor' },
       ],
     },
-    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
-    { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
-    { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
-    { path: '/admin/risk-control', label: t('nav.riskControl'), icon: ShieldIcon, hideInSimpleMode: true, featureFlag: flagRiskControl },
-    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
-    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true, permissionKey: 'admin_subscriptions' },
+    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon, permissionKey: 'admin_accounts' },
+    { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon, permissionKey: 'admin_announcements' },
+    { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon, permissionKey: 'admin_proxies' },
+    { path: '/admin/risk-control', label: t('nav.riskControl'), icon: ShieldIcon, hideInSimpleMode: true, featureFlag: flagRiskControl, permissionKey: 'admin_risk_control' },
+    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true, permissionKey: 'admin_redeem' },
+    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true, permissionKey: 'admin_promo_codes' },
     {
       path: '/admin/affiliates',
       label: t('nav.affiliateManagement'),
@@ -782,11 +801,11 @@ const adminNavItems = computed((): NavItem[] => {
       expandOnly: true,
       featureFlag: flagAffiliate,
       children: [
-        { path: '/admin/affiliates/usage', label: t('nav.affiliateUsage'), icon: ChartIcon },
-        { path: '/admin/affiliates/applications', label: t('nav.affiliateApplications'), icon: UserIcon },
-        { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon },
-        { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon },
-        { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon },
+        { path: '/admin/affiliates/usage', label: t('nav.affiliateUsage'), icon: ChartIcon, permissionKey: 'admin_affiliate_usage' },
+        { path: '/admin/affiliates/applications', label: t('nav.affiliateApplications'), icon: UserIcon, permissionKey: 'admin_affiliate_applications' },
+        { path: '/admin/affiliates/invites', label: t('nav.affiliateInviteRecords'), icon: UsersIcon, permissionKey: 'admin_affiliate_invites' },
+        { path: '/admin/affiliates/rebates', label: t('nav.affiliateRebateRecords'), icon: OrderIcon, permissionKey: 'admin_affiliate_rebates' },
+        { path: '/admin/affiliates/transfers', label: t('nav.affiliateTransferRecords'), icon: CreditCardIcon, permissionKey: 'admin_affiliate_transfers' },
       ],
     },
     {
@@ -797,33 +816,33 @@ const adminNavItems = computed((): NavItem[] => {
       expandOnly: true,
       featureFlag: flagAdminPayment,
       children: [
-        { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon },
-        { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon },
-        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
+        { path: '/admin/orders/dashboard', label: t('nav.paymentDashboard'), icon: ChartIcon, permissionKey: 'admin_order_dashboard' },
+        { path: '/admin/orders', label: t('nav.orderManagement'), icon: OrderIcon, permissionKey: 'admin_orders' },
+        { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon, permissionKey: 'admin_order_plans' },
       ],
     },
-    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon }
+    { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon, permissionKey: 'admin_usage' }
   ]
 
-  const visible = applyFeatureFlags(baseItems)
+  const visible = applyReadonlyAdminPermissions(applyFeatureFlags(baseItems))
 
   // 简单模式下，在系统设置前插入 API密钥
   if (authStore.isSimpleMode) {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
-    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
-    filtered.push({ path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageGenerationIcon })
-    filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
+    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon, permissionKey: 'api_keys' })
+    filtered.push({ path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageGenerationIcon, permissionKey: 'image_generation' })
+    filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon, permissionKey: 'admin_settings' })
     for (const cm of customMenuItemsForAdmin.value) {
-      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+      filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, permissionKey: `custom:admin:${cm.id}` })
     }
-    return filtered
+    return applyReadonlyAdminPermissions(filtered)
   }
 
-  visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
+  visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon, permissionKey: 'admin_settings' })
   for (const cm of customMenuItemsForAdmin.value) {
-    visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+    visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg, permissionKey: `custom:admin:${cm.id}` })
   }
-  return visible
+  return applyReadonlyAdminPermissions(visible)
 })
 
 function toggleSidebar() {
@@ -920,7 +939,7 @@ if (
 watch(
   isAdmin,
   (v) => {
-    if (v) {
+    if (v && authStore.isSuperAdmin) {
       adminSettingsStore.fetch()
     }
   },
@@ -928,7 +947,7 @@ watch(
 )
 
 onMounted(() => {
-  if (isAdmin.value) {
+  if (isAdmin.value && authStore.isSuperAdmin) {
     adminSettingsStore.fetch()
   }
 })

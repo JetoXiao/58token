@@ -5,6 +5,7 @@
 
 import 'vue-router'
 import type { UserMenuItem } from '@/utils/userMenuItems'
+import type { AdminMenuItem } from '@/utils/adminMenuPermissions'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -19,6 +20,7 @@ declare module 'vue-router' {
      * @default false
      */
     requiresAdmin?: boolean
+    adminMenuKey?: AdminMenuItem
 
     /**
      * Page title for this route

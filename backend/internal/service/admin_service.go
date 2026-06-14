@@ -117,26 +117,30 @@ type AdminService interface {
 
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
-	Email         string
-	Password      string
-	Username      string
-	Notes         string
-	Balance       float64
-	Concurrency   int
-	RPMLimit      int
-	AllowedGroups []int64
+	Email                string
+	Password             string
+	Username             string
+	Notes                string
+	Role                 string
+	AdminMenuPermissions []string
+	Balance              float64
+	Concurrency          int
+	RPMLimit             int
+	AllowedGroups        []int64
 }
 
 type UpdateUserInput struct {
-	Email         string
-	Password      string
-	Username      *string
-	Notes         *string
-	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
-	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
-	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
-	Status        string
-	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
+	Email                string
+	Password             string
+	Username             *string
+	Notes                *string
+	Role                 *string
+	AdminMenuPermissions *[]string
+	Balance              *float64 // 使用指针区分"未提供"和"设置为0"
+	Concurrency          *int     // 使用指针区分"未提供"和"设置为0"
+	RPMLimit             *int     // 使用指针区分"未提供"和"设置为0"
+	Status               string
+	AllowedGroups        *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64
@@ -652,16 +656,25 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
+	role, err := normalizeAdminInputRole(input.Role, RoleUser)
+	if err != nil {
+		return nil, err
+	}
+	permissions := NormalizeAdminMenuPermissions(input.AdminMenuPermissions)
+	if role != RoleSubAdmin {
+		permissions = nil
+	}
 	user := &User{
-		Email:         input.Email,
-		Username:      input.Username,
-		Notes:         input.Notes,
-		Role:          RoleUser, // Always create as regular user, never admin
-		Balance:       input.Balance,
-		Concurrency:   input.Concurrency,
-		RPMLimit:      input.RPMLimit,
-		Status:        StatusActive,
-		AllowedGroups: input.AllowedGroups,
+		Email:                input.Email,
+		Username:             input.Username,
+		Notes:                input.Notes,
+		Role:                 role,
+		AdminMenuPermissions: permissions,
+		Balance:              input.Balance,
+		Concurrency:          input.Concurrency,
+		RPMLimit:             input.RPMLimit,
+		Status:               StatusActive,
+		AllowedGroups:        input.AllowedGroups,
 	}
 	if err := user.SetPassword(input.Password); err != nil {
 		return nil, err
@@ -713,6 +726,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	oldConcurrency := user.Concurrency
 	oldStatus := user.Status
 	oldRole := user.Role
+	oldPermissions := strings.Join(NormalizeAdminMenuPermissions(user.AdminMenuPermissions), "\x00")
 	oldRPMLimit := user.RPMLimit
 
 	if input.Email != "" {
@@ -731,6 +745,17 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.Notes = *input.Notes
 	}
 
+	if input.Role != nil {
+		role, err := normalizeAdminInputRole(*input.Role, user.Role)
+		if err != nil {
+			return nil, err
+		}
+		if user.Role == RoleAdmin && role != RoleAdmin {
+			return nil, infraerrors.Forbidden("SUPER_ADMIN_PROTECTED", "cannot change super admin role")
+		}
+		user.Role = role
+	}
+
 	if input.Status != "" {
 		user.Status = input.Status
 	}
@@ -745,6 +770,12 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if input.AllowedGroups != nil {
 		user.AllowedGroups = *input.AllowedGroups
+	}
+	if input.AdminMenuPermissions != nil {
+		user.AdminMenuPermissions = NormalizeAdminMenuPermissions(*input.AdminMenuPermissions)
+	}
+	if user.Role != RoleSubAdmin {
+		user.AdminMenuPermissions = nil
 	}
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
@@ -762,6 +793,9 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// 不失效缓存会让修改在一个 L2 TTL 内失去效果。
 		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
+		}
+		if strings.Join(NormalizeAdminMenuPermissions(user.AdminMenuPermissions), "\x00") != oldPermissions {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}
@@ -807,6 +841,17 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, id)
 	}
 	return nil
+}
+
+func normalizeAdminInputRole(role string, defaultRole string) (string, error) {
+	trimmed := strings.TrimSpace(role)
+	if trimmed == "" {
+		trimmed = defaultRole
+	}
+	if !IsValidUserRole(trimmed) {
+		return "", infraerrors.BadRequest("INVALID_ROLE", "role must be one of admin, sub_admin, or user")
+	}
+	return trimmed, nil
 }
 
 func (s *adminServiceImpl) BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error) {

@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authAPI, isTotp2FARequired, type LoginResponse } from '@/api'
 import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
+import { hasAdminMenuPermission } from '@/utils/adminMenuPermissions'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -87,8 +88,10 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   const isAdmin = computed(() => {
-    return user.value?.role === 'admin'
+    return user.value?.role === 'admin' || user.value?.role === 'sub_admin'
   })
+  const isSuperAdmin = computed(() => user.value?.role === 'admin')
+  const isReadonlyAdmin = computed(() => user.value?.role === 'sub_admin')
 
   const isSimpleMode = computed(() => runMode.value === 'simple')
   const hasPendingAuthSession = computed(() => pendingAuthSession.value !== null)
@@ -476,6 +479,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isSuperAdmin,
+    isReadonlyAdmin,
     isSimpleMode,
     hasPendingAuthSession,
 
@@ -488,6 +493,7 @@ export const useAuthStore = defineStore('auth', () => {
     checkAuth,
     refreshUser,
     setPendingAuthSession,
-    clearPendingAuthSession
+    clearPendingAuthSession,
+    hasAdminMenuPermission: (key?: string) => hasAdminMenuPermission(user.value?.admin_menu_permissions, key)
   }
 })

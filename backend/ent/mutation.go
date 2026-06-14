@@ -38281,6 +38281,7 @@ type UserMutation struct {
 	email                         *string
 	password_hash                 *string
 	role                          *string
+	admin_menu_permissions        *string
 	balance                       *float64
 	addbalance                    *float64
 	concurrency                   *int
@@ -38670,6 +38671,42 @@ func (m *UserMutation) OldRole(ctx context.Context) (v string, err error) {
 // ResetRole resets all changes to the "role" field.
 func (m *UserMutation) ResetRole() {
 	m.role = nil
+}
+
+// SetAdminMenuPermissions sets the "admin_menu_permissions" field.
+func (m *UserMutation) SetAdminMenuPermissions(s string) {
+	m.admin_menu_permissions = &s
+}
+
+// AdminMenuPermissions returns the value of the "admin_menu_permissions" field in the mutation.
+func (m *UserMutation) AdminMenuPermissions() (r string, exists bool) {
+	v := m.admin_menu_permissions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdminMenuPermissions returns the old "admin_menu_permissions" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldAdminMenuPermissions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdminMenuPermissions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdminMenuPermissions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdminMenuPermissions: %w", err)
+	}
+	return oldValue.AdminMenuPermissions, nil
+}
+
+// ResetAdminMenuPermissions resets all changes to the "admin_menu_permissions" field.
+func (m *UserMutation) ResetAdminMenuPermissions() {
+	m.admin_menu_permissions = nil
 }
 
 // SetBalance sets the "balance" field.
@@ -40132,7 +40169,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -40150,6 +40187,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.role != nil {
 		fields = append(fields, user.FieldRole)
+	}
+	if m.admin_menu_permissions != nil {
+		fields = append(fields, user.FieldAdminMenuPermissions)
 	}
 	if m.balance != nil {
 		fields = append(fields, user.FieldBalance)
@@ -40222,6 +40262,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.PasswordHash()
 	case user.FieldRole:
 		return m.Role()
+	case user.FieldAdminMenuPermissions:
+		return m.AdminMenuPermissions()
 	case user.FieldBalance:
 		return m.Balance()
 	case user.FieldConcurrency:
@@ -40277,6 +40319,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPasswordHash(ctx)
 	case user.FieldRole:
 		return m.OldRole(ctx)
+	case user.FieldAdminMenuPermissions:
+		return m.OldAdminMenuPermissions(ctx)
 	case user.FieldBalance:
 		return m.OldBalance(ctx)
 	case user.FieldConcurrency:
@@ -40361,6 +40405,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRole(v)
+		return nil
+	case user.FieldAdminMenuPermissions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdminMenuPermissions(v)
 		return nil
 	case user.FieldBalance:
 		v, ok := value.(float64)
@@ -40649,6 +40700,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldRole:
 		m.ResetRole()
+		return nil
+	case user.FieldAdminMenuPermissions:
+		m.ResetAdminMenuPermissions()
 		return nil
 	case user.FieldBalance:
 		m.ResetBalance()

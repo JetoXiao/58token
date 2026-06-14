@@ -19,7 +19,8 @@ const (
 	// ContextKeyUserRole 当前用户角色（string）
 	ContextKeyUserRole ContextKey = "user_role"
 	// ContextKeyAPIKey API密钥上下文键
-	ContextKeyAPIKey ContextKey = "api_key"
+	ContextKeyAdminMenuPermissions ContextKey = "admin_menu_permissions"
+	ContextKeyAPIKey               ContextKey = "api_key"
 	// ContextKeySubscription 订阅上下文键
 	ContextKeySubscription ContextKey = "subscription"
 	// ContextKeyForcePlatform 强制平台（用于 /antigravity 路由）
