@@ -900,6 +900,101 @@ export interface OpsSystemLogSinkHealth {
   last_error?: string
 }
 
+export interface OpsResponseCacheHourlyStat {
+  hour: string
+  total: number
+  hit: number
+  monitor_total: number
+  monitor_hit: number
+  hit_rate: number
+}
+
+export interface OpsResponseCacheRecommendation {
+  enabled: boolean
+  recommended: boolean
+  decision: string
+  reasons: string[]
+  window_hours: number
+  observed_hours: number
+  min_observed_hours: number
+  total_candidates: number
+  shadow_hits: number
+  monitor_candidates: number
+  monitor_hits: number
+  hit_rate: number
+  threshold: number
+  min_candidates: number
+  below_threshold_hours: number
+  spike_detected: boolean
+  max_spike_ratio: number
+  unique_keys: number
+  min_unique_keys: number
+  top1_hit_share: number
+  top5_hit_share: number
+  top1_max_hit_share: number
+  top5_max_hit_share: number
+  concentration_detected: boolean
+  generated_at: string
+  hours: OpsResponseCacheHourlyStat[]
+}
+
+export interface OpsResponseCacheRecommendationQuery {
+  window_hours?: number
+  min_candidates?: number
+  hit_rate_threshold?: number
+  min_observed_hours?: number
+  max_spike_ratio?: number
+  min_unique_keys?: number
+  top1_max_hit_share?: number
+  top5_max_hit_share?: number
+}
+
+export interface OpsResponseCacheKeyStatsQuery {
+  window_hours?: number
+  limit?: number
+  sort?: 'hit_count' | 'total_count' | 'hit_rate' | 'last_seen_at' | 'cache_key_hash'
+  model?: string
+  api_key_id?: number
+  group_id?: number
+  monitor?: 'all' | 'yes' | 'no'
+}
+
+export interface OpsResponseCacheKeyStatsItem {
+  cache_key_hash: string
+  model: string
+  endpoint: string
+  protocol: string
+  api_key_id: number
+  group_id?: number | null
+  monitor: boolean
+  total_count: number
+  hit_count: number
+  hit_rate: number
+  hit_share: number
+  first_seen_at: string
+  last_seen_at: string
+}
+
+export interface OpsResponseCacheKeyStatsSummary {
+  unique_keys: number
+  tracked_keys: number
+  total_count: number
+  hit_count: number
+  top1_hit_share: number
+  top5_hit_share: number
+  concentration_detected: boolean
+}
+
+export interface OpsResponseCacheKeyStatsResponse {
+  enabled: boolean
+  window_hours: number
+  limit: number
+  sort: string
+  generated_at: string
+  summary: OpsResponseCacheKeyStatsSummary
+  items: OpsResponseCacheKeyStatsItem[]
+}
+
 export interface OpsErrorLog {
   id: number
   created_at: string
@@ -1282,6 +1377,28 @@ export async function getSystemLogSinkHealth(): Promise<OpsSystemLogSinkHealth> 
   return data
 }
 
+export async function getResponseCacheRecommendation(
+  params: OpsResponseCacheRecommendationQuery = {},
+  options: OpsRequestOptions = {}
+): Promise<OpsResponseCacheRecommendation> {
+  const { data } = await apiClient.get<OpsResponseCacheRecommendation>('/admin/ops/response-cache/recommendation', {
+    params,
+    signal: options.signal
+  })
+  return data
+}
+
+export async function getResponseCacheKeyStats(
+  params: OpsResponseCacheKeyStatsQuery = {},
+  options: OpsRequestOptions = {}
+): Promise<OpsResponseCacheKeyStatsResponse> {
+  const { data } = await apiClient.get<OpsResponseCacheKeyStatsResponse>('/admin/ops/response-cache/keys', {
+    params,
+    signal: options.signal
+  })
+  return data
+}
+
 // Advanced settings (DB-backed)
 export async function getAdvancedSettings(): Promise<OpsAdvancedSettings> {
   const { data } = await apiClient.get<OpsAdvancedSettings>('/admin/ops/advanced-settings')
@@ -1355,7 +1472,9 @@ export const opsAPI = {
   updateMetricThresholds,
   listSystemLogs,
   cleanupSystemLogs,
-  getSystemLogSinkHealth
+  getSystemLogSinkHealth,
+  getResponseCacheRecommendation,
+  getResponseCacheKeyStats
 }
 
 export default opsAPI

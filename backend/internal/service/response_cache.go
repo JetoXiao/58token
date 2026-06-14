@@ -53,6 +53,11 @@ type ResponseCacheDecision struct {
 	Monitor       bool
 	Key           string
 	Reason        string
+	Endpoint      string
+	Protocol      string
+	Model         string
+	APIKeyID      int64
+	GroupID       *int64
 }
 
 type ResponseCacheEntry struct {
@@ -68,6 +73,9 @@ type ResponseCacheRecommendationOptions struct {
 	HitRateThreshold float64
 	MinObservedHours int
 	MaxSpikeRatio    float64
+	MinUniqueKeys    int64
+	Top1MaxHitShare  float64
+	Top5MaxHitShare  float64
 }
 
 type ResponseCacheHourlyStat struct {
@@ -80,25 +88,79 @@ type ResponseCacheHourlyStat struct {
 }
 
 type ResponseCacheRecommendation struct {
-	Enabled             bool                       `json:"enabled"`
-	Recommended         bool                       `json:"recommended"`
-	Decision            string                     `json:"decision"`
-	Reasons             []string                   `json:"reasons"`
-	WindowHours         int                        `json:"window_hours"`
-	ObservedHours       int                        `json:"observed_hours"`
-	MinObservedHours    int                        `json:"min_observed_hours"`
-	TotalCandidates     int64                      `json:"total_candidates"`
-	ShadowHits          int64                      `json:"shadow_hits"`
-	MonitorCandidates   int64                      `json:"monitor_candidates"`
-	MonitorHits         int64                      `json:"monitor_hits"`
-	HitRate             float64                    `json:"hit_rate"`
-	Threshold           float64                    `json:"threshold"`
-	MinCandidates       int64                      `json:"min_candidates"`
-	BelowThresholdHours int                        `json:"below_threshold_hours"`
-	SpikeDetected       bool                       `json:"spike_detected"`
-	MaxSpikeRatio       float64                    `json:"max_spike_ratio"`
-	GeneratedAt         time.Time                  `json:"generated_at"`
-	Hours               []*ResponseCacheHourlyStat `json:"hours"`
+	Enabled               bool                       `json:"enabled"`
+	Recommended           bool                       `json:"recommended"`
+	Decision              string                     `json:"decision"`
+	Reasons               []string                   `json:"reasons"`
+	WindowHours           int                        `json:"window_hours"`
+	ObservedHours         int                        `json:"observed_hours"`
+	MinObservedHours      int                        `json:"min_observed_hours"`
+	TotalCandidates       int64                      `json:"total_candidates"`
+	ShadowHits            int64                      `json:"shadow_hits"`
+	MonitorCandidates     int64                      `json:"monitor_candidates"`
+	MonitorHits           int64                      `json:"monitor_hits"`
+	HitRate               float64                    `json:"hit_rate"`
+	Threshold             float64                    `json:"threshold"`
+	MinCandidates         int64                      `json:"min_candidates"`
+	BelowThresholdHours   int                        `json:"below_threshold_hours"`
+	SpikeDetected         bool                       `json:"spike_detected"`
+	MaxSpikeRatio         float64                    `json:"max_spike_ratio"`
+	UniqueKeys            int64                      `json:"unique_keys"`
+	MinUniqueKeys         int64                      `json:"min_unique_keys"`
+	Top1HitShare          float64                    `json:"top1_hit_share"`
+	Top5HitShare          float64                    `json:"top5_hit_share"`
+	Top1MaxHitShare       float64                    `json:"top1_max_hit_share"`
+	Top5MaxHitShare       float64                    `json:"top5_max_hit_share"`
+	ConcentrationDetected bool                       `json:"concentration_detected"`
+	GeneratedAt           time.Time                  `json:"generated_at"`
+	Hours                 []*ResponseCacheHourlyStat `json:"hours"`
+}
+
+type ResponseCacheKeyStatsOptions struct {
+	WindowHours int
+	Limit       int
+	Sort        string
+	Model       string
+	APIKeyID    int64
+	GroupID     int64
+	GroupIDSet  bool
+	Monitor     string
+}
+
+type ResponseCacheKeyStatsItem struct {
+	CacheKeyHash string    `json:"cache_key_hash"`
+	Model        string    `json:"model"`
+	Endpoint     string    `json:"endpoint"`
+	Protocol     string    `json:"protocol"`
+	APIKeyID     int64     `json:"api_key_id"`
+	GroupID      *int64    `json:"group_id"`
+	Monitor      bool      `json:"monitor"`
+	TotalCount   int64     `json:"total_count"`
+	HitCount     int64     `json:"hit_count"`
+	HitRate      float64   `json:"hit_rate"`
+	HitShare     float64   `json:"hit_share"`
+	FirstSeenAt  time.Time `json:"first_seen_at"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
+}
+
+type ResponseCacheKeyStatsSummary struct {
+	UniqueKeys            int64   `json:"unique_keys"`
+	TrackedKeys           int64   `json:"tracked_keys"`
+	TotalCount            int64   `json:"total_count"`
+	HitCount              int64   `json:"hit_count"`
+	Top1HitShare          float64 `json:"top1_hit_share"`
+	Top5HitShare          float64 `json:"top5_hit_share"`
+	ConcentrationDetected bool    `json:"concentration_detected"`
+}
+
+type ResponseCacheKeyStatsResponse struct {
+	Enabled     bool                         `json:"enabled"`
+	WindowHours int                          `json:"window_hours"`
+	Limit       int                          `json:"limit"`
+	Sort        string                       `json:"sort"`
+	GeneratedAt time.Time                    `json:"generated_at"`
+	Summary     ResponseCacheKeyStatsSummary `json:"summary"`
+	Items       []*ResponseCacheKeyStatsItem `json:"items"`
 }
 
 type responseCachePayload struct {
@@ -177,6 +239,11 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 			Monitor:       monitor,
 			Key:           key,
 			Reason:        "stream_shadow_only",
+			Endpoint:      strings.TrimSpace(req.Endpoint),
+			Protocol:      strings.TrimSpace(req.Protocol),
+			Model:         strings.TrimSpace(req.Model),
+			APIKeyID:      req.APIKeyID,
+			GroupID:       cloneResponseCacheInt64Ptr(req.GroupID),
 		}
 	}
 	deterministic := isDeterministicRequest(req.Body)
@@ -188,6 +255,11 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 		Monitor:       monitor,
 		Key:           key,
 		Reason:        nonDeterministicReason(deterministic, exactAllowed),
+		Endpoint:      strings.TrimSpace(req.Endpoint),
+		Protocol:      strings.TrimSpace(req.Protocol),
+		Model:         strings.TrimSpace(req.Model),
+		APIKeyID:      req.APIKeyID,
+		GroupID:       cloneResponseCacheInt64Ptr(req.GroupID),
 	}
 }
 
@@ -284,6 +356,7 @@ func (c *ResponseCache) ObserveShadowAsync(decision ResponseCacheDecision) {
 			pipe.Incr(ctx, hourlyHitKey)
 			pipe.Expire(ctx, hourlyHitKey, statsTTL)
 		}
+		c.appendKeyStatsPipeline(ctx, pipe, decision, !created, now, statsTTL)
 		if _, err := pipe.Exec(ctx); err != nil {
 			c.markRedisFailure(err)
 		}
@@ -300,6 +373,9 @@ func (c *ResponseCache) GetRecommendation(ctx context.Context, opts ResponseCach
 		Threshold:        opts.HitRateThreshold,
 		MinCandidates:    opts.MinCandidates,
 		MaxSpikeRatio:    opts.MaxSpikeRatio,
+		MinUniqueKeys:    opts.MinUniqueKeys,
+		Top1MaxHitShare:  opts.Top1MaxHitShare,
+		Top5MaxHitShare:  opts.Top5MaxHitShare,
 		GeneratedAt:      time.Now(),
 	}
 	if c == nil || !c.cfg.RecommendationEnabled {
@@ -371,6 +447,16 @@ func (c *ResponseCache) GetRecommendation(ctx context.Context, opts ResponseCach
 		avgHourly := float64(rec.TotalCandidates) / float64(rec.ObservedHours)
 		rec.SpikeDetected = avgHourly > 0 && float64(maxHourly) > avgHourly*opts.MaxSpikeRatio
 	}
+	summary, err := c.getKeyStatsSummary(cacheCtx, opts.WindowHours, opts.Top1MaxHitShare, opts.Top5MaxHitShare)
+	if err != nil {
+		c.markRedisFailure(err)
+		rec.Reasons = append(rec.Reasons, "key_stats_unavailable")
+	} else {
+		rec.UniqueKeys = summary.UniqueKeys
+		rec.Top1HitShare = summary.Top1HitShare
+		rec.Top5HitShare = summary.Top5HitShare
+		rec.ConcentrationDetected = summary.ConcentrationDetected
+	}
 
 	if c.cfg.Enabled {
 		rec.Decision = "already_enabled"
@@ -392,11 +478,371 @@ func (c *ResponseCache) GetRecommendation(ctx context.Context, opts ResponseCach
 	if rec.SpikeDetected {
 		rec.Reasons = append(rec.Reasons, "traffic_spike_detected")
 	}
+	if rec.UniqueKeys < opts.MinUniqueKeys {
+		rec.Reasons = append(rec.Reasons, "insufficient_unique_keys")
+	}
+	if rec.ConcentrationDetected {
+		rec.Reasons = append(rec.Reasons, "hit_concentration_detected")
+	}
 	if len(rec.Reasons) == 0 {
 		rec.Recommended = true
 		rec.Decision = "recommend_enable_exact_cache"
 	}
 	return rec, nil
+}
+
+func (c *ResponseCache) GetKeyStats(ctx context.Context, opts ResponseCacheKeyStatsOptions) (*ResponseCacheKeyStatsResponse, error) {
+	opts = c.normalizeKeyStatsOptions(opts)
+	resp := &ResponseCacheKeyStatsResponse{
+		Enabled:     c != nil && c.cfg.RecommendationEnabled,
+		WindowHours: opts.WindowHours,
+		Limit:       opts.Limit,
+		Sort:        opts.Sort,
+		GeneratedAt: time.Now(),
+		Items:       []*ResponseCacheKeyStatsItem{},
+	}
+	if c == nil || !c.cfg.RecommendationEnabled {
+		return resp, nil
+	}
+	if c.rdb == nil {
+		return resp, nil
+	}
+
+	cacheCtx, cancel := c.shortContext(ctx)
+	defer cancel()
+
+	allHashes, err := c.keyStatsHashes(cacheCtx, c.keyStatsIndexKey(), opts.WindowHours)
+	if err != nil {
+		c.markRedisFailure(err)
+		return resp, nil
+	}
+
+	items := make([]*ResponseCacheKeyStatsItem, 0, len(allHashes))
+	var totalCount int64
+	var hitCount int64
+	for _, hash := range allHashes {
+		item, ok := c.getKeyStatsItem(cacheCtx, strings.TrimSpace(hash), opts.WindowHours)
+		if !ok || item == nil {
+			continue
+		}
+		if !responseCacheKeyStatsMatches(item, opts) {
+			continue
+		}
+		items = append(items, item)
+		totalCount += item.TotalCount
+		hitCount += item.HitCount
+	}
+	sortKeyStatsItems(items, opts.Sort)
+	for _, item := range items {
+		if hitCount > 0 {
+			item.HitShare = float64(item.HitCount) / float64(hitCount)
+		}
+	}
+	resp.Summary = summarizeKeyStats(items, totalCount, hitCount, c.cfg.RecommendationTop1MaxHitShare, c.cfg.RecommendationTop5MaxHitShare)
+	if len(items) > opts.Limit {
+		items = items[:opts.Limit]
+	}
+	resp.Items = items
+	return resp, nil
+}
+
+func (c *ResponseCache) appendKeyStatsPipeline(ctx context.Context, pipe redis.Pipeliner, decision ResponseCacheDecision, hit bool, now time.Time, ttl time.Duration) {
+	if c == nil || pipe == nil || strings.TrimSpace(decision.Key) == "" {
+		return
+	}
+	hash := strings.TrimSpace(decision.Key)
+	key := c.keyStatsKey(hash)
+	groupID := ""
+	if decision.GroupID != nil {
+		groupID = strconv.FormatInt(*decision.GroupID, 10)
+	}
+	monitor := "0"
+	if decision.Monitor {
+		monitor = "1"
+	}
+	nowUnix := now.Unix()
+	z := redis.Z{Score: float64(nowUnix), Member: hash}
+	oldest := strconv.FormatInt(now.Add(-ttl).Unix(), 10)
+	pipe.ZAdd(ctx, c.keyStatsIndexKey(), z)
+	pipe.Expire(ctx, c.keyStatsIndexKey(), ttl)
+	pipe.ZRemRangeByScore(ctx, c.keyStatsIndexKey(), "-inf", oldest)
+	if decision.Monitor {
+		pipe.ZAdd(ctx, c.keyStatsMonitorIndexKey(), z)
+		pipe.Expire(ctx, c.keyStatsMonitorIndexKey(), ttl)
+		pipe.ZRemRangeByScore(ctx, c.keyStatsMonitorIndexKey(), "-inf", oldest)
+	} else {
+		pipe.ZAdd(ctx, c.keyStatsCandidateIndexKey(), z)
+		pipe.Expire(ctx, c.keyStatsCandidateIndexKey(), ttl)
+		pipe.ZRemRangeByScore(ctx, c.keyStatsCandidateIndexKey(), "-inf", oldest)
+	}
+	pipe.HSetNX(ctx, key, "first_seen_at", nowUnix)
+	pipe.HSet(ctx, key, map[string]any{
+		"cache_key_hash": shortCacheKeyHash(hash),
+		"model":          strings.TrimSpace(decision.Model),
+		"endpoint":       strings.TrimSpace(decision.Endpoint),
+		"protocol":       strings.TrimSpace(decision.Protocol),
+		"api_key_id":     decision.APIKeyID,
+		"group_id":       groupID,
+		"monitor":        monitor,
+		"last_seen_at":   nowUnix,
+	})
+	hour := responseCacheStatsHour(now)
+	pipe.HIncrBy(ctx, key, "total:"+hour, 1)
+	if hit {
+		pipe.HIncrBy(ctx, key, "hit:"+hour, 1)
+	}
+	expiredHour := responseCacheStatsHour(now.Add(-ttl))
+	pipe.HDel(ctx, key, "total:"+expiredHour, "hit:"+expiredHour)
+	pipe.Expire(ctx, key, ttl)
+}
+
+func (c *ResponseCache) getKeyStatsSummary(ctx context.Context, windowHours int, top1MaxHitShare, top5MaxHitShare float64) (ResponseCacheKeyStatsSummary, error) {
+	if c == nil || c.rdb == nil {
+		return ResponseCacheKeyStatsSummary{}, nil
+	}
+	hashes, err := c.keyStatsHashes(ctx, c.keyStatsCandidateIndexKey(), windowHours)
+	if err != nil {
+		return ResponseCacheKeyStatsSummary{}, err
+	}
+	items := make([]*ResponseCacheKeyStatsItem, 0, len(hashes))
+	var totalCount int64
+	var hitCount int64
+	for _, hash := range hashes {
+		item, ok := c.getKeyStatsItem(ctx, strings.TrimSpace(hash), windowHours)
+		if !ok || item == nil || item.Monitor {
+			continue
+		}
+		items = append(items, item)
+		totalCount += item.TotalCount
+		hitCount += item.HitCount
+	}
+	return summarizeKeyStats(items, totalCount, hitCount, top1MaxHitShare, top5MaxHitShare), nil
+}
+
+func (c *ResponseCache) keyStatsHashes(ctx context.Context, key string, windowHours int) ([]string, error) {
+	if c == nil || c.rdb == nil || strings.TrimSpace(key) == "" {
+		return nil, nil
+	}
+	if windowHours <= 0 {
+		windowHours = c.cfg.RecommendationWindowHours
+	}
+	if windowHours <= 0 {
+		windowHours = 72
+	}
+	cutoff := time.Now().Add(-time.Duration(windowHours) * time.Hour).Unix()
+	return c.rdb.ZRevRangeByScore(ctx, key, &redis.ZRangeBy{
+		Min: strconv.FormatInt(cutoff, 10),
+		Max: "+inf",
+	}).Result()
+}
+
+func (c *ResponseCache) getKeyStatsItem(ctx context.Context, hash string, windowHours int) (*ResponseCacheKeyStatsItem, bool) {
+	if c == nil || c.rdb == nil || strings.TrimSpace(hash) == "" {
+		return nil, false
+	}
+	values, err := c.rdb.HGetAll(ctx, c.keyStatsKey(hash)).Result()
+	if err != nil {
+		c.markRedisFailure(err)
+		return nil, false
+	}
+	if len(values) == 0 {
+		return nil, false
+	}
+	var groupID *int64
+	if raw := strings.TrimSpace(values["group_id"]); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			groupID = &v
+		}
+	}
+	total, hit := keyStatsCountsFromHash(values, windowHours, time.Now())
+	firstSeen := unixTimeFromString(values["first_seen_at"])
+	lastSeen := unixTimeFromString(values["last_seen_at"])
+	if firstSeen.IsZero() {
+		firstSeen = lastSeen
+	}
+	item := &ResponseCacheKeyStatsItem{
+		CacheKeyHash: strings.TrimSpace(values["cache_key_hash"]),
+		Model:        strings.TrimSpace(values["model"]),
+		Endpoint:     strings.TrimSpace(values["endpoint"]),
+		Protocol:     strings.TrimSpace(values["protocol"]),
+		APIKeyID:     stringInt64(values["api_key_id"]),
+		GroupID:      groupID,
+		Monitor:      strings.TrimSpace(values["monitor"]) == "1",
+		TotalCount:   total,
+		HitCount:     hit,
+		FirstSeenAt:  firstSeen,
+		LastSeenAt:   lastSeen,
+	}
+	if item.CacheKeyHash == "" {
+		item.CacheKeyHash = shortCacheKeyHash(hash)
+	}
+	if item.TotalCount > 0 {
+		item.HitRate = float64(item.HitCount) / float64(item.TotalCount)
+	}
+	return item, true
+}
+
+func keyStatsCountsFromHash(values map[string]string, windowHours int, now time.Time) (int64, int64) {
+	if len(values) == 0 {
+		return 0, 0
+	}
+	if windowHours <= 0 {
+		windowHours = 72
+	}
+	if windowHours > 168 {
+		windowHours = 168
+	}
+	cutoff := responseCacheStatsHour(now.UTC().Truncate(time.Hour).Add(-time.Duration(windowHours-1) * time.Hour))
+	var total int64
+	var hit int64
+	var sawHourly bool
+	for key, value := range values {
+		switch {
+		case strings.HasPrefix(key, "total:"):
+			sawHourly = true
+			if hour := strings.TrimPrefix(key, "total:"); hour >= cutoff {
+				total += stringInt64(value)
+			}
+		case strings.HasPrefix(key, "hit:"):
+			sawHourly = true
+			if hour := strings.TrimPrefix(key, "hit:"); hour >= cutoff {
+				hit += stringInt64(value)
+			}
+		}
+	}
+	if !sawHourly {
+		total = stringInt64(values["total_count"])
+		hit = stringInt64(values["hit_count"])
+	}
+	return total, hit
+}
+
+func (c *ResponseCache) normalizeKeyStatsOptions(opts ResponseCacheKeyStatsOptions) ResponseCacheKeyStatsOptions {
+	if opts.WindowHours <= 0 {
+		if c != nil && c.cfg.RecommendationWindowHours > 0 {
+			opts.WindowHours = c.cfg.RecommendationWindowHours
+		} else {
+			opts.WindowHours = 72
+		}
+	}
+	if opts.WindowHours > 168 {
+		opts.WindowHours = 168
+	}
+	if opts.Limit <= 0 {
+		opts.Limit = 50
+	}
+	if opts.Limit > 500 {
+		opts.Limit = 500
+	}
+	opts.Sort = strings.ToLower(strings.TrimSpace(opts.Sort))
+	switch opts.Sort {
+	case "total_count", "hit_rate", "last_seen_at", "cache_key_hash":
+	default:
+		opts.Sort = "hit_count"
+	}
+	opts.Model = strings.TrimSpace(opts.Model)
+	opts.Monitor = strings.ToLower(strings.TrimSpace(opts.Monitor))
+	switch opts.Monitor {
+	case "yes", "true", "1":
+		opts.Monitor = "yes"
+	case "no", "false", "0":
+		opts.Monitor = "no"
+	default:
+		opts.Monitor = "all"
+	}
+	return opts
+}
+
+func responseCacheKeyStatsMatches(item *ResponseCacheKeyStatsItem, opts ResponseCacheKeyStatsOptions) bool {
+	if item == nil {
+		return false
+	}
+	if opts.WindowHours > 0 && !item.LastSeenAt.IsZero() {
+		cutoff := time.Now().Add(-time.Duration(opts.WindowHours) * time.Hour)
+		if item.LastSeenAt.Before(cutoff) {
+			return false
+		}
+	}
+	if opts.Model != "" && !strings.EqualFold(strings.TrimSpace(item.Model), opts.Model) {
+		return false
+	}
+	if opts.APIKeyID > 0 && item.APIKeyID != opts.APIKeyID {
+		return false
+	}
+	if opts.GroupIDSet {
+		if item.GroupID == nil || *item.GroupID != opts.GroupID {
+			return false
+		}
+	}
+	if opts.Monitor == "yes" && !item.Monitor {
+		return false
+	}
+	if opts.Monitor == "no" && item.Monitor {
+		return false
+	}
+	return true
+}
+
+func sortKeyStatsItems(items []*ResponseCacheKeyStatsItem, sortBy string) {
+	sort.SliceStable(items, func(i, j int) bool {
+		a := items[i]
+		b := items[j]
+		switch sortBy {
+		case "total_count":
+			if a.TotalCount != b.TotalCount {
+				return a.TotalCount > b.TotalCount
+			}
+		case "hit_rate":
+			if a.HitRate != b.HitRate {
+				return a.HitRate > b.HitRate
+			}
+		case "last_seen_at":
+			if !a.LastSeenAt.Equal(b.LastSeenAt) {
+				return a.LastSeenAt.After(b.LastSeenAt)
+			}
+		case "cache_key_hash":
+			if a.CacheKeyHash != b.CacheKeyHash {
+				return a.CacheKeyHash < b.CacheKeyHash
+			}
+		default:
+			if a.HitCount != b.HitCount {
+				return a.HitCount > b.HitCount
+			}
+		}
+		if a.TotalCount != b.TotalCount {
+			return a.TotalCount > b.TotalCount
+		}
+		return a.LastSeenAt.After(b.LastSeenAt)
+	})
+}
+
+func summarizeKeyStats(items []*ResponseCacheKeyStatsItem, totalCount, hitCount int64, top1MaxHitShare, top5MaxHitShare float64) ResponseCacheKeyStatsSummary {
+	summary := ResponseCacheKeyStatsSummary{
+		UniqueKeys:  int64(len(items)),
+		TrackedKeys: int64(len(items)),
+		TotalCount:  totalCount,
+		HitCount:    hitCount,
+	}
+	if hitCount <= 0 || len(items) == 0 {
+		return summary
+	}
+	byHit := append([]*ResponseCacheKeyStatsItem(nil), items...)
+	sortKeyStatsItems(byHit, "hit_count")
+	var top5Hits int64
+	for i, item := range byHit {
+		if i >= 5 {
+			break
+		}
+		if i == 0 {
+			summary.Top1HitShare = float64(item.HitCount) / float64(hitCount)
+		}
+		top5Hits += item.HitCount
+	}
+	summary.Top5HitShare = float64(top5Hits) / float64(hitCount)
+	summary.ConcentrationDetected =
+		(top1MaxHitShare > 0 && summary.Top1HitShare > top1MaxHitShare) ||
+			(top5MaxHitShare > 0 && summary.Top5HitShare > top5MaxHitShare)
+	return summary
 }
 
 func (c *ResponseCache) WaitOrClaimInflight(ctx context.Context, decision ResponseCacheDecision) (*ResponseCacheEntry, bool, bool) {
@@ -534,6 +980,22 @@ func (c *ResponseCache) flightKey(hash string) string {
 	return c.keyPrefix() + "flight:" + hash
 }
 
+func (c *ResponseCache) keyStatsKey(hash string) string {
+	return c.keyPrefix() + "key_stats:" + hash
+}
+
+func (c *ResponseCache) keyStatsIndexKey() string {
+	return c.keyPrefix() + "key_stats:zindex"
+}
+
+func (c *ResponseCache) keyStatsCandidateIndexKey() string {
+	return c.keyPrefix() + "key_stats:zindex:candidate"
+}
+
+func (c *ResponseCache) keyStatsMonitorIndexKey() string {
+	return c.keyPrefix() + "key_stats:zindex:monitor"
+}
+
 func (c *ResponseCache) flightTTL(waitTimeout time.Duration) time.Duration {
 	if waitTimeout <= 0 {
 		return 2 * time.Second
@@ -603,6 +1065,15 @@ func (c *ResponseCache) normalizeRecommendationOptions(opts ResponseCacheRecomme
 		if opts.MaxSpikeRatio <= 0 {
 			opts.MaxSpikeRatio = c.cfg.RecommendationMaxSpikeRatio
 		}
+		if opts.MinUniqueKeys <= 0 {
+			opts.MinUniqueKeys = c.cfg.RecommendationMinUniqueKeys
+		}
+		if opts.Top1MaxHitShare <= 0 {
+			opts.Top1MaxHitShare = c.cfg.RecommendationTop1MaxHitShare
+		}
+		if opts.Top5MaxHitShare <= 0 {
+			opts.Top5MaxHitShare = c.cfg.RecommendationTop5MaxHitShare
+		}
 	}
 	if opts.WindowHours <= 0 {
 		opts.WindowHours = 24
@@ -627,6 +1098,21 @@ func (c *ResponseCache) normalizeRecommendationOptions(opts ResponseCacheRecomme
 	}
 	if opts.MaxSpikeRatio < 0 {
 		opts.MaxSpikeRatio = 0
+	}
+	if opts.MinUniqueKeys < 0 {
+		opts.MinUniqueKeys = 0
+	}
+	if opts.Top1MaxHitShare <= 0 {
+		opts.Top1MaxHitShare = 0.50
+	}
+	if opts.Top1MaxHitShare > 1 {
+		opts.Top1MaxHitShare = 1
+	}
+	if opts.Top5MaxHitShare <= 0 {
+		opts.Top5MaxHitShare = 0.80
+	}
+	if opts.Top5MaxHitShare > 1 {
+		opts.Top5MaxHitShare = 1
 	}
 	return opts
 }
@@ -658,6 +1144,39 @@ func redisInt64(v any) int64 {
 	default:
 		return 0
 	}
+}
+
+func stringInt64(v string) int64 {
+	n, _ := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+	return n
+}
+
+func unixTimeFromString(v string) time.Time {
+	n := stringInt64(v)
+	if n <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(n, 0)
+}
+
+func cloneResponseCacheInt64Ptr(v *int64) *int64 {
+	if v == nil {
+		return nil
+	}
+	out := *v
+	return &out
+}
+
+func shortCacheKeyHash(hash string) string {
+	hash = strings.TrimSpace(hash)
+	if len(hash) <= 12 {
+		return hash
+	}
+	return hash[:12]
+}
+
+func responseCacheStatsHour(t time.Time) string {
+	return t.UTC().Format("2006010215")
 }
 
 func shouldBypassCacheControl(h http.Header) bool {

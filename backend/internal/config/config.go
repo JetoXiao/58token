@@ -714,6 +714,9 @@ type ResponseCacheConfig struct {
 	RecommendationMinCandidates    int64   `mapstructure:"recommendation_min_candidates"`
 	RecommendationMinObservedHours int     `mapstructure:"recommendation_min_observed_hours"`
 	RecommendationMaxSpikeRatio    float64 `mapstructure:"recommendation_max_spike_ratio"`
+	RecommendationMinUniqueKeys    int64   `mapstructure:"recommendation_min_unique_keys"`
+	RecommendationTop1MaxHitShare  float64 `mapstructure:"recommendation_top1_max_hit_share"`
+	RecommendationTop5MaxHitShare  float64 `mapstructure:"recommendation_top5_max_hit_share"`
 }
 
 const (
@@ -1233,6 +1236,15 @@ func validateResponseCacheConfig(c *ResponseCacheConfig) error {
 	}
 	if c.RecommendationMaxSpikeRatio < 0 {
 		return fmt.Errorf("response_cache.recommendation_max_spike_ratio must be non-negative")
+	}
+	if c.RecommendationMinUniqueKeys < 0 {
+		return fmt.Errorf("response_cache.recommendation_min_unique_keys must be non-negative")
+	}
+	if c.RecommendationTop1MaxHitShare < 0 || c.RecommendationTop1MaxHitShare > 1 {
+		return fmt.Errorf("response_cache.recommendation_top1_max_hit_share must be between 0 and 1")
+	}
+	if c.RecommendationTop5MaxHitShare < 0 || c.RecommendationTop5MaxHitShare > 1 {
+		return fmt.Errorf("response_cache.recommendation_top5_max_hit_share must be between 0 and 1")
 	}
 	if c.Redis.Host == "" {
 		c.Redis.Host = "redis-response-cache"
@@ -1915,6 +1927,9 @@ func setDefaults() {
 	viper.SetDefault("response_cache.recommendation_min_candidates", 150)
 	viper.SetDefault("response_cache.recommendation_min_observed_hours", 24)
 	viper.SetDefault("response_cache.recommendation_max_spike_ratio", 5.0)
+	viper.SetDefault("response_cache.recommendation_min_unique_keys", 20)
+	viper.SetDefault("response_cache.recommendation_top1_max_hit_share", 0.50)
+	viper.SetDefault("response_cache.recommendation_top5_max_hit_share", 0.80)
 
 	// Ops (vNext)
 	viper.SetDefault("ops.enabled", true)

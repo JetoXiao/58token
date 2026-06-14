@@ -881,6 +881,15 @@ response_cache:
   recommendation_min_candidates: 150
   recommendation_min_observed_hours: 24
   recommendation_max_spike_ratio: 5.0
+  # Minimum number of distinct anonymized cache keys before recommending exact cache.
+  # 推荐开启前至少需要多少个不同的脱敏缓存 Key，避免少数问题撑高命中率。
+  recommendation_min_unique_keys: 20
+  # Maximum allowed Top1 hit contribution. 0.50 means one key cannot contribute over 50% of shadow hits.
+  # 单个缓存 Key 的最大命中贡献。0.50 表示 Top1 不应超过 50%。
+  recommendation_top1_max_hit_share: 0.50
+  # Maximum allowed Top5 hit contribution. 0.80 means top five keys cannot contribute over 80% of shadow hits.
+  # 前五个缓存 Key 的最大命中贡献。0.80 表示 Top5 不应超过 80%。
+  recommendation_top5_max_hit_share: 0.80
 
 # =============================================================================
 # Ops Monitoring (Optional)

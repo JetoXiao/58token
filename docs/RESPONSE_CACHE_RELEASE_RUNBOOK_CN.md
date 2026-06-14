@@ -197,42 +197,107 @@ nano .env
 第一阶段推荐配置：
 
 ```env
+# 是否真实返回 exact cache 命中结果。第一阶段必须保持 false，只观察不改用户响应。
 RESPONSE_CACHE_ENABLED=false
+
+# 是否开启 shadow 统计。true 表示只统计重复率，不返回缓存答案。
 RESPONSE_CACHE_SHADOW_ENABLED=true
 
+# 第二 Redis 密码。生产必须换成强密码，不要复用业务 Redis 密码。
 RESPONSE_CACHE_REDIS_PASSWORD=替换为上面生成的强密码
+
+# 第二 Redis 使用的 DB 编号。独立 Redis 一般保持 0。
 RESPONSE_CACHE_REDIS_DB=0
+
+# 第二 Redis 连接池大小。请求量不大时 128 足够，后续可按并发调大。
 RESPONSE_CACHE_REDIS_POOL_SIZE=128
+
+# 第二 Redis 最小空闲连接数。保持少量热连接，减少冷启动延迟。
 RESPONSE_CACHE_REDIS_MIN_IDLE_CONNS=8
+
+# 第二 Redis 最大内存。Compose 会使用 allkeys-lru，满了自动淘汰旧缓存。
 RESPONSE_CACHE_REDIS_MAXMEMORY=1gb
 
+# exact cache 的缓存 TTL，单位秒。300 表示真实缓存最多保留 5 分钟。
 RESPONSE_CACHE_TTL_SECONDS=300
+
+# shadow 去重窗口，单位秒。3600 表示 1 小时内相同请求算重复命中。
 RESPONSE_CACHE_SHADOW_TTL_SECONDS=3600
+
+# 单次 Redis 操作超时，单位毫秒。保持很小，避免 Redis 慢时拖慢用户请求。
 RESPONSE_CACHE_REDIS_TIMEOUT_MS=10
+
+# 请求体最大参与缓存判断的字节数。超过直接 bypass，避免大请求规范化拖慢链路。
 RESPONSE_CACHE_MAX_BODY_BYTES=65536
+
+# 单个缓存响应最大字节数。超过不写入 exact cache，避免 Redis 被大响应撑爆。
 RESPONSE_CACHE_MAX_VALUE_BYTES=1048576
+
+# 最小 prompt 字符数。短句、hi、ping 小于该值直接 bypass，避免遮蔽探活。
 RESPONSE_CACHE_MIN_PROMPT_CHARS=16
+
+# 最大 prompt 字符数。超长 prompt 直接 bypass，避免规范化和存储成本过高。
 RESPONSE_CACHE_MAX_PROMPT_CHARS=12000
 
+# 是否开启相同 cache key 的并发去重。exact cache 阶段建议 true。
 RESPONSE_CACHE_SINGLEFLIGHT_ENABLED=true
+
+# 并发去重等待时间，单位毫秒。150 表示只短暂等待，避免增加用户体感延迟。
 RESPONSE_CACHE_SINGLEFLIGHT_WAIT_TIMEOUT_MS=150
+
+# 是否启用 prompt_cache_key / prefix cache 辅助能力。第一阶段建议 false。
 RESPONSE_CACHE_PREFIX_CACHE_ENABLED=false
 
+# exact cache 允许的 API Key ID 列表，逗号分隔。为空表示不按 API Key 限制。
 RESPONSE_CACHE_ALLOWED_API_KEY_ID_LIST=
+
+# exact cache 允许的分组 ID 列表，逗号分隔。灰度分组时填写，例如 8,9。
 RESPONSE_CACHE_ALLOWED_GROUP_ID_LIST=
+
+# exact cache 允许的模型列表，逗号分隔。例如 gpt-4o-mini,gpt-4.1-mini。
 RESPONSE_CACHE_ALLOWED_MODEL_LIST=
+
+# 强制绕过缓存的 API Key ID 列表，逗号分隔。优先级高于 allowed。
 RESPONSE_CACHE_BYPASS_API_KEY_ID_LIST=
+
+# 强制绕过缓存的分组 ID 列表，逗号分隔。用于不希望缓存的业务分组。
 RESPONSE_CACHE_BYPASS_GROUP_ID_LIST=
+
+# 强制绕过缓存的模型列表，逗号分隔。用于不适合缓存的模型。
 RESPONSE_CACHE_BYPASS_MODEL_LIST=
+
+# 监控/探活 API Key ID 列表，逗号分隔。单独统计，不参与开启推荐。
 RESPONSE_CACHE_MONITOR_API_KEY_ID_LIST=
+
+# 监控/探活分组 ID 列表，逗号分隔。该分组请求不参与业务推荐判断。
 RESPONSE_CACHE_MONITOR_GROUP_ID_LIST=
 
+# 是否开启缓存推荐接口。true 表示后台可以查看是否建议开启 exact cache。
 RESPONSE_CACHE_RECOMMENDATION_ENABLED=true
+
+# 推荐统计窗口，单位小时。72 表示观察最近 3 天。
 RESPONSE_CACHE_RECOMMENDATION_WINDOW_HOURS=72
+
+# 推荐命中率阈值。0.20 表示 shadow 命中率至少 20%。
 RESPONSE_CACHE_RECOMMENDATION_HIT_RATE_THRESHOLD=0.20
+
+# 最小候选请求数。候选请求不足 150 时不建议开启，避免样本太少误判。
 RESPONSE_CACHE_RECOMMENDATION_MIN_CANDIDATES=150
+
+# 最小观察时长，单位小时。至少观察 24 小时后再给开启建议。
 RESPONSE_CACHE_RECOMMENDATION_MIN_OBSERVED_HOURS=24
+
+# 异常尖峰保护倍率。某小时流量异常突增时避免误判推荐。
 RESPONSE_CACHE_RECOMMENDATION_MAX_SPIKE_RATIO=5.0
+
+# 最小唯一缓存 Key 数。低于该值说明重复问题太少，不建议直接开启真实缓存。
+RESPONSE_CACHE_RECOMMENDATION_MIN_UNIQUE_KEYS=20
+
+# Top1 最大命中贡献。0.50 表示单个缓存 Key 贡献超过 50% 时认为过于集中。
+RESPONSE_CACHE_RECOMMENDATION_TOP1_MAX_HIT_SHARE=0.50
+
+# Top5 最大命中贡献。0.80 表示前五个缓存 Key 贡献超过 80% 时认为过于集中。
+RESPONSE_CACHE_RECOMMENDATION_TOP5_MAX_HIT_SHARE=0.80
 ```
 
 ## 4. 代码如何连接到第二 Redis
@@ -354,6 +419,9 @@ curl -s \
   "total_candidates": 150,
   "shadow_hits": 35,
   "hit_rate": 0.23,
+  "unique_keys": 26,
+  "top1_hit_share": 0.18,
+  "top5_hit_share": 0.52,
   "recommended": true,
   "decision": "recommend_enable_exact_cache"
 }
@@ -365,10 +433,23 @@ curl -s \
 total_candidates >= 150
 hit_rate >= 0.20
 observed_hours >= 24
+unique_keys >= 20
+top1_hit_share <= 0.50
+top5_hit_share <= 0.80
 recommended = true
 ```
 
 满足后仍然不会自动开启真实缓存，需要管理员手动配置。
+
+后台也可以查看脱敏 Top Key 明细：
+
+```bash
+curl -s \
+  -H "Authorization: Bearer 管理员JWT" \
+  "https://你的域名/api/v1/admin/ops/response-cache/keys?window_hours=72&limit=50&monitor=no"
+```
+
+该接口只返回脱敏后的缓存 Key hash、模型、API Key ID、分组 ID、候选数、命中数、命中率和贡献占比，不返回用户原始问题、完整请求体或模型回答。它用于判断命中是否分散，避免少量重复请求把整体命中率抬高。
 
 ## 7. 按 API Key / 分组灰度开启 exact cache
 
@@ -605,6 +686,24 @@ RESPONSE_CACHE_RECOMMENDATION_MAX_SPIKE_RATIO=5.0
 ```
 
 异常尖峰保护。某小时请求量异常突增时避免误判。
+
+```env
+RESPONSE_CACHE_RECOMMENDATION_MIN_UNIQUE_KEYS=20
+```
+
+推荐开启前至少需要多少个不同的脱敏缓存 Key。这个字段用来避免只有少数几个重复问题时误判。
+
+```env
+RESPONSE_CACHE_RECOMMENDATION_TOP1_MAX_HIT_SHARE=0.50
+```
+
+单个缓存 Key 的最大命中贡献。`0.50` 表示 Top1 不应贡献超过 50% 的 shadow 命中。
+
+```env
+RESPONSE_CACHE_RECOMMENDATION_TOP5_MAX_HIT_SHARE=0.80
+```
+
+前五个缓存 Key 的最大命中贡献。`0.80` 表示 Top5 不应贡献超过 80% 的 shadow 命中。
 
 ## 9. 回滚
 

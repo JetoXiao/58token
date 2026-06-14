@@ -752,6 +752,7 @@ const adminNavItems = computed((): NavItem[] => {
   const baseItems: NavItem[] = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring },
+    { path: '/admin/ops/response-cache', label: t('nav.responseCache'), icon: ServerIcon, featureFlag: flagOpsMonitoring },
     { path: '/admin/requests', label: t('nav.requests'), icon: OrderListIcon, featureFlag: flagOpsMonitoring },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
@@ -860,6 +861,9 @@ function handleMenuItemClick(itemPath: string) {
 }
 
 function isActive(path: string): boolean {
+  if (path === '/admin/ops') {
+    return route.path === path
+  }
   return route.path === path || route.path.startsWith(path + '/')
 }
 

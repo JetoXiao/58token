@@ -446,6 +446,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/ops/response-cache',
+    name: 'AdminResponseCache',
+    component: () => import('@/views/admin/ops/ResponseCacheView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Response Cache',
+      titleKey: 'nav.responseCache'
+    }
+  },
+  {
     path: '/admin/requests',
     name: 'AdminRequests',
     component: () => import('@/views/admin/RequestsView.vue'),

@@ -224,6 +224,9 @@ func TestLoadResponseCacheListsFromEnv(t *testing.T) {
 	t.Setenv("RESPONSE_CACHE_BYPASS_MODEL_LIST", "o3,o4-mini")
 	t.Setenv("RESPONSE_CACHE_MONITOR_API_KEY_ID_LIST", "301")
 	t.Setenv("RESPONSE_CACHE_MONITOR_GROUP_ID_LIST", "28")
+	t.Setenv("RESPONSE_CACHE_RECOMMENDATION_MIN_UNIQUE_KEYS", "12")
+	t.Setenv("RESPONSE_CACHE_RECOMMENDATION_TOP1_MAX_HIT_SHARE", "0.45")
+	t.Setenv("RESPONSE_CACHE_RECOMMENDATION_TOP5_MAX_HIT_SHARE", "0.75")
 
 	cfg, err := Load()
 	require.NoError(t, err)
@@ -236,6 +239,9 @@ func TestLoadResponseCacheListsFromEnv(t *testing.T) {
 	require.Equal(t, []string{"o3", "o4-mini"}, cfg.ResponseCache.BypassModels)
 	require.Equal(t, []int64{301}, cfg.ResponseCache.MonitorAPIKeyIDs)
 	require.Equal(t, []int64{28}, cfg.ResponseCache.MonitorGroupIDs)
+	require.Equal(t, int64(12), cfg.ResponseCache.RecommendationMinUniqueKeys)
+	require.Equal(t, 0.45, cfg.ResponseCache.RecommendationTop1MaxHitShare)
+	require.Equal(t, 0.75, cfg.ResponseCache.RecommendationTop5MaxHitShare)
 }
 
 func TestLoadSchedulingConfigFromEnv(t *testing.T) {

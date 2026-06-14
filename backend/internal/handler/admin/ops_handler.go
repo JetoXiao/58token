@@ -154,6 +154,9 @@ func (h *OpsHandler) GetResponseCacheRecommendation(c *gin.Context) {
 		HitRateThreshold: parseRatioQuery(c, "hit_rate_threshold"),
 		MinObservedHours: parsePositiveIntQuery(c, "min_observed_hours"),
 		MaxSpikeRatio:    parseFloatQuery(c, "max_spike_ratio"),
+		MinUniqueKeys:    parsePositiveInt64Query(c, "min_unique_keys"),
+		Top1MaxHitShare:  parseRatioQuery(c, "top1_max_hit_share"),
+		Top5MaxHitShare:  parseRatioQuery(c, "top5_max_hit_share"),
 	}
 	rec, err := h.responseCache.GetRecommendation(c.Request.Context(), opts)
 	if err != nil {
@@ -161,6 +164,41 @@ func (h *OpsHandler) GetResponseCacheRecommendation(c *gin.Context) {
 		return
 	}
 	response.Success(c, rec)
+}
+
+// GetResponseCacheKeyStats returns anonymized top cache-key shadow statistics.
+// GET /api/v1/admin/ops/response-cache/keys
+func (h *OpsHandler) GetResponseCacheKeyStats(c *gin.Context) {
+	if h == nil || h.responseCache == nil {
+		response.Success(c, gin.H{
+			"enabled":      false,
+			"window_hours": parsePositiveIntQuery(c, "window_hours"),
+			"items":        []any{},
+			"summary": gin.H{
+				"unique_keys":  0,
+				"tracked_keys": 0,
+			},
+		})
+		return
+	}
+	opts := service.ResponseCacheKeyStatsOptions{
+		WindowHours: parsePositiveIntQuery(c, "window_hours"),
+		Limit:       parsePositiveIntQuery(c, "limit"),
+		Sort:        c.Query("sort"),
+		Model:       c.Query("model"),
+		APIKeyID:    parsePositiveInt64Query(c, "api_key_id"),
+		Monitor:     c.Query("monitor"),
+	}
+	if strings.TrimSpace(c.Query("group_id")) != "" {
+		opts.GroupIDSet = true
+		opts.GroupID = parsePositiveInt64Query(c, "group_id")
+	}
+	result, err := h.responseCache.GetKeyStats(c.Request.Context(), opts)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
 }
 
 // GetErrorLogs lists ops error logs.
