@@ -38,4 +38,11 @@ describe('IntegrationDocsView docs snippets', () => {
     expect(englishSource).not.toContain('Codex CLI OpenAI-compatible providers use https://useaifor.me/v1')
     expect(chineseSource).not.toContain('Codex CLI 的 OpenAI 兼容 provider 填 https://useaifor.me/v1')
   })
+
+  it('keeps the long docs table of contents scroll-aware', () => {
+    expect(docsSource).toContain('scrollProgressPercent')
+    expect(docsSource).toContain('updateTocPanelPosition')
+    expect(docsSource).toContain("window.addEventListener('scroll', handleDocsScroll")
+    expect(docsSource).toContain("window.removeEventListener('scroll', handleDocsScroll")
+  })
 })

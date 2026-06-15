@@ -92,53 +92,65 @@
       </section>
 
       <div class="mx-auto mt-6 grid max-w-7xl gap-6 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside class="z-20 max-h-[calc(100vh-9rem)] self-start overflow-y-auto rounded-[1.5rem] border border-gray-200/70 bg-white/85 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75 md:sticky md:top-28 xl:top-32">
-          <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ t('integrationDocs.toc.title') }}</h2>
-          <nav class="mt-4 space-y-2">
-            <div v-for="item in tocItems" :key="item.id">
-              <div
-                v-if="item.id === 'clients'"
-                class="rounded-xl border border-transparent transition hover:border-gray-200 hover:bg-gray-50 dark:hover:border-white/10 dark:hover:bg-white/10"
-              >
-                <div class="flex items-center">
-                  <a
-                    :href="`#${item.id}`"
-                    class="min-w-0 flex-1 px-3 py-2 text-sm text-gray-600 transition hover:text-gray-950 dark:text-slate-300 dark:hover:text-white"
-                  >
-                    {{ item.label }}
-                  </a>
-                  <button
-                    type="button"
-                    class="mr-1 rounded-lg p-2 text-gray-500 transition hover:bg-white hover:text-gray-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
-                    :aria-expanded="clientsTocExpanded"
-                    :aria-label="t('integrationDocs.toc.toggleClients')"
-                    @click="clientsTocExpanded = !clientsTocExpanded"
-                  >
-                    <Icon :name="clientsTocExpanded ? 'chevronUp' : 'chevronDown'" size="xs" />
-                  </button>
-                </div>
-                <div v-if="clientsTocExpanded" class="space-y-1 pb-2 pl-3 pr-2">
-                  <a
-                    v-for="guide in clientGuides"
-                    :key="`toc-${guide.id}`"
-                    :href="`#${guide.id}`"
-                    class="block rounded-lg px-3 py-1.5 text-xs text-gray-500 transition hover:bg-white hover:text-primary-700 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-primary-300"
-                  >
-                    {{ guide.title }}
-                  </a>
-                </div>
-              </div>
-              <a
-                v-else
-                :href="`#${item.id}`"
-                class="flex items-center justify-between rounded-xl border border-transparent px-3 py-2 text-sm text-gray-600 transition hover:border-gray-200 hover:bg-gray-50 hover:text-gray-950 dark:text-slate-300 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white"
-              >
-                <span>{{ item.label }}</span>
-                <Icon name="chevronRight" size="xs" />
-              </a>
+        <div ref="tocColumnRef" class="relative z-20 md:min-h-full">
+          <aside
+            ref="tocPanelRef"
+            class="z-20 max-h-[calc(100vh-9rem)] self-start overflow-y-auto rounded-[1.5rem] border border-gray-200/70 bg-white/85 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75"
+            :style="tocPanelStyle"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ t('integrationDocs.toc.title') }}</h2>
+              <span class="font-mono text-xs font-semibold text-primary-700 dark:text-primary-300">{{ scrollProgressPercent }}%</span>
             </div>
-          </nav>
-        </aside>
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+              <div class="h-full rounded-full bg-primary-500 transition-[width] duration-150 dark:bg-primary-300" :style="{ width: `${scrollProgressPercent}%` }"></div>
+            </div>
+            <nav class="mt-4 space-y-2">
+              <div v-for="item in tocItems" :key="item.id">
+                <div
+                  v-if="item.id === 'clients'"
+                  :class="tocGroupClass(item.id)"
+                >
+                  <div class="flex items-center">
+                    <a
+                      :href="`#${item.id}`"
+                      :class="tocLinkClass(item.id, true)"
+                    >
+                      {{ item.label }}
+                    </a>
+                    <button
+                      type="button"
+                      class="mr-1 rounded-lg p-2 text-gray-500 transition hover:bg-white hover:text-gray-950 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-white"
+                      :aria-expanded="clientsTocExpanded"
+                      :aria-label="t('integrationDocs.toc.toggleClients')"
+                      @click="clientsTocExpanded = !clientsTocExpanded"
+                    >
+                      <Icon :name="clientsTocExpanded ? 'chevronUp' : 'chevronDown'" size="xs" />
+                    </button>
+                  </div>
+                  <div v-if="clientsTocExpanded" class="space-y-1 pb-2 pl-3 pr-2">
+                    <a
+                      v-for="guide in clientGuides"
+                      :key="`toc-${guide.id}`"
+                      :href="`#${guide.id}`"
+                      :class="tocSubLinkClass(guide.id)"
+                    >
+                      {{ guide.title }}
+                    </a>
+                  </div>
+                </div>
+                <a
+                  v-else
+                  :href="`#${item.id}`"
+                  :class="tocLinkClass(item.id)"
+                >
+                  <span>{{ item.label }}</span>
+                  <Icon name="chevronRight" size="xs" />
+                </a>
+              </div>
+            </nav>
+          </aside>
+        </div>
 
         <section class="min-w-0 space-y-6">
           <DocsSection id="quick-start" :title="t('integrationDocs.quickStart.title')" :description="t('integrationDocs.quickStart.description')">
@@ -339,7 +351,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
@@ -409,6 +421,11 @@ const dashboardPath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/das
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const copiedKey = ref('')
 const clientsTocExpanded = ref(false)
+const activeTocId = ref('quick-start')
+const scrollProgressPercent = ref(0)
+const tocColumnRef = ref<HTMLElement | null>(null)
+const tocPanelRef = ref<HTMLElement | null>(null)
+const tocPanelStyle = ref<Record<string, string>>({})
 const normalizeOrigin = (value: string) => value.replace(/\/+$/, '')
 const origin = computed(() => (typeof window === 'undefined' ? 'https://useaifor.me' : window.location.origin))
 const gatewayOrigin = computed(() => {
@@ -852,6 +869,41 @@ function tr(key: string, fallbackZh: string, fallbackEn: string): string {
   return String(locale.value).startsWith('zh') ? fallbackZh : fallbackEn
 }
 
+function isTocItemActive(id: string): boolean {
+  return activeTocId.value === id || (id === 'clients' && activeTocId.value.startsWith('client-'))
+}
+
+function tocGroupClass(id: string): string {
+  const active = isTocItemActive(id)
+  return [
+    'rounded-xl border transition hover:border-gray-200 hover:bg-gray-50 dark:hover:border-white/10 dark:hover:bg-white/10',
+    active
+      ? 'border-primary-200 bg-primary-50/80 dark:border-primary-800/50 dark:bg-primary-900/20'
+      : 'border-transparent'
+  ].join(' ')
+}
+
+function tocLinkClass(id: string, nested = false): string {
+  const active = isTocItemActive(id)
+  return [
+    nested ? 'min-w-0 flex-1' : 'flex items-center justify-between',
+    'rounded-xl border px-3 py-2 text-sm transition hover:border-gray-200 hover:bg-gray-50 hover:text-gray-950 dark:hover:border-white/10 dark:hover:bg-white/10 dark:hover:text-white',
+    active
+      ? 'border-primary-200 bg-primary-50 font-semibold text-primary-800 dark:border-primary-800/50 dark:bg-primary-900/25 dark:text-primary-200'
+      : 'border-transparent text-gray-600 dark:text-slate-300'
+  ].join(' ')
+}
+
+function tocSubLinkClass(id: string): string {
+  const active = activeTocId.value === id
+  return [
+    'block rounded-lg px-3 py-1.5 text-xs transition hover:bg-white hover:text-primary-700 dark:hover:bg-white/10 dark:hover:text-primary-300',
+    active
+      ? 'bg-white font-semibold text-primary-700 shadow-sm dark:bg-white/10 dark:text-primary-200'
+      : 'text-gray-500 dark:text-slate-400'
+  ].join(' ')
+}
+
 function toggleTheme() {
   isDark.value = !isDark.value
   document.documentElement.classList.toggle('dark', isDark.value)
@@ -873,11 +925,103 @@ function initTheme() {
   document.documentElement.classList.toggle('dark', isDark.value)
 }
 
+const scrollTrackedIds = computed(() => [
+  ...tocItems.value.flatMap((item) =>
+    item.id === 'clients'
+      ? [item.id, ...clientGuides.value.map((guide) => guide.id)]
+      : [item.id]
+  )
+])
+
+let scrollRaf = 0
+
+function updateDocsScrollState() {
+  if (typeof window === 'undefined') return
+
+  const doc = document.documentElement
+  const maxScroll = Math.max(1, doc.scrollHeight - window.innerHeight)
+  scrollProgressPercent.value = Math.min(100, Math.max(0, Math.round((window.scrollY / maxScroll) * 100)))
+
+  const offset = 156
+  let current = scrollTrackedIds.value[0] || 'quick-start'
+  for (const id of scrollTrackedIds.value) {
+    const section = document.getElementById(id)
+    if (!section) continue
+    if (section.getBoundingClientRect().top <= offset) {
+      current = id
+    } else {
+      break
+    }
+  }
+  activeTocId.value = current
+  updateTocPanelPosition()
+}
+
+function updateTocPanelPosition() {
+  const column = tocColumnRef.value
+  const panel = tocPanelRef.value
+  if (!column || !panel || window.innerWidth < 768) {
+    tocPanelStyle.value = {}
+    return
+  }
+
+  const top = window.innerWidth >= 1280 ? 128 : 112
+  const columnRect = column.getBoundingClientRect()
+  const columnTop = columnRect.top + window.scrollY
+  const columnBottom = columnTop + column.offsetHeight
+  const panelHeight = panel.offsetHeight
+  const columnWidth = columnRect.width
+  const columnLeft = columnRect.left
+  const fixedTopDocumentY = window.scrollY + top
+
+  if (fixedTopDocumentY <= columnTop) {
+    tocPanelStyle.value = {}
+    return
+  }
+
+  if (fixedTopDocumentY + panelHeight >= columnBottom) {
+    tocPanelStyle.value = {
+      position: 'absolute',
+      left: '0px',
+      right: '0px',
+      top: `${Math.max(0, column.offsetHeight - panelHeight)}px`,
+      width: `${columnWidth}px`
+    }
+    return
+  }
+
+  tocPanelStyle.value = {
+    position: 'fixed',
+    left: `${columnLeft}px`,
+    top: `${top}px`,
+    width: `${columnWidth}px`
+  }
+}
+
+function handleDocsScroll() {
+  if (scrollRaf) return
+  scrollRaf = window.requestAnimationFrame(() => {
+    scrollRaf = 0
+    updateDocsScrollState()
+  })
+}
+
 onMounted(() => {
   initTheme()
   authStore.checkAuth()
   if (!appStore.publicSettingsLoaded) {
     appStore.fetchPublicSettings()
+  }
+  updateDocsScrollState()
+  window.addEventListener('scroll', handleDocsScroll, { passive: true })
+  window.addEventListener('resize', handleDocsScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleDocsScroll)
+  window.removeEventListener('resize', handleDocsScroll)
+  if (scrollRaf) {
+    window.cancelAnimationFrame(scrollRaf)
   }
 })
 

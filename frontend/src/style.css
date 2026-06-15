@@ -399,16 +399,28 @@
   .modal-overlay {
     @apply fixed inset-0 z-50;
     @apply bg-black/50 backdrop-blur-sm;
-    @apply flex items-center justify-center p-2 sm:p-4;
+    @apply flex items-start justify-center overflow-y-auto p-3 py-4 sm:p-6;
   }
 
   .modal-content {
-    @apply w-full;
-    @apply max-h-[95vh] sm:max-h-[90vh];
+    @apply my-auto w-full;
+    @apply max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)];
     @apply bg-white dark:bg-dark-800;
     @apply rounded-2xl shadow-2xl;
     @apply border border-gray-200 dark:border-dark-700;
-    @apply flex flex-col;
+    @apply flex min-h-0 flex-col overflow-hidden;
+  }
+
+  @supports (height: 100dvh) {
+    .modal-content {
+      max-height: calc(100dvh - 2rem);
+    }
+
+    @media (min-width: 640px) {
+      .modal-content {
+        max-height: calc(100dvh - 3rem);
+      }
+    }
   }
 
   .modal-header {
@@ -425,12 +437,14 @@
   .modal-body {
     @apply px-4 py-3;
     @apply sm:px-6 sm:py-4;
-    @apply flex-1 overflow-y-auto;
+    @apply min-h-0 overflow-y-auto;
+    flex: 0 1 auto;
   }
 
   .modal-footer {
     @apply border-t border-gray-200 px-4 py-3 dark:border-dark-700;
-    @apply sm:px-6 sm:py-4;
+    @apply bg-white dark:bg-dark-800;
+    @apply sm:px-6 sm:py-3;
     @apply flex items-center justify-end gap-3;
     @apply flex-shrink-0;
   }
