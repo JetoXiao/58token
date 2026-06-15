@@ -1241,8 +1241,6 @@ func approxPromptChars(body []byte) int {
 		"instructions",
 		"system",
 		"messages.#.content",
-		"messages.#.content.#.text",
-		"messages.#.content.#.input_text",
 	}
 	for _, path := range paths {
 		total += promptCharsFromResult(gjson.GetBytes(body, path))
@@ -1265,7 +1263,11 @@ func promptCharsFromResult(r gjson.Result) int {
 		}
 		return total
 	case r.IsObject():
-		return len(r.Raw)
+		total := 0
+		for _, key := range []string{"text", "input_text", "content", "message"} {
+			total += promptCharsFromResult(r.Get(key))
+		}
+		return total
 	case r.Type == gjson.String:
 		return len([]rune(strings.TrimSpace(r.String())))
 	default:

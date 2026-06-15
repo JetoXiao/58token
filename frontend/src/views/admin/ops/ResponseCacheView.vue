@@ -196,7 +196,7 @@
             @click="fetchRecommendation"
           >
             <Icon name="refresh" size="sm" />
-            按当前阈值重新计算
+            按当前阈值重新计算建议
           </button>
 
           <div class="mt-5 rounded-lg bg-gray-50 p-4 dark:bg-dark-900">
@@ -215,7 +215,7 @@
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 class="text-base font-semibold text-gray-900 dark:text-white">上线建议配置</h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">按中文字段查看建议值，复制时仍会生成生产 `.env` 可用配置。</p>
+              <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">按左侧当前阈值生成建议值，复制时仍会生成生产 `.env` 可用配置。</p>
             </div>
             <button
               type="button"
@@ -411,22 +411,33 @@ const keyStatsFilters = reactive<{
   limit: 50
 })
 
+const activeThresholds = computed(() => ({
+  windowHours: normalizePositiveInt(filters.windowHours),
+  minCandidates: normalizePositiveInt(filters.minCandidates),
+  hitRateThreshold: normalizePercentInput(filters.hitRateThreshold),
+  minObservedHours: normalizePositiveInt(filters.minObservedHours),
+  maxSpikeRatio: normalizeNumber(filters.maxSpikeRatio),
+  minUniqueKeys: normalizeNonNegativeInt(filters.minUniqueKeys),
+  top1MaxHitShare: normalizePercentInput(filters.top1MaxHitShare),
+  top5MaxHitShare: normalizePercentInput(filters.top5MaxHitShare)
+}))
+
 const totalCandidates = computed(() => recommendation.value?.total_candidates ?? 0)
 const shadowHits = computed(() => recommendation.value?.shadow_hits ?? 0)
 const monitorCandidates = computed(() => recommendation.value?.monitor_candidates ?? 0)
 const monitorHits = computed(() => recommendation.value?.monitor_hits ?? 0)
 const hitRate = computed(() => recommendation.value?.hit_rate ?? 0)
-const threshold = computed(() => recommendation.value?.threshold ?? filters.hitRateThreshold / 100)
+const threshold = computed(() => activeThresholds.value.hitRateThreshold)
 const observedHours = computed(() => recommendation.value?.observed_hours ?? 0)
-const minObservedHours = computed(() => recommendation.value?.min_observed_hours ?? filters.minObservedHours)
-const minCandidates = computed(() => recommendation.value?.min_candidates ?? filters.minCandidates)
-const windowHours = computed(() => recommendation.value?.window_hours ?? filters.windowHours)
+const minObservedHours = computed(() => activeThresholds.value.minObservedHours)
+const minCandidates = computed(() => activeThresholds.value.minCandidates)
+const windowHours = computed(() => activeThresholds.value.windowHours)
 const uniqueKeys = computed(() => recommendation.value?.unique_keys ?? keyStats.value?.summary?.unique_keys ?? 0)
-const minUniqueKeys = computed(() => recommendation.value?.min_unique_keys ?? filters.minUniqueKeys)
+const minUniqueKeys = computed(() => activeThresholds.value.minUniqueKeys)
 const top1HitShare = computed(() => recommendation.value?.top1_hit_share ?? keyStats.value?.summary?.top1_hit_share ?? 0)
 const top5HitShare = computed(() => recommendation.value?.top5_hit_share ?? keyStats.value?.summary?.top5_hit_share ?? 0)
-const top1MaxHitShare = computed(() => recommendation.value?.top1_max_hit_share ?? filters.top1MaxHitShare / 100)
-const top5MaxHitShare = computed(() => recommendation.value?.top5_max_hit_share ?? filters.top5MaxHitShare / 100)
+const top1MaxHitShare = computed(() => activeThresholds.value.top1MaxHitShare)
+const top5MaxHitShare = computed(() => activeThresholds.value.top5MaxHitShare)
 const concentrationDetected = computed(() => recommendation.value?.concentration_detected ?? keyStats.value?.summary?.concentration_detected ?? false)
 const top1TooHigh = computed(() => top1MaxHitShare.value > 0 && top1HitShare.value > top1MaxHitShare.value)
 const top5TooHigh = computed(() => top5MaxHitShare.value > 0 && top5HitShare.value > top5MaxHitShare.value)
@@ -473,6 +484,7 @@ const observedProgressStyle = computed(() => ({ width: progressWidth(observedHou
 
 const configFields = computed(() => {
   const rec = recommendation.value
+  const thresholds = activeThresholds.value
   const realCacheEnabled =
     rec?.decision === 'already_enabled' ? 'true' : rec?.recommended ? 'true（建议灰度开启）' : 'false（继续 shadow）'
   return [
@@ -497,49 +509,49 @@ const configFields = computed(() => {
     {
       key: 'windowHours',
       label: '统计窗口小时',
-      value: String(rec?.window_hours || filters.windowHours),
+      value: String(thresholds.windowHours),
       help: '默认观察最近 72 小时。'
     },
     {
       key: 'minCandidates',
       label: '最小候选数',
-      value: String(rec?.min_candidates || filters.minCandidates),
+      value: String(thresholds.minCandidates),
       help: '样本量低于这个值时不建议开启真实缓存。'
     },
     {
       key: 'threshold',
       label: '命中率阈值',
-      value: formatPercent(rec?.threshold ?? filters.hitRateThreshold / 100),
+      value: formatPercent(thresholds.hitRateThreshold),
       help: 'shadow 命中率超过该值才满足命中条件。'
     },
     {
       key: 'minObservedHours',
       label: '最小观察小时',
-      value: String(rec?.min_observed_hours || filters.minObservedHours),
+      value: String(thresholds.minObservedHours),
       help: '避免只看短时间偶然重复请求。'
     },
     {
       key: 'maxSpikeRatio',
       label: '流量尖刺倍数',
-      value: String(rec?.max_spike_ratio || filters.maxSpikeRatio),
+      value: String(thresholds.maxSpikeRatio),
       help: '用于识别异常集中流量，降低误判。'
     },
     {
       key: 'minUniqueKeys',
       label: '最小唯一 Key 数',
-      value: String(rec?.min_unique_keys || filters.minUniqueKeys),
+      value: String(thresholds.minUniqueKeys),
       help: '避免少数重复问题撑高整体命中率。'
     },
     {
       key: 'top1MaxHitShare',
       label: 'Top1 最大命中贡献',
-      value: formatPercent(rec?.top1_max_hit_share ?? filters.top1MaxHitShare / 100),
+      value: formatPercent(thresholds.top1MaxHitShare),
       help: '单个缓存 key 贡献过高时不建议直接开启。'
     },
     {
       key: 'top5MaxHitShare',
       label: 'Top5 最大命中贡献',
-      value: formatPercent(rec?.top5_max_hit_share ?? filters.top5MaxHitShare / 100),
+      value: formatPercent(thresholds.top5MaxHitShare),
       help: '前 5 个缓存 key 贡献过高时视为命中过于集中。'
     },
     {
@@ -559,6 +571,7 @@ const configFields = computed(() => {
 
 const configSnippet = computed(() => {
   const rec = recommendation.value
+  const thresholds = activeThresholds.value
   if (!rec) {
     return [
       'RESPONSE_CACHE_ENABLED=false',
@@ -571,14 +584,14 @@ const configSnippet = computed(() => {
     '# ResponseCache 第一阶段推荐配置',
     'RESPONSE_CACHE_SHADOW_ENABLED=true',
     'RESPONSE_CACHE_RECOMMENDATION_ENABLED=true',
-    `RESPONSE_CACHE_RECOMMENDATION_WINDOW_HOURS=${rec.window_hours || filters.windowHours}`,
-    `RESPONSE_CACHE_RECOMMENDATION_MIN_CANDIDATES=${rec.min_candidates || filters.minCandidates}`,
-    `RESPONSE_CACHE_RECOMMENDATION_HIT_RATE_THRESHOLD=${formatConfigRatio(rec.threshold || filters.hitRateThreshold / 100)}`,
-    `RESPONSE_CACHE_RECOMMENDATION_MIN_OBSERVED_HOURS=${rec.min_observed_hours || filters.minObservedHours}`,
-    `RESPONSE_CACHE_RECOMMENDATION_MAX_SPIKE_RATIO=${rec.max_spike_ratio || filters.maxSpikeRatio}`,
-    `RESPONSE_CACHE_RECOMMENDATION_MIN_UNIQUE_KEYS=${rec.min_unique_keys || filters.minUniqueKeys}`,
-    `RESPONSE_CACHE_RECOMMENDATION_TOP1_MAX_HIT_SHARE=${formatConfigRatio(rec.top1_max_hit_share || filters.top1MaxHitShare / 100)}`,
-    `RESPONSE_CACHE_RECOMMENDATION_TOP5_MAX_HIT_SHARE=${formatConfigRatio(rec.top5_max_hit_share || filters.top5MaxHitShare / 100)}`,
+    `RESPONSE_CACHE_RECOMMENDATION_WINDOW_HOURS=${thresholds.windowHours}`,
+    `RESPONSE_CACHE_RECOMMENDATION_MIN_CANDIDATES=${thresholds.minCandidates}`,
+    `RESPONSE_CACHE_RECOMMENDATION_HIT_RATE_THRESHOLD=${formatConfigRatio(thresholds.hitRateThreshold)}`,
+    `RESPONSE_CACHE_RECOMMENDATION_MIN_OBSERVED_HOURS=${thresholds.minObservedHours}`,
+    `RESPONSE_CACHE_RECOMMENDATION_MAX_SPIKE_RATIO=${thresholds.maxSpikeRatio}`,
+    `RESPONSE_CACHE_RECOMMENDATION_MIN_UNIQUE_KEYS=${thresholds.minUniqueKeys}`,
+    `RESPONSE_CACHE_RECOMMENDATION_TOP1_MAX_HIT_SHARE=${formatConfigRatio(thresholds.top1MaxHitShare)}`,
+    `RESPONSE_CACHE_RECOMMENDATION_TOP5_MAX_HIT_SHARE=${formatConfigRatio(thresholds.top5MaxHitShare)}`,
     '',
     '# 监控/探活 Key 建议加入 bypass 或 monitor 列表',
     'RESPONSE_CACHE_MONITOR_API_KEY_ID_LIST=',
@@ -609,16 +622,17 @@ async function fetchRecommendation() {
   loading.value = true
   errorMessage.value = ''
   try {
+    const thresholds = activeThresholds.value
     recommendation.value = await opsAPI.getResponseCacheRecommendation(
       {
-        window_hours: normalizePositiveInt(filters.windowHours),
-        min_candidates: normalizePositiveInt(filters.minCandidates),
-        hit_rate_threshold: normalizeNumber(filters.hitRateThreshold),
-        min_observed_hours: normalizePositiveInt(filters.minObservedHours),
-        max_spike_ratio: normalizeNumber(filters.maxSpikeRatio),
-        min_unique_keys: normalizePositiveInt(filters.minUniqueKeys),
-        top1_max_hit_share: normalizeNumber(filters.top1MaxHitShare),
-        top5_max_hit_share: normalizeNumber(filters.top5MaxHitShare)
+        window_hours: thresholds.windowHours,
+        min_candidates: thresholds.minCandidates,
+        hit_rate_threshold: thresholds.hitRateThreshold,
+        min_observed_hours: thresholds.minObservedHours,
+        max_spike_ratio: thresholds.maxSpikeRatio,
+        min_unique_keys: thresholds.minUniqueKeys,
+        top1_max_hit_share: thresholds.top1MaxHitShare,
+        top5_max_hit_share: thresholds.top5MaxHitShare
       },
       { signal: controller.signal }
     )
@@ -640,9 +654,10 @@ async function fetchKeyStats() {
   keyStatsAbortController.value = controller
   keyStatsLoading.value = true
   try {
+    const thresholds = activeThresholds.value
     keyStats.value = await opsAPI.getResponseCacheKeyStats(
       {
-        window_hours: normalizePositiveInt(filters.windowHours),
+        window_hours: thresholds.windowHours,
         limit: normalizePositiveInt(keyStatsFilters.limit),
         sort: keyStatsFilters.sort,
         monitor: keyStatsFilters.monitor
@@ -723,9 +738,19 @@ function normalizePositiveInt(value: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
 }
 
+function normalizeNonNegativeInt(value: number): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
+}
+
 function normalizeNumber(value: number): number {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
+function normalizePercentInput(value: number): number {
+  const n = normalizeNumber(value)
+  return n > 1 ? n / 100 : n
 }
 
 function formatConfigRatio(value: number): string {

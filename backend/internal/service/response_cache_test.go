@@ -26,11 +26,35 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 			wantReason: "prompt_too_short",
 		},
 		{
+			name:       "short text block prompt bypasses probes",
+			body:       []byte(`{"model":"claude-sonnet","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
+			wantReason: "prompt_too_short",
+		},
+		{
+			name:       "short openai text block prompt bypasses probes",
+			body:       []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
+			wantReason: "prompt_too_short",
+		},
+		{
 			name:        "implicit temperature can be counted in shadow but not exact cache",
 			body:        []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please summarize this fairly long paragraph"}]}`),
 			wantEnabled: true,
 			wantShadow:  true,
 			wantReason:  "non_deterministic",
+		},
+		{
+			name:        "long text block prompt is eligible",
+			body:        []byte(`{"model":"claude-sonnet","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"please answer this deterministic request"}]}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
+		},
+		{
+			name:        "long openai text block prompt is eligible",
+			body:        []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"please answer this deterministic request"}]}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
 			name:       "tools are not cached",
