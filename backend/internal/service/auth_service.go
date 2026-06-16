@@ -74,6 +74,7 @@ type AuthService struct {
 	promoService       *PromoService
 	affiliateService   *AffiliateService
 	defaultSubAssigner DefaultSubscriptionAssigner
+	freeQuotaService   *FreeQuotaService
 }
 
 type DefaultSubscriptionAssigner interface {
@@ -115,6 +116,10 @@ func NewAuthService(
 		affiliateService:   affiliateService,
 		defaultSubAssigner: defaultSubAssigner,
 	}
+}
+
+func (s *AuthService) SetFreeQuotaService(freeQuotaService *FreeQuotaService) {
+	s.freeQuotaService = freeQuotaService
 }
 
 func (s *AuthService) EntClient() *dbent.Client {
@@ -226,6 +231,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	}
 	s.postAuthUserBootstrap(ctx, user, "email", true)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
+	affiliateBound := false
 	if s.affiliateService != nil {
 		if _, err := s.affiliateService.EnsureUserAffiliate(ctx, user.ID); err != nil {
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to initialize affiliate profile for user %d: %v", user.ID, err)
@@ -234,6 +240,8 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 			if err := s.affiliateService.BindInviterByCode(ctx, user.ID, code); err != nil {
 				// 邀请返利码绑定失败不影响注册，只记录日志
 				logger.LegacyPrintf("service.auth", "[Auth] Failed to bind affiliate inviter for user %d: %v", user.ID, err)
+			} else {
+				affiliateBound = true
 			}
 		}
 	}
@@ -245,6 +253,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to mark invitation code as used for user %d: %v", user.ID, err)
 		}
 	}
+	s.grantSignupInvitationFreeQuota(ctx, user.ID, affiliateBound)
 	// 应用优惠码（如果提供且功能已启用）
 	if promoCode != "" && s.promoService != nil && s.settingService != nil && s.settingService.IsPromoCodeEnabled(ctx) {
 		if err := s.promoService.ApplyPromoCode(ctx, user.ID, promoCode); err != nil {
@@ -685,7 +694,8 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
-					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
+					affiliateBound := s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
+					s.grantSignupInvitationFreeQuota(ctx, user.ID, affiliateBound)
 				}
 			} else {
 				if err := s.userRepo.Create(ctx, newUser); err != nil {
@@ -703,12 +713,13 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
-					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
+					affiliateBound := s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
 					if invitationRedeemCode != nil {
 						if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
 							return nil, nil, ErrInvitationCodeInvalid
 						}
 					}
+					s.grantSignupInvitationFreeQuota(ctx, user.ID, affiliateBound)
 				}
 			}
 		} else {
@@ -747,6 +758,21 @@ func (s *AuthService) assignSubscriptions(ctx context.Context, userID int64, ite
 		}); err != nil {
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to assign default subscription: user_id=%d group_id=%d err=%v", userID, item.GroupID, err)
 		}
+	}
+}
+
+func (s *AuthService) grantInvitationFreeQuota(ctx context.Context, userID int64) {
+	if s == nil || s.freeQuotaService == nil || userID <= 0 {
+		return
+	}
+	if err := s.freeQuotaService.GrantInvitationQuota(ctx, userID); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to grant invitation free quota: user_id=%d err=%v", userID, err)
+	}
+}
+
+func (s *AuthService) grantSignupInvitationFreeQuota(ctx context.Context, userID int64, affiliateBound bool) {
+	if affiliateBound {
+		s.grantInvitationFreeQuota(ctx, userID)
 	}
 }
 
@@ -806,9 +832,9 @@ func authSourceSignupSettings(defaults *AuthSourceDefaultSettings, signupSource 
 
 // bindOAuthAffiliate initializes the affiliate profile and binds the inviter
 // for an OAuth-registered user. Failures are logged but never block registration.
-func (s *AuthService) bindOAuthAffiliate(ctx context.Context, userID int64, affiliateCode string) {
+func (s *AuthService) bindOAuthAffiliate(ctx context.Context, userID int64, affiliateCode string) bool {
 	if s.affiliateService == nil || userID <= 0 {
-		return
+		return false
 	}
 	if _, err := s.affiliateService.EnsureUserAffiliate(ctx, userID); err != nil {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to initialize affiliate profile for user %d: %v", userID, err)
@@ -816,8 +842,11 @@ func (s *AuthService) bindOAuthAffiliate(ctx context.Context, userID int64, affi
 	if code := strings.TrimSpace(affiliateCode); code != "" {
 		if err := s.affiliateService.BindInviterByCode(ctx, userID, code); err != nil {
 			logger.LegacyPrintf("service.auth", "[Auth] Failed to bind affiliate inviter for user %d: %v", userID, err)
+			return false
 		}
+		return true
 	}
+	return false
 }
 
 func (s *AuthService) postAuthUserBootstrap(ctx context.Context, user *User, signupSource string, touchLogin bool) {

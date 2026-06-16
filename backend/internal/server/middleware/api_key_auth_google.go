@@ -31,7 +31,6 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "API key is required")
 			return
 		}
-
 		apiKey, err := apiKeyService.GetByKey(c.Request.Context(), apiKeyString)
 		if err != nil {
 			if errors.Is(err, service.ErrAPIKeyNotFound) {
@@ -39,6 +38,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				return
 			}
 			abortWithGoogleError(c, 500, "Failed to validate API key")
+			return
+		}
+		if apiKey.Group != nil && !apiKeyService.CanUserUseGroup(c.Request.Context(), apiKey.User, apiKey.Group) {
+			abortWithGoogleError(c, 403, "User is not allowed to use this group")
 			return
 		}
 
@@ -104,7 +107,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				subscriptionService.DoWindowMaintenance(&maintenanceCopy)
 			}
 		} else {
-			if apiKey.User.Balance <= 0 {
+			if !apiKeyService.HasBillableCredit(c.Request.Context(), apiKey.User, apiKey.Group) {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
 				return
 			}

@@ -200,6 +200,7 @@ type APIKeyService struct {
 	userGroupRateRepo     UserGroupRateRepository
 	cache                 APIKeyCache
 	rateLimitCacheInvalid RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
+	freeQuotaService      *FreeQuotaService
 	cfg                   *config.Config
 	authCacheL1           *ristretto.Cache
 	authCfg               apiKeyAuthCacheConfig
@@ -235,6 +236,10 @@ func NewAPIKeyService(
 // Called after construction (e.g. in wire) to avoid circular dependencies.
 func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidator) {
 	s.rateLimitCacheInvalid = inv
+}
+
+func (s *APIKeyService) SetFreeQuotaService(freeQuotaService *FreeQuotaService) {
+	s.freeQuotaService = freeQuotaService
 }
 
 func (s *APIKeyService) compileAPIKeyIPRules(apiKey *APIKey) {
@@ -322,6 +327,35 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 		return err == nil // 有有效订阅则允许
 	}
 	// 标准类型分组：使用原有逻辑
+	if s.freeQuotaService != nil {
+		return s.freeQuotaService.CanUnpaidUserBindGroup(ctx, user, group.ID, group.IsExclusive)
+	}
+	return user.CanBindGroup(group.ID, group.IsExclusive)
+}
+
+func (s *APIKeyService) HasBillableCredit(ctx context.Context, user *User, group *Group) bool {
+	if user == nil {
+		return false
+	}
+	if user.Balance > 0 {
+		return true
+	}
+	if s.freeQuotaService == nil || group == nil {
+		return false
+	}
+	return s.freeQuotaService.HasBillableCredit(ctx, user.ID, user.Balance, group.ID)
+}
+
+func (s *APIKeyService) CanUserUseGroup(ctx context.Context, user *User, group *Group) bool {
+	if user == nil || group == nil {
+		return true
+	}
+	if group.IsSubscriptionType() {
+		return true
+	}
+	if s.freeQuotaService != nil {
+		return s.freeQuotaService.CanUnpaidUserBindGroup(ctx, user, group.ID, group.IsExclusive)
+	}
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
@@ -766,8 +800,20 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 
 	// 过滤出用户有权限的分组
 	availableGroups := make([]Group, 0)
+	showLockedGroups := true
+	if s.freeQuotaService != nil {
+		settings, err := s.freeQuotaService.GetSettings(ctx)
+		showLockedGroups = err == nil && settings.ShowLockedGroups
+	}
 	for _, group := range allGroups {
 		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
+			availableGroups = append(availableGroups, group)
+		} else {
+			if !showLockedGroups {
+				continue
+			}
+			group.Locked = true
+			group.LockReason = "payment_required"
 			availableGroups = append(availableGroups, group)
 		}
 	}
@@ -782,6 +828,9 @@ func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subsc
 		return subscribedGroupIDs[group.ID]
 	}
 	// 标准类型分组：使用原有逻辑
+	if s.freeQuotaService != nil {
+		return s.freeQuotaService.CanUnpaidUserBindGroup(context.Background(), user, group.ID, group.IsExclusive)
+	}
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 

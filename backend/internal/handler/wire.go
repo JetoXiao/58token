@@ -40,6 +40,7 @@ func ProvideAdminHandlers(
 	contentModerationHandler *admin.ContentModerationHandler,
 	paymentHandler *admin.PaymentHandler,
 	affiliateHandler *admin.AffiliateHandler,
+	trialCardHandler *admin.TrialCardHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
@@ -72,6 +73,7 @@ func ProvideAdminHandlers(
 		ContentModeration:      contentModerationHandler,
 		Payment:                paymentHandler,
 		Affiliate:              affiliateHandler,
+		TrialCard:              trialCardHandler,
 	}
 }
 
@@ -107,6 +109,7 @@ func ProvideHandlers(
 	apiKeyHandler *APIKeyHandler,
 	usageHandler *UsageHandler,
 	redeemHandler *RedeemHandler,
+	freeQuotaHandler *FreeQuotaHandler,
 	subscriptionHandler *SubscriptionHandler,
 	announcementHandler *AnnouncementHandler,
 	channelMonitorUserHandler *ChannelMonitorUserHandler,
@@ -129,6 +132,7 @@ func ProvideHandlers(
 		APIKey:           apiKeyHandler,
 		Usage:            usageHandler,
 		Redeem:           redeemHandler,
+		FreeQuota:        freeQuotaHandler,
 		Subscription:     subscriptionHandler,
 		Announcement:     announcementHandler,
 		ChannelMonitor:   channelMonitorUserHandler,
@@ -153,6 +157,7 @@ var ProviderSet = wire.NewSet(
 	NewAPIKeyHandler,
 	NewUsageHandler,
 	NewRedeemHandler,
+	NewFreeQuotaHandler,
 	NewSubscriptionHandler,
 	NewAnnouncementHandler,
 	NewChannelMonitorUserHandler,
@@ -197,6 +202,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewContentModerationHandler,
 	admin.NewPaymentHandler,
 	admin.NewAffiliateHandler,
+	admin.NewTrialCardHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

@@ -559,6 +559,8 @@ export interface Group {
   rpm_limit?: number // Group-level RPM cap (0 = unlimited); overrides user-level rpm_limit when set
   is_exclusive: boolean
   status: 'active' | 'inactive'
+  locked?: boolean
+  lock_reason?: string
   subscription_type: SubscriptionType
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
@@ -1384,6 +1386,55 @@ export interface BatchUpdateRedeemCodesRequest {
 
 export interface RedeemCodeRequest {
   code: string
+}
+
+export interface FreeQuotaLedger {
+  id: number
+  user_id: number
+  source_type: 'invitation' | 'trial_card' | string
+  source_id?: string
+  amount: number
+  remaining_amount: number
+  allowed_group_ids: number[]
+  status: string
+  notes?: string
+  expires_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface TrialCard {
+  id: number
+  code: string
+  name: string
+  amount: number
+  max_redemptions: number
+  redeemed_count: number
+  per_user_limit: number
+  status: 'active' | 'inactive' | string
+  notes?: string
+  expires_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FreeQuotaSettings {
+  invitation_enabled: boolean
+  invitation_amount: number
+  group_ids: number[]
+  show_locked_groups: boolean
+  transfer_on_payment: boolean
+}
+
+export interface FreeQuotaSummary {
+  balance_amount: number
+  free_quota_amount: number
+  total_amount: number
+}
+
+export interface RedeemTrialCardResponse {
+  trial_card: TrialCard
+  free_quota: FreeQuotaLedger
 }
 
 // ==================== Dashboard & Statistics ====================

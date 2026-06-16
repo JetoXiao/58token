@@ -9,6 +9,7 @@ import groupsAPI from './groups'
 import accountsAPI from './accounts'
 import proxiesAPI from './proxies'
 import redeemAPI from './redeem'
+import trialCardsAPI from './trialCards'
 import promoAPI from './promo'
 import announcementsAPI from './announcements'
 import settingsAPI from './settings'
@@ -42,6 +43,7 @@ export const adminAPI = {
   accounts: accountsAPI,
   proxies: proxiesAPI,
   redeem: redeemAPI,
+  trialCards: trialCardsAPI,
   promo: promoAPI,
   announcements: announcementsAPI,
   settings: settingsAPI,
@@ -73,6 +75,7 @@ export {
   accountsAPI,
   proxiesAPI,
   redeemAPI,
+  trialCardsAPI,
   promoAPI,
   announcementsAPI,
   settingsAPI,
@@ -101,6 +104,7 @@ export default adminAPI
 
 // Re-export types used by components
 export type { BalanceHistoryItem } from './users'
+export type { TrialCardPayload, TrialCardUpdatePayload } from './trialCards'
 export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from './errorPassthrough'
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'
 export type { TLSFingerprintProfile, CreateProfileRequest, UpdateProfileRequest } from './tlsFingerprintProfile'

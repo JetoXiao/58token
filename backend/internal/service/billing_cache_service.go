@@ -92,6 +92,7 @@ type BillingCacheService struct {
 	apiKeyRateLimitLoader apiKeyRateLimitLoader
 	userRPMCache          UserRPMCache
 	userGroupRateRepo     UserGroupRateRepository
+	freeQuotaService      *FreeQuotaService
 	cfg                   *config.Config
 	circuitBreaker        *billingCircuitBreaker
 
@@ -130,6 +131,10 @@ func NewBillingCacheService(
 	svc.circuitBreaker = newBillingCircuitBreaker(cfg.Billing.CircuitBreaker)
 	svc.startCacheWriteWorkers()
 	return svc
+}
+
+func (s *BillingCacheService) SetFreeQuotaService(freeQuotaService *FreeQuotaService) {
+	s.freeQuotaService = freeQuotaService
 }
 
 // Stop 关闭缓存写入工作池
@@ -679,7 +684,7 @@ func (s *BillingCacheService) CheckBillingEligibility(ctx context.Context, user 
 			return err
 		}
 	} else {
-		if err := s.checkBalanceEligibility(ctx, user.ID); err != nil {
+		if err := s.checkBalanceEligibility(ctx, user.ID, group); err != nil {
 			return err
 		}
 	}
@@ -784,7 +789,7 @@ func (s *BillingCacheService) checkRPM(ctx context.Context, user *User, group *G
 }
 
 // checkBalanceEligibility 检查余额模式资格
-func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userID int64) error {
+func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userID int64, group *Group) error {
 	balance, err := s.GetUserBalance(ctx, userID)
 	if err != nil {
 		if s.circuitBreaker != nil {
@@ -798,6 +803,15 @@ func (s *BillingCacheService) checkBalanceEligibility(ctx context.Context, userI
 	}
 
 	if balance <= 0 {
+		if s.freeQuotaService != nil && group != nil {
+			available, err := s.freeQuotaService.GetAvailableForGroup(ctx, userID, group.ID)
+			if err == nil && available > 0 {
+				return nil
+			}
+			if err != nil {
+				logger.LegacyPrintf("service.billing_cache", "free quota check failed for user %d group %d: %v", userID, group.ID, err)
+			}
+		}
 		return ErrInsufficientBalance
 	}
 

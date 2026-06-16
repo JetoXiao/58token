@@ -2803,7 +2803,12 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyChannelMonitorDefaultIntervalSeconds: "60",
 
 		// Available channels feature (default disabled; opt-in)
-		SettingKeyAvailableChannelsEnabled: "false",
+		SettingKeyAvailableChannelsEnabled:   "false",
+		SettingKeyFreeQuotaInvitationEnabled: "false",
+		SettingKeyFreeQuotaInvitationAmount:  "0",
+		SettingKeyFreeQuotaGroupIDs:          "[]",
+		SettingKeyFreeQuotaShowLockedGroups:  "false",
+		SettingKeyFreeQuotaTransferOnPayment: "false",
 
 		// Affiliate (邀请返利) feature (default disabled; opt-in)
 		SettingKeyAffiliateEnabled:          "false",

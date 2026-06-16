@@ -192,6 +192,7 @@ type PaymentService struct {
 	groupRepo                GroupRepository
 	resumeService            *PaymentResumeService
 	affiliateService         *AffiliateService
+	freeQuotaService         *FreeQuotaService
 	notificationEmailService *NotificationEmailService
 }
 
@@ -203,6 +204,10 @@ func NewPaymentService(entClient *dbent.Client, registry *payment.Registry, load
 
 func (s *PaymentService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
 	s.notificationEmailService = notificationEmailService
+}
+
+func (s *PaymentService) SetFreeQuotaService(freeQuotaService *FreeQuotaService) {
+	s.freeQuotaService = freeQuotaService
 }
 
 // --- Provider Registry ---

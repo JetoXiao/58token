@@ -113,11 +113,25 @@ func (r *usageBillingRepository) applyUsageBillingEffects(ctx context.Context, t
 	}
 
 	if cmd.BalanceCost > 0 {
-		newBalance, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, cmd.BalanceCost)
-		if err != nil {
-			return err
+		balanceCost := cmd.BalanceCost
+		if cmd.GroupID > 0 {
+			freeDeducted, err := deductUsageBillingFreeQuota(ctx, tx, cmd.UserID, cmd.GroupID, cmd.BalanceCost)
+			if err != nil {
+				return err
+			}
+			result.FreeQuotaDeducted = freeDeducted
+			balanceCost -= freeDeducted
+			if balanceCost < 0.00000001 {
+				balanceCost = 0
+			}
 		}
-		result.NewBalance = &newBalance
+		if balanceCost > 0 {
+			newBalance, err := deductUsageBillingBalance(ctx, tx, cmd.UserID, balanceCost)
+			if err != nil {
+				return err
+			}
+			result.NewBalance = &newBalance
+		}
 	}
 
 	if cmd.APIKeyQuotaCost > 0 {
@@ -171,6 +185,71 @@ func incrementUsageBillingSubscription(ctx context.Context, tx *sql.Tx, subscrip
 		return nil
 	}
 	return service.ErrSubscriptionNotFound
+}
+
+func deductUsageBillingFreeQuota(ctx context.Context, tx *sql.Tx, userID, groupID int64, amount float64) (float64, error) {
+	if amount <= 0 || groupID <= 0 {
+		return 0, nil
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, remaining_amount
+		FROM user_free_quota_ledger
+		WHERE user_id = $1
+			AND status = $3
+			AND remaining_amount > 0
+			AND $2 = ANY(allowed_group_ids)
+			AND (expires_at IS NULL OR expires_at > NOW())
+		ORDER BY created_at ASC, id ASC
+		FOR UPDATE
+	`, userID, groupID, service.StatusActive)
+	if err != nil {
+		return 0, err
+	}
+	type rowData struct {
+		id        int64
+		remaining float64
+	}
+	rowsData := make([]rowData, 0)
+	for rows.Next() {
+		var item rowData
+		if err := rows.Scan(&item.id, &item.remaining); err != nil {
+			_ = rows.Close()
+			return 0, err
+		}
+		rowsData = append(rowsData, item)
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return 0, err
+	}
+	if err := rows.Close(); err != nil {
+		return 0, err
+	}
+
+	remainingNeed := amount
+	deducted := 0.0
+	for _, item := range rowsData {
+		if remainingNeed <= 0 {
+			break
+		}
+		take := item.remaining
+		if take > remainingNeed {
+			take = remainingNeed
+		}
+		if take <= 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE user_free_quota_ledger
+			SET remaining_amount = remaining_amount - $1, updated_at = NOW()
+			WHERE id = $2
+		`, take, item.id); err != nil {
+			return 0, err
+		}
+		deducted += take
+		remainingNeed -= take
+	}
+	return deducted, nil
 }
 
 func deductUsageBillingBalance(ctx context.Context, tx *sql.Tx, userID int64, amount float64) (float64, error) {

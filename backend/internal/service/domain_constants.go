@@ -343,6 +343,12 @@ const (
 	// sidebar entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
 
+	SettingKeyFreeQuotaInvitationEnabled = "free_quota_invitation_enabled"
+	SettingKeyFreeQuotaInvitationAmount  = "free_quota_invitation_amount"
+	SettingKeyFreeQuotaGroupIDs          = "free_quota_group_ids"
+	SettingKeyFreeQuotaShowLockedGroups  = "free_quota_show_locked_groups"
+	SettingKeyFreeQuotaTransferOnPayment = "free_quota_transfer_on_payment"
+
 	// =========================
 	// Overload Cooldown (529)
 	// =========================

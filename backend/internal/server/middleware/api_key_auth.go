@@ -115,6 +115,10 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}
+		if apiKey.Group != nil && !apiKeyService.CanUserUseGroup(c.Request.Context(), apiKey.User, apiKey.Group) {
+			AbortWithError(c, 403, "GROUP_NOT_ALLOWED", "User is not allowed to use this group")
+			return
+		}
 
 		// ── 4. SimpleMode → early return ─────────────────────────────
 
@@ -202,7 +206,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKey.User.Balance <= 0 {
+				if !apiKeyService.HasBillableCredit(c.Request.Context(), apiKey.User, apiKey.Group) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 					return
 				}

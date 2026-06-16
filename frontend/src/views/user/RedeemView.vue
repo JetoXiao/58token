@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="mx-auto max-w-2xl space-y-6">
+    <div class="mx-auto max-w-4xl space-y-6">
       <!-- Current Balance Card -->
       <div class="card overflow-hidden">
         <div class="bg-gradient-to-br from-primary-500 to-primary-600 px-6 py-8 text-center">
@@ -11,15 +11,20 @@
           </div>
           <p class="text-sm font-medium text-primary-100">{{ t('redeem.currentBalance') }}</p>
           <p class="mt-2 text-4xl font-bold text-white">
-            ${{ user?.balance?.toFixed(2) || '0.00' }}
+            {{ formatCurrency(totalBalance) }}
           </p>
+          <div class="mt-2 flex justify-center gap-4 text-sm text-primary-100">
+            <span>{{ t('common.balance') }} {{ formatCurrency(paidBalance) }}</span>
+            <span>{{ t('common.freeQuota') }} {{ formatCurrency(freeQuotaAmount) }}</span>
+          </div>
           <p class="mt-2 text-sm text-primary-100">
             {{ t('redeem.concurrency') }}: {{ user?.concurrency || 0 }} {{ t('redeem.requests') }}
           </p>
         </div>
       </div>
 
-      <!-- Redeem Form -->
+      <!-- Redeem Forms -->
+      <div class="grid gap-6 lg:grid-cols-2">
       <div class="card">
         <div class="p-6">
           <form @submit.prevent="handleRedeem" class="space-y-5">
@@ -78,6 +83,65 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="p-6">
+          <form @submit.prevent="handleTrialRedeem" class="space-y-5">
+            <div>
+              <label for="trial-code" class="input-label">
+                {{ t('redeem.trialCardLabel') }}
+              </label>
+              <div class="relative mt-1">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                  <Icon name="beaker" size="md" class="text-gray-400 dark:text-dark-500" />
+                </div>
+                <input
+                  id="trial-code"
+                  v-model="trialCode"
+                  type="text"
+                  required
+                  :placeholder="t('redeem.trialCardPlaceholder')"
+                  :disabled="submittingTrial"
+                  class="input py-3 pl-12 text-lg"
+                />
+              </div>
+              <p class="input-hint">
+                {{ t('redeem.trialCardHint') }}
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              :disabled="!trialCode || submittingTrial"
+              class="btn btn-primary w-full py-3"
+            >
+              <svg
+                v-if="submittingTrial"
+                class="-ml-1 mr-2 h-5 w-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <Icon v-else name="checkCircle" size="md" class="mr-2" />
+              {{ submittingTrial ? t('redeem.redeeming') : t('redeem.trialCardButton') }}
+            </button>
+          </form>
+        </div>
+      </div>
+      </div>
+
       <!-- Success Message -->
       <transition name="fade">
         <div
@@ -125,6 +189,41 @@
                       >
                     </p>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+
+      <transition name="fade">
+        <div
+          v-if="trialResult"
+          class="card border-blue-200 bg-blue-50 dark:border-blue-800/50 dark:bg-blue-900/20"
+        >
+          <div class="p-6">
+            <div class="flex items-start gap-4">
+              <div
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/30"
+              >
+                <Icon name="beaker" size="md" class="text-blue-600 dark:text-blue-400" />
+              </div>
+              <div class="flex-1">
+                <h3 class="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                  {{ t('redeem.trialCardSuccess') }}
+                </h3>
+                <div class="mt-2 space-y-1 text-sm text-blue-700 dark:text-blue-400">
+                  <p class="font-medium">
+                    {{ t('redeem.added') }}: ${{ trialResult.free_quota.amount.toFixed(2) }}
+                  </p>
+                  <p>
+                    {{ t('redeem.trialCardRemaining') }}:
+                    ${{ trialResult.free_quota.remaining_amount.toFixed(2) }}
+                  </p>
+                  <p>
+                    {{ t('redeem.trialCardAllowedGroups') }}:
+                    {{ formatGroupNames(trialResult.free_quota.allowed_group_ids) }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -347,20 +446,28 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import { useSubscriptionStore } from '@/stores/subscriptions'
-import { redeemAPI, authAPI, type RedeemHistoryItem } from '@/api'
+import { useFreeQuotaStore } from '@/stores/freeQuota'
+import { redeemAPI, freeQuotaAPI, authAPI, userGroupsAPI, type RedeemHistoryItem } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatDateTime } from '@/utils/format'
+import type { Group, RedeemTrialCardResponse } from '@/types'
 
 const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 const subscriptionStore = useSubscriptionStore()
+const freeQuotaStore = useFreeQuotaStore()
 
 const user = computed(() => authStore.user)
+const paidBalance = computed(() => freeQuotaStore.summary.balance_amount || user.value?.balance || 0)
+const freeQuotaAmount = computed(() => freeQuotaStore.summary.free_quota_amount || 0)
+const totalBalance = computed(() => freeQuotaStore.summary.total_amount || paidBalance.value + freeQuotaAmount.value)
 
 const redeemCode = ref('')
 const submitting = ref(false)
+const trialCode = ref('')
+const submittingTrial = ref(false)
 const redeemResult = ref<{
   message: string
   type: string
@@ -370,12 +477,21 @@ const redeemResult = ref<{
   group_name?: string
   validity_days?: number
 } | null>(null)
+const trialResult = ref<RedeemTrialCardResponse | null>(null)
 const errorMessage = ref('')
 
 // History data
 const history = ref<RedeemHistoryItem[]>([])
 const loadingHistory = ref(false)
 const contactInfo = ref('')
+const availableGroups = ref<Group[]>([])
+const groupNameMap = computed(() => {
+  const map = new Map<number, string>()
+  for (const group of availableGroups.value) {
+    map.set(group.id, group.name)
+  }
+  return map
+})
 
 // Helper functions for history display
 const isBalanceType = (type: string) => {
@@ -431,6 +547,25 @@ const fetchHistory = async () => {
   }
 }
 
+const fetchAvailableGroups = async () => {
+  try {
+    availableGroups.value = await userGroupsAPI.getAvailable()
+  } catch (error) {
+    console.error('Failed to fetch available groups:', error)
+  }
+}
+
+const formatGroupNames = (ids: number[]) => {
+  if (!ids.length) {
+    return t('common.none')
+  }
+  return ids.map((id) => groupNameMap.value.get(id) || `#${id}`).join(', ')
+}
+
+const formatCurrency = (value: number) => {
+  return `$${Number(value || 0).toFixed(2)}`
+}
+
 const handleRedeem = async () => {
   if (!redeemCode.value.trim()) {
     appStore.showError(t('redeem.pleaseEnterCode'))
@@ -448,6 +583,12 @@ const handleRedeem = async () => {
 
     // Refresh user data to get updated balance/concurrency
     await authStore.refreshUser()
+    if (authStore.user?.balance != null) {
+      freeQuotaStore.setBalanceAmount(authStore.user.balance)
+    }
+    await freeQuotaStore.fetchSummary(true).catch((error) => {
+      console.error('Failed to refresh free quota summary after redeem:', error)
+    })
 
     // If subscription type, immediately refresh subscription status
     if (result.type === 'subscription') {
@@ -476,8 +617,42 @@ const handleRedeem = async () => {
   }
 }
 
+const handleTrialRedeem = async () => {
+  if (!trialCode.value.trim()) {
+    appStore.showError(t('redeem.pleaseEnterTrialCode'))
+    return
+  }
+
+  submittingTrial.value = true
+  errorMessage.value = ''
+  trialResult.value = null
+
+  try {
+    const result = await freeQuotaAPI.redeemTrialCard(trialCode.value.trim())
+    trialResult.value = result
+    trialCode.value = ''
+    freeQuotaStore.applyTrialGrant(result.free_quota.remaining_amount, authStore.user?.balance)
+    await authStore.refreshUser()
+    if (authStore.user?.balance != null) {
+      freeQuotaStore.setBalanceAmount(authStore.user.balance)
+    }
+    await freeQuotaStore.fetchSummary(true)
+    await fetchAvailableGroups()
+    appStore.showSuccess(t('redeem.trialCardRedeemSuccess'))
+  } catch (error: any) {
+    errorMessage.value = error.response?.data?.detail || error.message || t('redeem.failedToRedeemTrialCard')
+    appStore.showError(t('redeem.redeemFailed'))
+  } finally {
+    submittingTrial.value = false
+  }
+}
+
 onMounted(async () => {
   fetchHistory()
+  fetchAvailableGroups()
+  freeQuotaStore.fetchSummary().catch((error) => {
+    console.error('Failed to fetch free quota summary:', error)
+  })
   try {
     const settings = await authAPI.getPublicSettings()
     contactInfo.value = settings.contact_info || ''

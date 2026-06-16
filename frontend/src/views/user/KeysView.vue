@@ -1027,10 +1027,11 @@
           <button
             v-for="option in filteredGroupOptions"
             :key="option.value ?? 'null'"
-            @click="changeGroup(selectedKeyForGroup!, option.value)"
+            @click="!option.disabled && changeGroup(selectedKeyForGroup!, option.value)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
+              option.disabled && 'cursor-not-allowed opacity-50',
               selectedKeyForGroup?.group_id === option.value ||
               (!selectedKeyForGroup?.group_id && option.value === null)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
@@ -1111,6 +1112,7 @@ interface GroupOption {
   userRate: number | null
   subscriptionType: SubscriptionType
   platform: GroupPlatform
+  disabled?: boolean
 }
 
 const appStore = useAppStore()
@@ -1269,7 +1271,8 @@ const groupOptions = computed(() =>
     rate: group.rate_multiplier,
     userRate: userGroupRates.value[group.id] ?? null,
     subscriptionType: group.subscription_type,
-    platform: group.platform
+    platform: group.platform,
+    disabled: !!group.locked
   }))
 )
 
@@ -1490,6 +1493,11 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   groupSelectorKeyId.value = null
   dropdownPosition.value = null
   if (key.group_id === newGroupId) return
+  const nextGroup = newGroupId !== null ? groups.value.find((group) => group.id === newGroupId) : undefined
+  if (nextGroup?.locked) {
+    appStore.showError(t('keys.groupLocked'))
+    return
+  }
 
   try {
     await keysAPI.update(key.id, { group_id: newGroupId })
@@ -1518,6 +1526,11 @@ const handleSubmit = async () => {
   // Validate group_id is required
   if (formData.value.group_id === null) {
     appStore.showError(t('keys.groupRequired'))
+    return
+  }
+  const selectedGroup = groups.value.find((group) => group.id === formData.value.group_id)
+  if (selectedGroup?.locked) {
+    appStore.showError(t('keys.groupLocked'))
     return
   }
 

@@ -47,6 +47,7 @@ func RegisterAdminRoutes(
 
 		// 卡密管理
 		registerRedeemCodeRoutes(admin, h)
+		registerTrialCardRoutes(admin, h)
 
 		// 优惠码管理
 		registerPromoCodeRoutes(admin, h)
@@ -401,6 +402,21 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		codes.POST("/batch-delete", h.Admin.Redeem.BatchDelete)
 		codes.POST("/batch-update", h.Admin.Redeem.BatchUpdate)
 		codes.POST("/:id/expire", h.Admin.Redeem.Expire)
+	}
+}
+
+func registerTrialCardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	cards := admin.Group("/trial-cards")
+	{
+		cards.GET("", h.Admin.TrialCard.List)
+		cards.POST("", h.Admin.TrialCard.Create)
+		cards.PUT("/:id", h.Admin.TrialCard.Update)
+		cards.DELETE("/:id", h.Admin.TrialCard.Delete)
+	}
+	freeQuota := admin.Group("/free-quota")
+	{
+		freeQuota.GET("/settings", h.Admin.TrialCard.GetSettings)
+		freeQuota.PUT("/settings", h.Admin.TrialCard.UpdateSettings)
 	}
 }
 

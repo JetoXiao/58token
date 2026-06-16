@@ -18,6 +18,8 @@ type Group struct {
 	IsExclusive    bool
 	Status         string
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
+	Locked         bool
+	LockReason     string
 
 	SubscriptionType    string
 	DailyLimitUSD       *float64

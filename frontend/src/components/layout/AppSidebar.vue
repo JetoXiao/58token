@@ -793,6 +793,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon, permissionKey: 'admin_proxies' },
     { path: '/admin/risk-control', label: t('nav.riskControl'), icon: ShieldIcon, hideInSimpleMode: true, featureFlag: flagRiskControl, permissionKey: 'admin_risk_control' },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true, permissionKey: 'admin_redeem' },
+    { path: '/admin/trial-cards', label: t('nav.trialCards'), icon: GiftIcon, hideInSimpleMode: true, permissionKey: 'admin_redeem' },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true, permissionKey: 'admin_promo_codes' },
     {
       path: '/admin/affiliates',

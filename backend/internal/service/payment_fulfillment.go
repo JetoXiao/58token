@@ -367,6 +367,11 @@ func (s *PaymentService) markCompleted(ctx context.Context, o *dbent.PaymentOrde
 	if err != nil {
 		return fmt.Errorf("mark completed: %w", err)
 	}
+	if s.freeQuotaService != nil {
+		if err := s.freeQuotaService.MarkPaymentSucceeded(ctx, o.UserID, o.PayAmount); err != nil {
+			slog.Warn("payment free quota state update failed", "order_id", o.ID, "user_id", o.UserID, "err", err.Error())
+		}
+	}
 	s.writeAuditLog(ctx, o.ID, auditAction, "system", map[string]any{
 		"rechargeCode":   o.RechargeCode,
 		"creditedAmount": o.Amount,

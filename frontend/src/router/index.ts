@@ -618,6 +618,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/trial-cards',
+    name: 'AdminTrialCards',
+    component: () => import('@/views/admin/TrialCardsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      adminMenuKey: 'admin_redeem',
+      title: 'Trial Cards',
+      titleKey: 'admin.trialCards.title',
+      descriptionKey: 'admin.trialCards.description'
+    }
+  },
+  {
     path: '/admin/promo-codes',
     name: 'AdminPromoCodes',
     component: () => import('@/views/admin/PromoCodesView.vue'),
@@ -979,6 +992,7 @@ router.beforeEach(async (to, _from, next) => {
       '/admin/groups',
       '/admin/subscriptions',
       '/admin/redeem',
+      '/admin/trial-cards',
       '/subscriptions',
       '/redeem'
     ]

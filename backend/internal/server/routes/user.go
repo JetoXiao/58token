@@ -24,6 +24,7 @@ func RegisterUserRoutes(
 		user := authenticated.Group("/user")
 		{
 			user.GET("/profile", h.User.GetProfile)
+			user.GET("/free-quota/summary", h.FreeQuota.GetSummary)
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
 			user.GET("/aff", h.User.GetAffiliate)
@@ -103,6 +104,7 @@ func RegisterUserRoutes(
 		redeem := authenticated.Group("/redeem")
 		{
 			redeem.POST("", h.Redeem.Redeem)
+			redeem.POST("/trial", h.FreeQuota.RedeemTrialCard)
 			redeem.GET("/history", h.Redeem.GetHistory)
 		}
 

@@ -66,9 +66,17 @@
                 <p class="text-xs font-medium uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">
                   {{ t('profile.accountBalance') }}
                 </p>
-                <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {{ formatCurrency(user?.balance || 0) }}
+                <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                  {{ formatCurrency(totalBalance) }}
                 </p>
+                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <span class="font-medium text-primary-600 dark:text-primary-400">
+                    {{ t('common.balance') }} {{ formatCurrency(paidBalance) }}
+                  </span>
+                  <span class="font-medium text-emerald-600 dark:text-emerald-400">
+                    {{ t('common.freeQuota') }} {{ formatCurrency(freeQuotaAmount) }}
+                  </span>
+                </div>
               </div>
               <div
                 data-testid="profile-overview-metric-concurrency"
@@ -183,6 +191,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import { useFreeQuotaStore } from '@/stores/freeQuota'
 import ProfileAvatarCard from '@/components/user/profile/ProfileAvatarCard.vue'
 import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
 import ProfileIdentityBindingsSection from '@/components/user/profile/ProfileIdentityBindingsSection.vue'
@@ -208,6 +217,7 @@ const props = withDefaults(defineProps<{
 })
 
 const { t } = useI18n()
+const freeQuotaStore = useFreeQuotaStore()
 
 function normalizeBindingStatus(binding: boolean | UserAuthBindingStatus | undefined): boolean | null {
   if (typeof binding === 'boolean') {
@@ -245,6 +255,9 @@ const primaryEmailDisplay = computed(() => {
   return email
 })
 const avatarInitial = computed(() => displayName.value.charAt(0).toUpperCase() || 'U')
+const paidBalance = computed(() => freeQuotaStore.summary.balance_amount || props.user?.balance || 0)
+const freeQuotaAmount = computed(() => freeQuotaStore.summary.free_quota_amount || 0)
+const totalBalance = computed(() => freeQuotaStore.summary.total_amount || paidBalance.value + freeQuotaAmount.value)
 const memberSinceLabel = computed(() => {
   const raw = props.user?.created_at?.trim()
   if (!raw) {

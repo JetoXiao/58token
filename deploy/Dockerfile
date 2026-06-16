@@ -20,15 +20,15 @@ FROM ${NODE_IMAGE} AS frontend-builder
 WORKDIR /app/frontend
 
 # Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # Install dependencies first (better caching)
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# COPY frontend/package.json frontend/pnpm-lock.yaml ./
+# RUN pnpm install --frozen-lockfile
 
 # Copy frontend source and build
-COPY frontend/ ./
-RUN pnpm run build
+# COPY frontend/ ./
+# RUN pnpm run build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder

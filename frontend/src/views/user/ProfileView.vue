@@ -60,10 +60,12 @@ import ProfileTotpCard from '@/components/user/profile/ProfileTotpCard.vue'
 import { isWeChatWebOAuthEnabled } from '@/api/auth'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useFreeQuotaStore } from '@/stores/freeQuota'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
+const freeQuotaStore = useFreeQuotaStore()
 const user = computed(() => authStore.user)
 
 const contactInfo = ref('')
@@ -80,6 +82,10 @@ const oidcOAuthProviderName = ref('OIDC')
 onMounted(async () => {
   const profileRefresh = authStore.refreshUser().catch((error) => {
     console.error('Failed to refresh profile:', error)
+  })
+
+  const freeQuotaRefresh = freeQuotaStore.fetchSummary(true).catch((error) => {
+    console.error('Failed to refresh free quota summary:', error)
   })
 
   const settingsLoad = appStore.fetchPublicSettings()
@@ -106,6 +112,6 @@ onMounted(async () => {
       console.error('Failed to load settings:', error)
     })
 
-  await Promise.all([profileRefresh, settingsLoad])
+  await Promise.all([profileRefresh, freeQuotaRefresh, settingsLoad])
 })
 </script>
