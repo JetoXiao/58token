@@ -201,6 +201,62 @@ func (h *OpsHandler) GetResponseCacheKeyStats(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// GetTTFTAnalysis returns first-token latency attribution and recommendations.
+// GET /api/v1/admin/ops/ttft-analysis
+func (h *OpsHandler) GetTTFTAnalysis(c *gin.Context) {
+	if h.opsService == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Ops service not available")
+		return
+	}
+	if err := h.opsService.RequireMonitoringEnabled(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	startTime, endTime, err := parseOpsTimeRange(c, "1h")
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	filter := &service.OpsTTFTAnalysisFilter{
+		StartTime: startTime,
+		EndTime:   endTime,
+		Platform:  strings.TrimSpace(c.Query("platform")),
+	}
+	if v := strings.TrimSpace(c.Query("group_id")); v != "" {
+		id, err := strconv.ParseInt(v, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "Invalid group_id")
+			return
+		}
+		filter.GroupID = &id
+	}
+	if v := strings.TrimSpace(c.Query("slow_threshold_ms")); v != "" {
+		threshold, err := strconv.Atoi(v)
+		if err != nil || threshold <= 0 {
+			response.BadRequest(c, "Invalid slow_threshold_ms")
+			return
+		}
+		filter.SlowThresholdMs = threshold
+	}
+	if v := strings.TrimSpace(c.Query("limit")); v != "" {
+		limit, err := strconv.Atoi(v)
+		if err != nil || limit <= 0 {
+			response.BadRequest(c, "Invalid limit")
+			return
+		}
+		filter.TopLimit = limit
+	}
+
+	out, err := h.opsService.GetTTFTAnalysis(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, out)
+}
+
 // GetErrorLogs lists ops error logs.
 // GET /api/v1/admin/ops/errors
 func (h *OpsHandler) GetErrorLogs(c *gin.Context) {

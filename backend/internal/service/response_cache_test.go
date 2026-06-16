@@ -232,6 +232,29 @@ func TestResponseCacheKeyStatsCountsFallbackToLegacyTotals(t *testing.T) {
 	}
 }
 
+func TestResponseCacheShadowOnlyCountsSuccessfulResponses(t *testing.T) {
+	tests := []struct {
+		status int
+		want   bool
+	}{
+		{status: 200, want: true},
+		{status: 204, want: true},
+		{status: 299, want: true},
+		{status: 0, want: false},
+		{status: 199, want: false},
+		{status: 300, want: false},
+		{status: 400, want: false},
+		{status: 429, want: false},
+		{status: 503, want: false},
+	}
+
+	for _, tt := range tests {
+		if got := responseCacheStatusAllowsShadow(tt.status); got != tt.want {
+			t.Fatalf("responseCacheStatusAllowsShadow(%d) = %v, want %v", tt.status, got, tt.want)
+		}
+	}
+}
+
 func newTestResponseCache() *ResponseCache {
 	cfg := &config.Config{}
 	cfg.ResponseCache = config.ResponseCacheConfig{

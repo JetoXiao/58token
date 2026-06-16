@@ -308,7 +308,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		}
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-		requestParams := getOpsRequestParams(c)
+		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		upstreamModel := ""
 		if result != nil {

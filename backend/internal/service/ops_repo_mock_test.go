@@ -109,6 +109,10 @@ func (m *opsRepoMock) GetOpenAITokenStats(ctx context.Context, filter *OpsOpenAI
 	return &OpsOpenAITokenStatsResponse{}, nil
 }
 
+func (m *opsRepoMock) GetTTFTAnalysis(ctx context.Context, filter *OpsTTFTAnalysisFilter) (*OpsTTFTAnalysisResponse, error) {
+	return emptyOpsTTFTAnalysis(filter), nil
+}
+
 func (m *opsRepoMock) InsertSystemMetrics(ctx context.Context, input *OpsInsertSystemMetricsInput) error {
 	return nil
 }

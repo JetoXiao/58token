@@ -107,7 +107,7 @@ export interface OpsThroughputTrendResponse {
 
 export type OpsRequestKind = 'success' | 'error'
 export type OpsRequestDetailsKind = OpsRequestKind | 'all'
-export type OpsRequestDetailsSort = 'created_at_desc' | 'duration_desc'
+export type OpsRequestDetailsSort = 'created_at_desc' | 'duration_desc' | 'first_token_desc'
 
 export interface OpsRequestDetail {
   kind: OpsRequestKind
@@ -122,6 +122,7 @@ export interface OpsRequestDetail {
   requested_model?: string
   upstream_model?: string
   duration_ms?: number | null
+  first_token_ms?: number | null
   status_code?: number | null
 
   error_id?: number | null
@@ -199,6 +200,129 @@ export interface OpsLatencyHistogramResponse {
 
   total_requests: number
   buckets: OpsLatencyHistogramBucket[]
+}
+
+export interface OpsTTFTSummary {
+  request_count: number
+  first_token_sample_count: number
+  slow_request_count: number
+  slow_rate: number
+  cache_hit_count: number
+  cache_hit_rate: number
+  by_route_source: Record<string, number>
+  route_sources?: OpsTTFTRouteSourceItem[]
+  ttft: OpsPercentiles
+  duration: OpsPercentiles
+  pre_upstream: OpsPercentiles
+}
+
+export interface OpsTTFTRouteSourceItem {
+  source: string
+  count: number
+  share: number
+  slow_count: number
+  slow_rate: number
+}
+
+export interface OpsTTFTReasonItem {
+  reason: string
+  count: number
+  share: number
+  avg_ttft_ms?: number | null
+  p95_ttft_ms?: number | null
+  suggestion: string
+}
+
+export interface OpsTTFTTopItem {
+  key: string
+  label: string
+  count: number
+  slow_count: number
+  slow_rate: number
+  avg_ttft_ms?: number | null
+  p95_ttft_ms?: number | null
+  p99_ttft_ms?: number | null
+  max_ttft_ms?: number | null
+  route_hint?: string
+  suggestion?: string
+}
+
+export interface OpsTTFTAccountParticipationItem {
+  account_id: number
+  account_name: string
+  account_type: string
+  platform: string
+  status: string
+  schedulable: boolean
+  in_observed_group: boolean
+  observed_group_ids?: number[]
+  request_count: number
+  slow_count: number
+  slow_rate: number
+  avg_ttft_ms?: number | null
+  p95_ttft_ms?: number | null
+  max_ttft_ms?: number | null
+  participation_reason: string
+}
+
+export interface OpsTTFTSlowRequest {
+  created_at: string
+  request_id: string
+  platform: string
+  model: string
+  user_id?: number | null
+  api_key_id?: number | null
+  account_id?: number | null
+  group_id?: number | null
+  user_email?: string
+  api_key_name?: string
+  account_name?: string
+  group_name?: string
+  request_type?: string
+  route_source: string
+  cache_status?: string
+  slow_reason: string
+  slow_detail?: string
+  first_token_ms?: number | null
+  duration_ms?: number | null
+  auth_latency_ms?: number | null
+  routing_latency_ms?: number | null
+  upstream_latency_ms?: number | null
+  response_latency_ms?: number | null
+  queue_wait_ms?: number | null
+  conn_pick_ms?: number | null
+  pre_upstream_ms?: number | null
+  scheduler_candidate_count?: number | null
+  scheduler_top_k?: number | null
+  scheduler_latency_ms?: number | null
+  scheduler_layer?: string
+  scheduler_reason?: string
+  scheduler_load_skew?: number | null
+  request_params?: Record<string, unknown> | null
+}
+
+export interface OpsTTFTRecommendation {
+  severity: 'info' | 'warning' | 'critical' | string
+  title: string
+  message: string
+  action: string
+}
+
+export interface OpsTTFTAnalysisResponse {
+  start_time: string
+  end_time: string
+  platform?: string
+  group_id?: number | null
+  slow_threshold_ms: number
+  summary: OpsTTFTSummary
+  reasons: OpsTTFTReasonItem[]
+  top_models: OpsTTFTTopItem[]
+  top_accounts: OpsTTFTTopItem[]
+  top_groups: OpsTTFTTopItem[]
+  top_api_keys: OpsTTFTTopItem[]
+  account_participation: OpsTTFTAccountParticipationItem[]
+  slow_requests: OpsTTFTSlowRequest[]
+  recommendations: OpsTTFTRecommendation[]
 }
 
 export interface OpsErrorTrendPoint {
@@ -1131,6 +1255,25 @@ export async function getLatencyHistogram(
   return data
 }
 
+export async function getTTFTAnalysis(
+  params: {
+  time_range?: '5m' | '30m' | '1h' | '6h' | '24h' | '7d' | '30d'
+  start_time?: string
+  end_time?: string
+  platform?: string
+  group_id?: number | null
+  slow_threshold_ms?: number
+  limit?: number
+  },
+  options: OpsRequestOptions = {}
+): Promise<OpsTTFTAnalysisResponse> {
+  const { data } = await apiClient.get<OpsTTFTAnalysisResponse>('/admin/ops/ttft-analysis', {
+    params,
+    signal: options.signal
+  })
+  return data
+}
+
 export async function getErrorTrend(
   params: {
   time_range?: '5m' | '30m' | '1h' | '6h' | '24h'
@@ -1426,6 +1569,7 @@ export const opsAPI = {
   getDashboardOverview,
   getThroughputTrend,
   getLatencyHistogram,
+  getTTFTAnalysis,
   getErrorTrend,
   getErrorDistribution,
   getOpenAITokenStats,

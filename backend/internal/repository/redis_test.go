@@ -23,7 +23,7 @@ func TestBuildRedisOptions(t *testing.T) {
 		},
 	}
 
-	opts := buildRedisOptions(cfg)
+	opts := buildRedisOptions(cfg.Redis)
 	require.Equal(t, "localhost:6379", opts.Addr)
 	require.Equal(t, "secret", opts.Password)
 	require.Equal(t, 2, opts.DB)
@@ -41,7 +41,7 @@ func TestBuildRedisOptions(t *testing.T) {
 			EnableTLS: true,
 		},
 	}
-	optsTLS := buildRedisOptions(cfgTLS)
+	optsTLS := buildRedisOptions(cfgTLS.Redis)
 	require.NotNil(t, optsTLS.TLSConfig)
 	require.Equal(t, "localhost", optsTLS.TLSConfig.ServerName)
 }

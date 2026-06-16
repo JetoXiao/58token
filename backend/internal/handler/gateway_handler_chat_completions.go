@@ -307,7 +307,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			)
 			return
 		}
-		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
 		cacheInflightFinished = true
 
 		// 6. Record usage
@@ -316,7 +316,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 		requestPayloadHash := service.HashUsageRequestPayload(body)
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-		requestParams := getOpsRequestParams(c)
+		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		h.submitUsageRecordTask(func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{

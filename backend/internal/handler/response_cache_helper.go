@@ -64,16 +64,17 @@ func tryResponseCacheBeforeForward(
 ) (service.ResponseCacheDecision, bool, bool) {
 	decision := rc.Decide(req)
 	if decision.Enabled {
-		rc.ObserveShadowAsync(decision)
 		if decision.ExactEnabled {
 			if entry, ok := rc.Lookup(c.Request.Context(), decision); ok {
 				service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, 0)
 				replayResponseCacheEntry(c, entry)
+				rc.ObserveShadowAsync(decision, entry.StatusCode)
 				return decision, false, true
 			}
 			if entry, shared, claimed := rc.WaitOrClaimInflight(c.Request.Context(), decision); shared {
 				service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, 0)
 				replayResponseCacheEntry(c, entry)
+				rc.ObserveShadowAsync(decision, entry.StatusCode)
 				return decision, false, true
 			} else if claimed {
 				markResponseCacheStatus(c, service.ResponseCacheStatusMiss)
@@ -90,11 +91,13 @@ func tryResponseCacheBeforeForward(
 }
 
 func finishResponseCacheAfterForward(
+	c *gin.Context,
 	rc *service.ResponseCache,
 	decision service.ResponseCacheDecision,
 	entry *service.ResponseCacheEntry,
 	inflightOwner bool,
 ) {
+	rc.ObserveShadowAsync(decision, responseCacheFinalStatus(c, entry))
 	stored := false
 	if entry != nil {
 		stored = rc.StoreAsync(decision, entry)
@@ -102,6 +105,16 @@ func finishResponseCacheAfterForward(
 	if inflightOwner && !stored {
 		rc.ReleaseInflightAsync(decision)
 	}
+}
+
+func responseCacheFinalStatus(c *gin.Context, entry *service.ResponseCacheEntry) int {
+	if entry != nil && entry.StatusCode > 0 {
+		return entry.StatusCode
+	}
+	if c != nil && c.Writer != nil {
+		return c.Writer.Status()
+	}
+	return 0
 }
 
 func markResponseCacheBypass(c *gin.Context, reason string) {

@@ -1622,6 +1622,13 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		if err != nil {
 			return nil, err
 		}
+		if decision := openAILegacyScheduleDecisionFromContext(ctx); decision != nil {
+			decision.CandidateCount = 1
+			decision.Candidates = nil
+			if stickyAccountID > 0 && stickyAccountID == account.ID {
+				decision.StickySessionHit = true
+			}
+		}
 		result, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
 		if err == nil && result != nil && result.Acquired {
 			return s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
@@ -1680,6 +1687,11 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 					} else if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else {
+						if decision := openAILegacyScheduleDecisionFromContext(ctx); decision != nil {
+							decision.StickySessionHit = true
+							decision.CandidateCount = 1
+							decision.Candidates = nil
+						}
 						result, err := s.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 						if err == nil && result != nil && result.Acquired {
 							selection, selectErr := s.newAcquiredSelectionResult(ctx, account, result.ReleaseFunc)
@@ -1802,6 +1814,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		} else {
 			selectionOrder = append(selectionOrder, available...)
 		}
+		if decision := openAILegacyScheduleDecisionFromContext(ctx); decision != nil {
+			decision.Candidates = buildLegacyOpenAISchedulerCandidateDiagnostics(selectionOrder)
+			decision.CandidateCount = len(decision.Candidates)
+		}
 
 		for _, item := range selectionOrder {
 			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, item.account, requestedModel, false)
@@ -1836,6 +1852,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		sortAccountsByPriorityAndLastUsed(ordered, false)
 		if requireCompact {
 			ordered = prioritizeOpenAICompactAccounts(ordered)
+		}
+		if decision := openAILegacyScheduleDecisionFromContext(ctx); decision != nil {
+			decision.Candidates = buildLegacyOpenAISchedulerCandidateDiagnostics(accountsWithDefaultLoad(ordered))
+			decision.CandidateCount = len(decision.Candidates)
 		}
 		for _, acc := range ordered {
 			fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, requestedModel, false)
@@ -1881,6 +1901,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 	sortAccountsByPriorityAndLastUsed(candidates, false)
 	if requireCompact {
 		candidates = prioritizeOpenAICompactAccounts(candidates)
+	}
+	if decision := openAILegacyScheduleDecisionFromContext(ctx); decision != nil && len(decision.Candidates) == 0 {
+		decision.Candidates = buildLegacyOpenAISchedulerCandidateDiagnostics(accountsWithDefaultLoad(candidates))
+		decision.CandidateCount = len(decision.Candidates)
 	}
 	for _, acc := range candidates {
 		fresh := s.resolveFreshSchedulableOpenAIAccount(ctx, acc, requestedModel, false)

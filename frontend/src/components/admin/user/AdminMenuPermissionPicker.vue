@@ -70,6 +70,7 @@ const { t } = useI18n()
 const adminLabelKeys: Record<string, string> = {
   admin_dashboard: 'nav.dashboard',
   admin_ops: 'nav.ops',
+  admin_ttft_analysis: 'nav.ttftAnalysis',
   admin_response_cache: 'nav.responseCache',
   admin_requests: 'nav.requests',
   admin_users: 'nav.users',

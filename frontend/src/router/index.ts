@@ -461,6 +461,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/ops/ttft',
+    name: 'AdminTTFTAnalysis',
+    component: () => import('@/views/admin/ops/TTFTAnalysisView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      adminMenuKey: 'admin_ttft_analysis',
+      title: 'TTFT Analysis',
+      titleKey: 'nav.ttftAnalysis'
+    }
+  },
+  {
     path: '/admin/requests',
     name: 'AdminRequests',
     component: () => import('@/views/admin/RequestsView.vue'),

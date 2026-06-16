@@ -575,6 +575,7 @@ export default {
     proxies: 'IP管理',
     redeemCodes: '兑换码',
     ops: '运维监控',
+    ttftAnalysis: '首字分析',
     responseCache: '响应缓存',
     promoCodes: '优惠码',
     settings: '系统设置',

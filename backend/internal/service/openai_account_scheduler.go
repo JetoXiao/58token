@@ -59,6 +59,45 @@ type OpenAIAccountScheduleDecision struct {
 	LoadSkew            float64
 	SelectedAccountID   int64
 	SelectedAccountType string
+	Candidates          []OpenAIAccountScheduleCandidateDiagnostic
+}
+
+type OpenAIAccountScheduleCandidateDiagnostic struct {
+	AccountID          int64   `json:"account_id"`
+	AccountName        string  `json:"account_name,omitempty"`
+	AccountType        string  `json:"account_type,omitempty"`
+	Priority           int     `json:"priority"`
+	Concurrency        int     `json:"concurrency"`
+	LoadFactor         int     `json:"load_factor"`
+	CurrentConcurrency int     `json:"current_concurrency"`
+	WaitingCount       int     `json:"waiting_count"`
+	LoadRate           int     `json:"load_rate"`
+	Score              float64 `json:"score,omitempty"`
+	ErrorRate          float64 `json:"error_rate,omitempty"`
+	TTFTMs             int     `json:"ttft_ms,omitempty"`
+	HasTTFT            bool    `json:"has_ttft,omitempty"`
+	Rank               int     `json:"rank,omitempty"`
+	Order              int     `json:"order,omitempty"`
+	InTopK             bool    `json:"in_top_k,omitempty"`
+	Selected           bool    `json:"selected,omitempty"`
+	LastUsedAt         string  `json:"last_used_at,omitempty"`
+}
+
+type openAILegacyScheduleDecisionContextKey struct{}
+
+func withOpenAILegacyScheduleDecision(ctx context.Context, decision *OpenAIAccountScheduleDecision) context.Context {
+	if ctx == nil || decision == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, openAILegacyScheduleDecisionContextKey{}, decision)
+}
+
+func openAILegacyScheduleDecisionFromContext(ctx context.Context) *OpenAIAccountScheduleDecision {
+	if ctx == nil {
+		return nil
+	}
+	decision, _ := ctx.Value(openAILegacyScheduleDecisionContextKey{}).(*OpenAIAccountScheduleDecision)
+	return decision
 }
 
 type OpenAIAccountSchedulerMetricsSnapshot struct {
@@ -306,17 +345,19 @@ func (s *defaultOpenAIAccountScheduler) Select(
 		return selection, decision, nil
 	}
 
-	selection, candidateCount, topK, loadSkew, err := s.selectByLoadBalance(ctx, req)
+	selection, candidateCount, topK, loadSkew, candidates, err := s.selectByLoadBalance(ctx, req)
 	decision.Layer = openAIAccountScheduleLayerLoadBalance
 	decision.CandidateCount = candidateCount
 	decision.TopK = topK
 	decision.LoadSkew = loadSkew
+	decision.Candidates = candidates
 	if err != nil {
 		return nil, decision, err
 	}
 	if selection != nil && selection.Account != nil {
 		decision.SelectedAccountID = selection.Account.ID
 		decision.SelectedAccountType = selection.Account.Type
+		markOpenAIScheduleCandidateSelected(decision.Candidates, selection.Account.ID)
 	}
 	return selection, decision, nil
 }
@@ -484,6 +525,116 @@ func selectTopKOpenAICandidates(candidates []openAIAccountCandidateScore, topK i
 		return isOpenAIAccountCandidateBetter(ranked[i], ranked[j])
 	})
 	return ranked
+}
+
+func buildOpenAIScheduleCandidateDiagnostics(
+	plan openAIAccountLoadPlan,
+	selectedAccountID int64,
+) []OpenAIAccountScheduleCandidateDiagnostic {
+	if len(plan.candidates) == 0 {
+		return nil
+	}
+	ranked := selectTopKOpenAICandidates(plan.candidates, len(plan.candidates))
+	topK := plan.topK
+	if topK <= 0 || topK > len(ranked) {
+		topK = len(ranked)
+	}
+	topKIDs := make(map[int64]struct{}, topK)
+	for i := 0; i < topK; i++ {
+		if ranked[i].account != nil {
+			topKIDs[ranked[i].account.ID] = struct{}{}
+		}
+	}
+
+	orderByAccountID := make(map[int64]int, len(plan.selectionOrder))
+	for i, candidate := range plan.selectionOrder {
+		if candidate.account != nil {
+			orderByAccountID[candidate.account.ID] = i + 1
+		}
+	}
+
+	out := make([]OpenAIAccountScheduleCandidateDiagnostic, 0, len(ranked))
+	for i, candidate := range ranked {
+		accountID := int64(0)
+		if candidate.account != nil {
+			accountID = candidate.account.ID
+		}
+		_, inTopK := topKIDs[accountID]
+		out = append(out, openAIScheduleDiagnosticFromCandidate(
+			candidate,
+			i+1,
+			orderByAccountID[accountID],
+			inTopK,
+			accountID > 0 && accountID == selectedAccountID,
+		))
+	}
+	return out
+}
+
+func openAIScheduleDiagnosticFromCandidate(
+	candidate openAIAccountCandidateScore,
+	rank int,
+	order int,
+	inTopK bool,
+	selected bool,
+) OpenAIAccountScheduleCandidateDiagnostic {
+	diag := OpenAIAccountScheduleCandidateDiagnostic{
+		Rank:     rank,
+		Order:    order,
+		InTopK:   inTopK,
+		Selected: selected,
+	}
+	account := candidate.account
+	if account != nil {
+		diag.AccountID = account.ID
+		diag.AccountName = account.Name
+		diag.AccountType = account.Type
+		diag.Priority = account.Priority
+		diag.Concurrency = account.Concurrency
+		diag.LoadFactor = account.EffectiveLoadFactor()
+		diag.LastUsedAt = formatOpenAIScheduleLastUsedAt(account.LastUsedAt)
+	}
+	loadInfo := candidate.loadInfo
+	if loadInfo != nil {
+		diag.CurrentConcurrency = loadInfo.CurrentConcurrency
+		diag.WaitingCount = loadInfo.WaitingCount
+		diag.LoadRate = loadInfo.LoadRate
+	}
+	if candidate.score > 0 {
+		diag.Score = roundOpenAIScheduleMetric(candidate.score)
+	}
+	if candidate.errorRate > 0 {
+		diag.ErrorRate = roundOpenAIScheduleMetric(candidate.errorRate)
+	}
+	if candidate.hasTTFT && candidate.ttft > 0 {
+		diag.TTFTMs = int(math.Round(candidate.ttft))
+		diag.HasTTFT = true
+	}
+	return diag
+}
+
+func markOpenAIScheduleCandidateSelected(
+	candidates []OpenAIAccountScheduleCandidateDiagnostic,
+	accountID int64,
+) []OpenAIAccountScheduleCandidateDiagnostic {
+	if accountID <= 0 {
+		return candidates
+	}
+	for i := range candidates {
+		candidates[i].Selected = candidates[i].AccountID == accountID
+	}
+	return candidates
+}
+
+func formatOpenAIScheduleLastUsedAt(lastUsedAt *time.Time) string {
+	if lastUsedAt == nil {
+		return ""
+	}
+	return lastUsedAt.UTC().Format(time.RFC3339Nano)
+}
+
+func roundOpenAIScheduleMetric(value float64) float64 {
+	return math.Round(value*10000) / 10000
 }
 
 type openAISelectionRNG struct {
@@ -824,13 +975,13 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrder(
 func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
-) (*AccountSelectionResult, int, int, float64, error) {
+) (*AccountSelectionResult, int, int, float64, []OpenAIAccountScheduleCandidateDiagnostic, error) {
 	accounts, err := s.service.listSchedulableAccounts(ctx, req.GroupID)
 	if err != nil {
-		return nil, 0, 0, 0, err
+		return nil, 0, 0, 0, nil, err
 	}
 	if len(accounts) == 0 {
-		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false)
+		return nil, 0, 0, 0, nil, noAvailableOpenAISelectionError(req.RequestedModel, false)
 	}
 
 	// require_privacy_set: 获取分组信息
@@ -874,7 +1025,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 		})
 	}
 	if len(filtered) == 0 {
-		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false)
+		return nil, 0, 0, 0, nil, noAvailableOpenAISelectionError(req.RequestedModel, false)
 	}
 
 	loadMap := map[int64]*AccountLoadInfo{}
@@ -889,40 +1040,49 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	topK := plan.topK
 	loadSkew := plan.loadSkew
 	selectionOrder := plan.selectionOrder
+	diagnostics := buildOpenAIScheduleCandidateDiagnostics(plan, 0)
 	if req.RequireCompact && len(plan.candidates) == 0 && len(plan.staleSnapshotCompactRetry) == 0 {
-		return nil, 0, 0, 0, ErrNoAvailableCompactAccounts
+		return nil, 0, 0, 0, diagnostics, ErrNoAvailableCompactAccounts
 	}
 	if req.RequireCompact && len(selectionOrder) == 0 && s.service.schedulerSnapshot == nil {
-		return nil, candidateCount, topK, loadSkew, ErrNoAvailableCompactAccounts
+		return nil, candidateCount, topK, loadSkew, diagnostics, ErrNoAvailableCompactAccounts
 	}
 	if len(selectionOrder) == 0 {
-		return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, req.RequireCompact && len(plan.allCandidates) > 0)
+		return nil, candidateCount, topK, loadSkew, diagnostics, noAvailableOpenAISelectionError(req.RequestedModel, req.RequireCompact && len(plan.allCandidates) > 0)
 	}
 
 	result, compactBlocked, acquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, selectionOrder)
 	if acquireErr != nil {
-		return nil, candidateCount, topK, loadSkew, acquireErr
+		return nil, candidateCount, topK, loadSkew, diagnostics, acquireErr
 	}
 	if result != nil {
-		return result, candidateCount, topK, loadSkew, nil
+		if result.Account != nil {
+			markOpenAIScheduleCandidateSelected(diagnostics, result.Account.ID)
+		}
+		return result, candidateCount, topK, loadSkew, diagnostics, nil
 	}
 
 	if s.service.concurrencyService != nil {
 		if freshLoadMap, loadErr := s.service.concurrencyService.GetAccountsLoadBatchFresh(ctx, loadReq); loadErr == nil {
 			freshPlan := s.buildOpenAIAccountLoadPlan(req, filtered, freshLoadMap)
 			if len(freshPlan.selectionOrder) > 0 {
+				freshDiagnostics := buildOpenAIScheduleCandidateDiagnostics(freshPlan, 0)
 				freshResult, freshCompactBlocked, freshAcquireErr := s.tryAcquireOpenAISelectionOrder(ctx, req, freshPlan.selectionOrder)
 				if freshAcquireErr != nil {
-					return nil, candidateCount, topK, loadSkew, freshAcquireErr
+					return nil, candidateCount, topK, loadSkew, freshDiagnostics, freshAcquireErr
 				}
 				if freshResult != nil {
-					return freshResult, freshPlan.candidateCount, freshPlan.topK, freshPlan.loadSkew, nil
+					if freshResult.Account != nil {
+						markOpenAIScheduleCandidateSelected(freshDiagnostics, freshResult.Account.ID)
+					}
+					return freshResult, freshPlan.candidateCount, freshPlan.topK, freshPlan.loadSkew, freshDiagnostics, nil
 				}
 				compactBlocked = compactBlocked || freshCompactBlocked
 				selectionOrder = freshPlan.selectionOrder
 				candidateCount = freshPlan.candidateCount
 				topK = freshPlan.topK
 				loadSkew = freshPlan.loadSkew
+				diagnostics = freshDiagnostics
 			}
 		}
 	}
@@ -950,10 +1110,10 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 				Timeout:        cfg.FallbackWaitTimeout,
 				MaxWaiting:     cfg.FallbackMaxWaiting,
 			},
-		}, candidateCount, topK, loadSkew, nil
+		}, candidateCount, topK, loadSkew, markOpenAIScheduleCandidateSelected(diagnostics, fresh.ID), nil
 	}
 
-	return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked)
+	return nil, candidateCount, topK, loadSkew, diagnostics, noAvailableOpenAISelectionError(req.RequestedModel, compactBlocked)
 }
 
 func (s *defaultOpenAIAccountScheduler) isAccountTransportCompatible(account *Account, requiredTransport OpenAIUpstreamTransport) bool {
@@ -1137,10 +1297,10 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 	requiredImageCapability OpenAIImagesCapability,
 	requireCompact bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
-	decision := OpenAIAccountScheduleDecision{}
+	decision := OpenAIAccountScheduleDecision{Layer: openAIAccountScheduleLayerLoadBalance}
 	scheduler := s.getOpenAIAccountScheduler(ctx)
 	if scheduler == nil {
-		decision.Layer = openAIAccountScheduleLayerLoadBalance
+		ctx = withOpenAILegacyScheduleDecision(ctx, &decision)
 		if requiredTransport == OpenAIUpstreamTransportAny || requiredTransport == OpenAIUpstreamTransportHTTPSSE {
 			effectiveExcludedIDs := cloneExcludedAccountIDs(excludedIDs)
 			for {
@@ -1152,6 +1312,9 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 					return selection, decision, nil
 				}
 				if selection.Account.SupportsOpenAIImageCapability(requiredImageCapability) {
+					decision.SelectedAccountID = selection.Account.ID
+					decision.SelectedAccountType = selection.Account.Type
+					decision.Candidates = markOpenAIScheduleCandidateSelected(decision.Candidates, selection.Account.ID)
 					return selection, decision, nil
 				}
 				if selection.ReleaseFunc != nil {
@@ -1177,6 +1340,9 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 				return selection, decision, nil
 			}
 			if s.isOpenAIAccountTransportCompatible(selection.Account, requiredTransport) {
+				decision.SelectedAccountID = selection.Account.ID
+				decision.SelectedAccountType = selection.Account.Type
+				decision.Candidates = markOpenAIScheduleCandidateSelected(decision.Candidates, selection.Account.ID)
 				return selection, decision, nil
 			}
 			if selection.ReleaseFunc != nil {
@@ -1217,6 +1383,83 @@ func (s *OpenAIGatewayService) selectAccountWithScheduler(
 		RequireCompact:          requireCompact,
 		ExcludedIDs:             excludedIDs,
 	})
+}
+
+func (s *OpenAIGatewayService) countLegacyOpenAISchedulerCandidates(
+	ctx context.Context,
+	groupID *int64,
+	requestedModel string,
+	excludedIDs map[int64]struct{},
+	requiredTransport OpenAIUpstreamTransport,
+	requiredImageCapability OpenAIImagesCapability,
+	requireCompact bool,
+) int {
+	if s == nil {
+		return 0
+	}
+	accounts, err := s.listSchedulableAccounts(ctx, groupID)
+	if err != nil {
+		return 0
+	}
+	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
+	count := 0
+	for i := range accounts {
+		account := &accounts[i]
+		if excludedIDs != nil {
+			if _, excluded := excludedIDs[account.ID]; excluded {
+				continue
+			}
+		}
+		if !isOpenAIAccountEligibleForRequest(account, requestedModel, requireCompact) {
+			continue
+		}
+		if s.isOpenAIAccountRuntimeBlocked(account) {
+			continue
+		}
+		if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
+			continue
+		}
+		if !s.isOpenAIAccountTransportCompatible(account, requiredTransport) {
+			continue
+		}
+		if !account.SupportsOpenAIImageCapability(requiredImageCapability) {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func buildLegacyOpenAISchedulerCandidateDiagnostics(available []accountWithLoad) []OpenAIAccountScheduleCandidateDiagnostic {
+	if len(available) == 0 {
+		return nil
+	}
+	out := make([]OpenAIAccountScheduleCandidateDiagnostic, 0, len(available))
+	for i, item := range available {
+		candidate := openAIAccountCandidateScore{
+			account:  item.account,
+			loadInfo: item.loadInfo,
+		}
+		out = append(out, openAIScheduleDiagnosticFromCandidate(candidate, i+1, i+1, true, false))
+	}
+	return out
+}
+
+func accountsWithDefaultLoad(accounts []*Account) []accountWithLoad {
+	if len(accounts) == 0 {
+		return nil
+	}
+	out := make([]accountWithLoad, 0, len(accounts))
+	for _, account := range accounts {
+		if account == nil {
+			continue
+		}
+		out = append(out, accountWithLoad{
+			account:  account,
+			loadInfo: &AccountLoadInfo{AccountID: account.ID},
+		})
+	}
+	return out
 }
 
 func cloneExcludedAccountIDs(excludedIDs map[int64]struct{}) map[int64]struct{} {

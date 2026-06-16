@@ -316,8 +316,11 @@ func (c *ResponseCache) StoreAsync(decision ResponseCacheDecision, entry *Respon
 	return true
 }
 
-func (c *ResponseCache) ObserveShadowAsync(decision ResponseCacheDecision) {
+func (c *ResponseCache) ObserveShadowAsync(decision ResponseCacheDecision, statusCode int) {
 	if c == nil || !decision.ShadowEnabled || decision.Key == "" || c.rdb == nil {
+		return
+	}
+	if !responseCacheStatusAllowsShadow(statusCode) {
 		return
 	}
 	ttl := time.Duration(c.cfg.ShadowTTLSeconds) * time.Second
@@ -361,6 +364,10 @@ func (c *ResponseCache) ObserveShadowAsync(decision ResponseCacheDecision) {
 			c.markRedisFailure(err)
 		}
 	}()
+}
+
+func responseCacheStatusAllowsShadow(statusCode int) bool {
+	return statusCode >= 200 && statusCode < 300
 }
 
 func (c *ResponseCache) GetRecommendation(ctx context.Context, opts ResponseCacheRecommendationOptions) (*ResponseCacheRecommendation, error) {

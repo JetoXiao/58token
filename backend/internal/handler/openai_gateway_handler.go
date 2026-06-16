@@ -330,6 +330,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			zap.Int64("latency_ms", scheduleDecision.LatencyMs),
 			zap.Float64("load_skew", scheduleDecision.LoadSkew),
 		)
+		mergeOpsSchedulerDecision(c, scheduleDecision)
 		account := selection.Account
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
@@ -452,7 +453,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
-		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
 		cacheInflightFinished = true
 
 		// 捕获请求信息（用于异步记录，避免在 goroutine 中访问 gin.Context）
@@ -461,7 +462,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		requestPayloadHash := service.HashUsageRequestPayload(body)
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-		requestParams := getOpsRequestParams(c)
+		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {
@@ -754,7 +755,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		account := selection.Account
 		sessionHash = ensureOpenAIPoolModeSessionHash(sessionHash, account)
 		reqLog.Debug("openai_messages.account_selected", zap.Int64("account_id", account.ID), zap.String("account_name", account.Name))
-		_ = scheduleDecision
+		mergeOpsSchedulerDecision(c, scheduleDecision)
 		setOpsSelectedAccount(c, account.ID, account.Platform)
 
 		accountReleaseFunc, acquired := h.acquireResponsesAccountSlot(c, apiKey.GroupID, sessionHash, selection, reqStream, &streamStarted, reqLog)
@@ -863,7 +864,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
-		finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
 		cacheInflightFinished = true
 
 		userAgent := c.GetHeader("User-Agent")
@@ -871,7 +872,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		requestPayloadHash := service.HashUsageRequestPayload(body)
 		inboundEndpoint := GetInboundEndpoint(c)
 		upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-		requestParams := getOpsRequestParams(c)
+		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {
 			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
@@ -1440,7 +1441,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, result.FirstTokenMs)
 			inboundEndpoint := GetInboundEndpoint(c)
 			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-			requestParams := getOpsRequestParams(c)
+			requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 			h.submitOpenAIUsageRecordTask(result, func(taskCtx context.Context) {
 				if err := h.gatewayService.RecordUsage(taskCtx, &service.OpenAIRecordUsageInput{
 					Result:             result,

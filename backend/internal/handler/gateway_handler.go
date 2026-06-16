@@ -509,7 +509,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
-			finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
 			cacheInflightFinished = true
 
 			// RPM 计数递增（Forward 成功后）
@@ -527,7 +527,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			requestPayloadHash := service.HashUsageRequestPayload(body)
 			inboundEndpoint := GetInboundEndpoint(c)
 			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-			requestParams := getOpsRequestParams(c)
+			requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 			if result.ReasoningEffort == nil {
 				result.ReasoningEffort = service.NormalizeClaudeOutputEffort(parsedReq.OutputEffort)
@@ -902,7 +902,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
-			finishResponseCacheAfterForward(h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner && !fallbackUsed)
+			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner && !fallbackUsed)
 			if !fallbackUsed {
 				cacheInflightFinished = true
 			}
@@ -933,7 +933,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			requestPayloadHash := service.HashUsageRequestPayload(body)
 			inboundEndpoint := GetInboundEndpoint(c)
 			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
-			requestParams := getOpsRequestParams(c)
+			requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 			if result.ReasoningEffort == nil {
 				result.ReasoningEffort = service.NormalizeClaudeOutputEffort(parsedReq.OutputEffort)

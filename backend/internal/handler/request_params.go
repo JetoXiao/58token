@@ -15,6 +15,22 @@ const (
 	requestParamListMaxItems   = 8
 )
 
+const (
+	opsRequestParamTTFTSourceUnknown  = "unknown"
+	opsRequestParamTTFTSourceOwnPool  = "own_pool"
+	opsRequestParamTTFTSourceUpstream = "upstream"
+	opsRequestParamTTFTSourceCache    = "cache"
+
+	opsRequestParamTTFTSlowUnknown      = "unknown"
+	opsRequestParamTTFTSlowCacheHit     = "cache_hit"
+	opsRequestParamTTFTSlowAccountQueue = "account_queue_slow"
+	opsRequestParamTTFTSlowConnPick     = "connection_pick_slow"
+	opsRequestParamTTFTSlowRouting      = "routing_slow"
+	opsRequestParamTTFTSlowUpstream     = "upstream_ttft_slow"
+	opsRequestParamTTFTSlowPlatform     = "platform_overhead_slow"
+	opsRequestParamTTFTSlowNormal       = "normal"
+)
+
 func setOpsRequestParamsFromBody(c *gin.Context, body []byte) {
 	if c == nil || len(body) == 0 {
 		return
@@ -45,6 +61,21 @@ func getOpsRequestParams(c *gin.Context) map[string]any {
 	return out
 }
 
+func getOpsRequestParamsWithTTFTObservation(c *gin.Context, account *service.Account, result interface{}) map[string]any {
+	params := getOpsRequestParams(c)
+	obs := buildTTFTObservationParams(c, account, result)
+	if len(obs) == 0 {
+		return params
+	}
+	if params == nil {
+		params = make(map[string]any, len(obs))
+	}
+	for k, v := range obs {
+		params[k] = v
+	}
+	return params
+}
+
 func mergeOpsRequestParams(c *gin.Context, params map[string]any) {
 	if c == nil || len(params) == 0 {
 		return
@@ -62,6 +93,290 @@ func mergeOpsRequestParams(c *gin.Context, params map[string]any) {
 	if len(merged) > 0 {
 		c.Set(opsRequestParamsKey, merged)
 	}
+}
+
+func mergeOpsSchedulerDecision(c *gin.Context, decision service.OpenAIAccountScheduleDecision) {
+	params := make(map[string]any, 10)
+	if layer := strings.TrimSpace(decision.Layer); layer != "" {
+		params["scheduler_layer"] = layer
+	}
+	if reason := schedulerDecisionReason(decision); reason != "" {
+		params["scheduler_reason"] = reason
+	}
+	if decision.CandidateCount > 0 {
+		params["scheduler_candidate_count"] = decision.CandidateCount
+	}
+	if decision.TopK > 0 {
+		params["scheduler_top_k"] = decision.TopK
+	}
+	if decision.LatencyMs > 0 {
+		params["scheduler_latency_ms"] = decision.LatencyMs
+	}
+	if decision.LoadSkew > 0 {
+		params["scheduler_load_skew"] = decision.LoadSkew
+	}
+	if decision.SelectedAccountID > 0 {
+		params["scheduler_selected_account_id"] = decision.SelectedAccountID
+	}
+	if selectedType := strings.TrimSpace(decision.SelectedAccountType); selectedType != "" {
+		params["scheduler_selected_account_type"] = selectedType
+	}
+	if candidates := opsSchedulerDecisionCandidates(decision.Candidates); len(candidates) > 0 {
+		params["scheduler_candidates"] = candidates
+		if len(decision.Candidates) > len(candidates) {
+			params["scheduler_candidates_truncated"] = true
+		}
+	}
+	mergeOpsRequestParams(c, params)
+}
+
+func schedulerDecisionReason(decision service.OpenAIAccountScheduleDecision) string {
+	switch strings.TrimSpace(decision.Layer) {
+	case "previous_response_id":
+		return "previous_response_sticky"
+	case "session_hash":
+		if decision.StickySessionHit {
+			return "session_sticky_hit"
+		}
+		return "session_sticky"
+	case "load_balance":
+		if decision.StickySessionHit {
+			return "legacy_session_sticky_hit"
+		}
+		if decision.TopK > 0 && decision.CandidateCount > decision.TopK {
+			return "load_balance_top_k"
+		}
+		return "load_balance_priority_load_queue_ttft"
+	default:
+		return ""
+	}
+}
+
+func opsSchedulerDecisionCandidates(candidates []service.OpenAIAccountScheduleCandidateDiagnostic) []service.OpenAIAccountScheduleCandidateDiagnostic {
+	const maxCandidates = 12
+	if len(candidates) == 0 {
+		return nil
+	}
+	if len(candidates) <= maxCandidates {
+		return candidates
+	}
+	cloned := make([]service.OpenAIAccountScheduleCandidateDiagnostic, maxCandidates)
+	copy(cloned, candidates[:maxCandidates])
+	return cloned
+}
+
+func buildTTFTObservationParams(c *gin.Context, account *service.Account, result interface{}) map[string]any {
+	out := make(map[string]any, 16)
+	if c == nil {
+		return out
+	}
+
+	if account != nil {
+		out["route_source"] = classifyTTFTRouteSource(account)
+		out["account_type"] = strings.TrimSpace(account.Type)
+	} else {
+		out["route_source"] = opsRequestParamTTFTSourceUnknown
+	}
+
+	if v, ok := getContextInt64Local(c, service.OpsAuthLatencyMsKey); ok {
+		out["auth_latency_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsRoutingLatencyMsKey); ok {
+		out["routing_latency_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsUpstreamLatencyMsKey); ok {
+		out["upstream_latency_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsResponseLatencyMsKey); ok {
+		out["response_latency_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsTimeToFirstTokenMsKey); ok {
+		out["time_to_first_token_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsOpenAIWSQueueWaitMsKey); ok {
+		out["openai_ws_queue_wait_ms"] = v
+	}
+	if v, ok := getContextInt64Local(c, service.OpsOpenAIWSConnPickMsKey); ok {
+		out["openai_ws_conn_pick_ms"] = v
+	}
+	if status := responseCacheStatusFromContext(c); status != "" {
+		out["response_cache_status"] = status
+		if status == service.ResponseCacheStatusHit {
+			out["route_source"] = opsRequestParamTTFTSourceCache
+		}
+	}
+
+	if firstTokenMs, ok := ttftFirstTokenMsFromResult(result); ok {
+		out["first_token_ms"] = firstTokenMs
+	}
+	if durationMs, ok := ttftDurationMsFromResult(result); ok {
+		out["duration_ms"] = durationMs
+	}
+
+	reason, detail := classifyTTFTSlowReason(out)
+	out["ttft_slow_reason"] = reason
+	if detail != "" {
+		out["ttft_slow_reason_detail"] = detail
+	}
+
+	return out
+}
+
+func classifyTTFTRouteSource(account *service.Account) string {
+	if account == nil {
+		return opsRequestParamTTFTSourceUnknown
+	}
+	accountType := strings.ToLower(strings.TrimSpace(account.Type))
+	switch accountType {
+	case service.AccountTypeAPIKey, service.AccountTypeUpstream, service.AccountTypeBedrock, service.AccountTypeServiceAccount,
+		"api", "api_key", "openai-api", "openai_api":
+		return opsRequestParamTTFTSourceUpstream
+	default:
+		return opsRequestParamTTFTSourceOwnPool
+	}
+}
+
+func responseCacheStatusFromContext(c *gin.Context) string {
+	if c == nil || c.Writer == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(c.Writer.Header().Get(service.ResponseCacheHeader))
+	if raw == "" {
+		return ""
+	}
+	status := strings.TrimSpace(strings.Split(raw, ";")[0])
+	switch status {
+	case service.ResponseCacheStatusHit, service.ResponseCacheStatusMiss, service.ResponseCacheStatusBypass, service.ResponseCacheStatusShadow:
+		return status
+	default:
+		return status
+	}
+}
+
+func ttftFirstTokenMsFromResult(result interface{}) (int64, bool) {
+	switch v := result.(type) {
+	case *service.ForwardResult:
+		if v != nil && v.FirstTokenMs != nil {
+			return int64(*v.FirstTokenMs), true
+		}
+	case *service.OpenAIForwardResult:
+		if v != nil && v.FirstTokenMs != nil {
+			return int64(*v.FirstTokenMs), true
+		}
+	}
+	return 0, false
+}
+
+func ttftDurationMsFromResult(result interface{}) (int64, bool) {
+	switch v := result.(type) {
+	case *service.ForwardResult:
+		if v != nil {
+			return v.Duration.Milliseconds(), true
+		}
+	case *service.OpenAIForwardResult:
+		if v != nil {
+			return v.Duration.Milliseconds(), true
+		}
+	}
+	return 0, false
+}
+
+func classifyTTFTSlowReason(params map[string]any) (string, string) {
+	if len(params) == 0 {
+		return opsRequestParamTTFTSlowUnknown, ""
+	}
+	cacheStatus, _ := params["response_cache_status"].(string)
+	if cacheStatus == service.ResponseCacheStatusHit {
+		return opsRequestParamTTFTSlowCacheHit, "response cache hit returned without upstream wait"
+	}
+
+	ttft, ok := numericParamInt64(params, "time_to_first_token_ms")
+	if !ok {
+		ttft, ok = numericParamInt64(params, "first_token_ms")
+	}
+	if !ok {
+		return opsRequestParamTTFTSlowUnknown, "missing first token sample"
+	}
+	if ttft < 800 {
+		return opsRequestParamTTFTSlowNormal, "first token below observation threshold"
+	}
+
+	queue, _ := numericParamInt64(params, "openai_ws_queue_wait_ms")
+	if queue >= 300 && queue*100/maxInt64(ttft, 1) >= 35 {
+		return opsRequestParamTTFTSlowAccountQueue, "OpenAI WS queue wait dominates TTFT"
+	}
+	connPick, _ := numericParamInt64(params, "openai_ws_conn_pick_ms")
+	if connPick >= 200 && connPick*100/maxInt64(ttft, 1) >= 25 {
+		return opsRequestParamTTFTSlowConnPick, "OpenAI WS connection pick is high"
+	}
+	routing, _ := numericParamInt64(params, "routing_latency_ms")
+	if routing >= 200 && routing*100/maxInt64(ttft, 1) >= 25 {
+		return opsRequestParamTTFTSlowRouting, "routing or account selection is high"
+	}
+	auth, _ := numericParamInt64(params, "auth_latency_ms")
+	if auth+routing >= 300 && (auth+routing)*100/maxInt64(ttft, 1) >= 25 {
+		return opsRequestParamTTFTSlowPlatform, "platform pre-upstream processing is high"
+	}
+	upstream, _ := numericParamInt64(params, "upstream_latency_ms")
+	if upstream >= 500 && upstream*100/maxInt64(ttft, 1) >= 60 {
+		return opsRequestParamTTFTSlowUpstream, "upstream wait dominates TTFT"
+	}
+	return opsRequestParamTTFTSlowUpstream, "TTFT is high and no platform stage dominates"
+}
+
+func numericParamInt64(params map[string]any, key string) (int64, bool) {
+	if len(params) == 0 || strings.TrimSpace(key) == "" {
+		return 0, false
+	}
+	v, ok := params[key]
+	if !ok || v == nil {
+		return 0, false
+	}
+	switch t := v.(type) {
+	case int:
+		return int64(t), true
+	case int32:
+		return int64(t), true
+	case int64:
+		return t, true
+	case float32:
+		return int64(t), true
+	case float64:
+		return int64(t), true
+	default:
+		return 0, false
+	}
+}
+
+func getContextInt64Local(c *gin.Context, key string) (int64, bool) {
+	if c == nil || strings.TrimSpace(key) == "" {
+		return 0, false
+	}
+	v, ok := c.Get(key)
+	if !ok || v == nil {
+		return 0, false
+	}
+	switch t := v.(type) {
+	case int:
+		return int64(t), true
+	case int32:
+		return int64(t), true
+	case int64:
+		return t, true
+	case float32:
+		return int64(t), true
+	case float64:
+		return int64(t), true
+	default:
+		return 0, false
+	}
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func setOpsRequestParamsFromOpenAIImagesRequest(c *gin.Context, req *service.OpenAIImagesRequest) {
