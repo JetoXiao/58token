@@ -456,6 +456,69 @@ func TestAPIKeyServiceCreateRejectsNonFreeQuotaGroupForZeroBalanceUser(t *testin
 	require.Nil(t, apiKeyRepo.created, "backend must not persist an API key bound to a non-free group")
 }
 
+func TestAPIKeyServiceCreateAllowsAssignedExclusiveGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	user := &User{ID: 1, Status: StatusActive, Balance: 100, AllowedGroups: []int64{groupID}}
+
+	apiKeyRepo := &freeQuotaPermissionAPIKeyRepo{}
+	svc := NewAPIKeyService(
+		apiKeyRepo,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{group: &Group{
+			ID:               groupID,
+			Status:           StatusActive,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	customKey := "assignedexclusive"
+	_, err := svc.Create(ctx, user.ID, CreateAPIKeyRequest{
+		Name:      "assigned-exclusive",
+		GroupID:   &groupID,
+		CustomKey: &customKey,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, apiKeyRepo.created)
+	require.Equal(t, groupID, *apiKeyRepo.created.GroupID)
+}
+
+func TestAPIKeyServiceCreateRejectsUnassignedExclusiveGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	user := &User{ID: 1, Status: StatusActive, Balance: 100}
+
+	apiKeyRepo := &freeQuotaPermissionAPIKeyRepo{}
+	svc := NewAPIKeyService(
+		apiKeyRepo,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{group: &Group{
+			ID:               groupID,
+			Status:           StatusActive,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	_, err := svc.Create(ctx, user.ID, CreateAPIKeyRequest{
+		Name:    "unassigned-exclusive",
+		GroupID: &groupID,
+	})
+
+	require.ErrorIs(t, err, ErrGroupNotAllowed)
+	require.Nil(t, apiKeyRepo.created, "backend must not persist an API key bound to an unassigned exclusive group")
+}
+
 func TestAPIKeyServiceUpdateRejectsNonFreeQuotaGroupForZeroBalanceUser(t *testing.T) {
 	ctx := context.Background()
 	freeGroupID := int64(10)
@@ -486,6 +549,65 @@ func TestAPIKeyServiceUpdateRejectsNonFreeQuotaGroupForZeroBalanceUser(t *testin
 	require.Nil(t, apiKeyRepo.updated, "backend must not persist a forged group change")
 }
 
+func TestAPIKeyServiceUpdateAllowsAssignedExclusiveGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	user := &User{ID: 1, Status: StatusActive, Balance: 100, AllowedGroups: []int64{groupID}}
+
+	apiKeyRepo := &freeQuotaPermissionAPIKeyRepo{
+		key: &APIKey{ID: 99, UserID: user.ID, Key: "sk-test", Status: StatusActive},
+	}
+	svc := NewAPIKeyService(
+		apiKeyRepo,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{group: &Group{
+			ID:               groupID,
+			Status:           StatusActive,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	_, err := svc.Update(ctx, 99, user.ID, UpdateAPIKeyRequest{GroupID: &groupID})
+
+	require.NoError(t, err)
+	require.NotNil(t, apiKeyRepo.updated)
+	require.Equal(t, groupID, *apiKeyRepo.updated.GroupID)
+}
+
+func TestAPIKeyServiceUpdateRejectsUnassignedExclusiveGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	user := &User{ID: 1, Status: StatusActive, Balance: 100}
+
+	apiKeyRepo := &freeQuotaPermissionAPIKeyRepo{
+		key: &APIKey{ID: 99, UserID: user.ID, Key: "sk-test", Status: StatusActive},
+	}
+	svc := NewAPIKeyService(
+		apiKeyRepo,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{group: &Group{
+			ID:               groupID,
+			Status:           StatusActive,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeStandard,
+		}},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	_, err := svc.Update(ctx, 99, user.ID, UpdateAPIKeyRequest{GroupID: &groupID})
+
+	require.ErrorIs(t, err, ErrGroupNotAllowed)
+	require.Nil(t, apiKeyRepo.updated, "backend must not persist a forged unassigned exclusive group change")
+}
+
 func TestAPIKeyServiceCanUserUseGroupRejectsNonFreeQuotaGroupAtRuntime(t *testing.T) {
 	ctx := context.Background()
 	freeGroupID := int64(10)
@@ -500,6 +622,26 @@ func TestAPIKeyServiceCanUserUseGroupRejectsNonFreeQuotaGroupAtRuntime(t *testin
 
 	user.Balance = 1
 	require.True(t, svc.CanUserUseGroup(ctx, user, &Group{ID: blockedGroupID, SubscriptionType: SubscriptionTypeStandard}))
+}
+
+func TestAPIKeyServiceCanUserUseGroupChecksExclusiveAssignment(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, nil)
+
+	user := &User{ID: 1, Status: StatusActive, Balance: 100}
+	require.False(t, svc.CanUserUseGroup(ctx, user, &Group{
+		ID:               groupID,
+		IsExclusive:      true,
+		SubscriptionType: SubscriptionTypeStandard,
+	}))
+
+	user.AllowedGroups = []int64{groupID}
+	require.True(t, svc.CanUserUseGroup(ctx, user, &Group{
+		ID:               groupID,
+		IsExclusive:      true,
+		SubscriptionType: SubscriptionTypeStandard,
+	}))
 }
 
 func TestFreeQuotaServiceGrantInvitationQuotaRequiresEnabledSetting(t *testing.T) {
@@ -552,6 +694,42 @@ func TestAPIKeyServiceGetAvailableGroupsHidesLockedGroupsWhenSettingDisabled(t *
 	require.Len(t, groups, 1)
 	require.Equal(t, freeGroupID, groups[0].ID)
 	require.False(t, groups[0].Locked)
+}
+
+func TestAPIKeyServiceGetAvailableGroupsIncludesOnlyAssignedExclusiveGroups(t *testing.T) {
+	ctx := context.Background()
+	publicGroupID := int64(10)
+	assignedExclusiveGroupID := int64(20)
+	unassignedExclusiveGroupID := int64(30)
+	user := &User{
+		ID:            1,
+		Status:        StatusActive,
+		Balance:       100,
+		AllowedGroups: []int64{assignedExclusiveGroupID},
+	}
+
+	svc := NewAPIKeyService(
+		nil,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{groups: []Group{
+			{ID: publicGroupID, Name: "public", Status: StatusActive, SubscriptionType: SubscriptionTypeStandard},
+			{ID: assignedExclusiveGroupID, Name: "assigned", Status: StatusActive, IsExclusive: true, SubscriptionType: SubscriptionTypeStandard},
+			{ID: unassignedExclusiveGroupID, Name: "unassigned", Status: StatusActive, IsExclusive: true, SubscriptionType: SubscriptionTypeStandard},
+		}},
+		&freeQuotaPermissionUserSubRepo{},
+		nil,
+		nil,
+		nil,
+	)
+
+	groups, err := svc.GetAvailableGroups(ctx, user.ID)
+
+	require.NoError(t, err)
+	require.Len(t, groups, 2)
+	require.Equal(t, publicGroupID, groups[0].ID)
+	require.False(t, groups[0].IsExclusive)
+	require.Equal(t, assignedExclusiveGroupID, groups[1].ID)
+	require.True(t, groups[1].IsExclusive)
 }
 
 func TestAPIKeyServiceGetAvailableGroupsShowsLockedGroupsWhenSettingEnabled(t *testing.T) {
