@@ -840,7 +840,7 @@ response_cache:
   # Per Redis operation timeout. Keep very low so misses do not hurt latency.
   # 单次 Redis 操作超时，保持很低，避免未命中拖慢用户请求。
   redis_timeout_ms: 10
-  max_body_bytes: 65536
+  max_body_bytes: 524288
   max_value_bytes: 1048576
   # Short prompts such as hi/ping are bypassed to avoid hiding probes.
   # 短 prompt 不缓存，避免遮蔽探活。

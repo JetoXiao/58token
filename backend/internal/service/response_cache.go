@@ -218,6 +218,11 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	}
 	toolRequest := looksLikeToolRequest(req.Body)
 	promptChars := approxPromptChars(req.Body)
+	if toolRequest {
+		if userInputChars := userInputPromptChars(req.Body); userInputChars > 0 {
+			promptChars = userInputChars
+		}
+	}
 	if c.cfg.MinPromptChars > 0 && promptChars < c.cfg.MinPromptChars {
 		return ResponseCacheDecision{Reason: "prompt_too_short"}
 	}
@@ -1292,30 +1297,39 @@ func promptCacheObservationSeed(req ResponseCacheRequest) string {
 	if v := strings.TrimSpace(gjson.GetBytes(req.Body, "prompt_cache_key").String()); v != "" {
 		return "prompt_cache_key:" + v
 	}
-	if seed := anthropicPromptCacheObservationSeed(req); seed != "" {
-		return seed
+	anthropicDigestSeed := ""
+	if anchorSeed, digestSeed := anthropicPromptCacheObservationSeeds(req); anchorSeed != "" {
+		return anchorSeed
+	} else {
+		anthropicDigestSeed = digestSeed
+	}
+	if seed := userInputObservationSeed(req.Body); seed != "" {
+		return "user_input:" + seed
+	}
+	if anthropicDigestSeed != "" {
+		return anthropicDigestSeed
 	}
 	return ""
 }
 
-func anthropicPromptCacheObservationSeed(req ResponseCacheRequest) string {
+func anthropicPromptCacheObservationSeeds(req ResponseCacheRequest) (anchorSeed string, digestSeed string) {
 	if !isAnthropicMessagesCacheRequest(req) {
-		return ""
+		return "", ""
 	}
 	var parsed apicompat.AnthropicRequest
 	if err := json.Unmarshal(req.Body, &parsed); err != nil {
-		return ""
+		return "", ""
 	}
 	if key := promptCacheKeyFromAnthropicMetadataSession(&parsed); key != "" {
-		return "anthropic_metadata:" + key
+		return "anthropic_metadata:" + key, ""
 	}
 	if key := deriveAnthropicCacheControlPromptCacheKey(&parsed); key != "" {
-		return "anthropic_cache_control:" + key
+		return "anthropic_cache_control:" + key, ""
 	}
 	if chain := buildOpenAICompatAnthropicDigestChain(&parsed); chain != "" {
-		return "anthropic_digest:" + promptCacheKeyFromAnthropicDigest(chain)
+		return "", "anthropic_digest:" + promptCacheKeyFromAnthropicDigest(chain)
 	}
-	return ""
+	return "", ""
 }
 
 func isAnthropicMessagesCacheRequest(req ResponseCacheRequest) bool {
@@ -1325,6 +1339,75 @@ func isAnthropicMessagesCacheRequest(req ResponseCacheRequest) bool {
 	return strings.Contains(protocol, "anthropic") ||
 		strings.HasSuffix(endpoint, "/v1/messages") ||
 		strings.HasPrefix(model, "claude")
+}
+
+func userInputObservationSeed(body []byte) string {
+	parts := userInputObservationParts(body)
+	if len(parts) == 0 {
+		return ""
+	}
+	return hashSensitiveValueForLog(strings.Join(parts, "\n"))
+}
+
+func userInputPromptChars(body []byte) int {
+	parts := userInputObservationParts(body)
+	total := 0
+	for _, part := range parts {
+		total += len([]rune(part))
+	}
+	return total
+}
+
+func userInputObservationParts(body []byte) []string {
+	var parts []string
+	if input := userInputTextFromResult(gjson.GetBytes(body, "input")); input != "" {
+		parts = append(parts, "input:"+input)
+	}
+	if instructions := userInputTextFromResult(gjson.GetBytes(body, "instructions")); instructions != "" {
+		parts = append(parts, "instructions:"+instructions)
+	}
+	for _, msg := range gjson.GetBytes(body, "messages").Array() {
+		role := strings.TrimSpace(strings.ToLower(msg.Get("role").String()))
+		if role != "user" {
+			continue
+		}
+		if text := userInputTextFromResult(msg.Get("content")); text != "" {
+			parts = append(parts, "user:"+text)
+		}
+	}
+	return parts
+}
+
+func userInputTextFromResult(r gjson.Result) string {
+	if !r.Exists() {
+		return ""
+	}
+	switch {
+	case r.IsArray():
+		parts := make([]string, 0, len(r.Array()))
+		for _, item := range r.Array() {
+			if text := userInputTextFromResult(item); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	case r.IsObject():
+		blockType := strings.TrimSpace(strings.ToLower(r.Get("type").String()))
+		if blockType == "tool_result" || blockType == "tool_use" || blockType == "function_call" || blockType == "function_call_output" {
+			return ""
+		}
+		parts := make([]string, 0, 4)
+		for _, key := range []string{"text", "input_text", "content", "message"} {
+			if text := userInputTextFromResult(r.Get(key)); text != "" {
+				parts = append(parts, text)
+			}
+		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	case r.Type == gjson.String:
+		return strings.TrimSpace(r.String())
+	default:
+		return ""
+	}
 }
 
 func approxPromptChars(body []byte) int {

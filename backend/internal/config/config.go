@@ -1906,7 +1906,7 @@ func setDefaults() {
 	viper.SetDefault("response_cache.ttl_seconds", 300)
 	viper.SetDefault("response_cache.shadow_ttl_seconds", 3600)
 	viper.SetDefault("response_cache.redis_timeout_ms", 10)
-	viper.SetDefault("response_cache.max_body_bytes", 64*1024)
+	viper.SetDefault("response_cache.max_body_bytes", 512*1024)
 	viper.SetDefault("response_cache.max_value_bytes", 1024*1024)
 	viper.SetDefault("response_cache.min_prompt_chars", 16)
 	viper.SetDefault("response_cache.max_prompt_chars", 12000)

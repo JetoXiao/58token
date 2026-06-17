@@ -2,6 +2,8 @@ package service
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -213,6 +215,72 @@ func TestResponseCacheToolShadowUsesAnthropicCacheControlAnchor(t *testing.T) {
 	}
 }
 
+func TestResponseCacheToolShadowFallsBackToUserInput(t *testing.T) {
+	rc := newTestResponseCache()
+	base := ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body:     []byte(`{"model":"gpt-5","temperature":0,"tools":[{"type":"function","function":{"name":"bash"}}],"messages":[{"role":"user","content":"please inspect the repository with the cli tool"}]}`),
+		Headers:  http.Header{},
+	}
+	withToolHistory := base
+	withToolHistory.Body = []byte(`{
+		"model":"gpt-5",
+		"temperature":0,
+		"tools":[{"type":"function","function":{"name":"bash"}}],
+		"messages":[
+			{"role":"user","content":"please inspect the repository with the cli tool"},
+			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"very large cli output"}]}
+		]
+	}`)
+	changedUserInput := base
+	changedUserInput.Body = []byte(`{"model":"gpt-5","temperature":0,"tools":[{"type":"function","function":{"name":"bash"}}],"messages":[{"role":"user","content":"please inspect the database with the cli tool"}]}`)
+
+	k1 := rc.Decide(base).Key
+	k2 := rc.Decide(withToolHistory).Key
+	k3 := rc.Decide(changedUserInput).Key
+	if k1 == "" || k1 != k2 {
+		t.Fatalf("tool shadow keys should fall back to user input, got %q vs %q", k1, k2)
+	}
+	if k1 == k3 {
+		t.Fatalf("different user input should produce a different tool shadow key, got %q", k1)
+	}
+}
+
+func TestResponseCacheClaudeToolShadowUsesUserInputWhenNoAnchor(t *testing.T) {
+	rc := newTestResponseCache()
+	largeToolOutput := strings.Repeat("tool output ", 2000)
+	base := ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body:     []byte(`{"model":"claude-sonnet-4-5","temperature":0,"tools":[{"name":"bash","input_schema":{"type":"object"}}],"messages":[{"role":"user","content":"please inspect the repository with the cli tool"}]}`),
+		Headers:  http.Header{},
+	}
+	withToolHistory := base
+	withToolHistory.Body = []byte(`{
+		"model":"claude-sonnet-4-5",
+		"temperature":0,
+		"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+		"messages":[
+			{"role":"user","content":"please inspect the repository with the cli tool"},
+			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":` + strconv.Quote(largeToolOutput) + `}]}
+		]
+	}`)
+
+	d1 := rc.Decide(base)
+	d2 := rc.Decide(withToolHistory)
+	if d1.Reason != "tool_shadow_only" || d2.Reason != "tool_shadow_only" {
+		t.Fatalf("Decide() reasons = %q/%q, want tool shadow collection", d1.Reason, d2.Reason)
+	}
+	if d1.Key == "" || d1.Key != d2.Key {
+		t.Fatalf("Claude tool shadow keys should ignore tool output without losing collection, got %q vs %q", d1.Key, d2.Key)
+	}
+}
+
 func TestResponseCacheDecisionCarriesAnonymizedStatsMetadata(t *testing.T) {
 	rc := newTestResponseCache()
 	groupID := int64(42)
@@ -376,7 +444,7 @@ func newTestResponseCache() *ResponseCache {
 		TTLSeconds:                    300,
 		ShadowTTLSeconds:              3600,
 		RedisTimeoutMs:                10,
-		MaxBodyBytes:                  64 * 1024,
+		MaxBodyBytes:                  512 * 1024,
 		MaxValueBytes:                 1024 * 1024,
 		MinPromptChars:                16,
 		MaxPromptChars:                12000,
