@@ -240,7 +240,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const data = ref<OpsTTFTAnalysisResponse | null>(null)
 const filters = reactive({
-  timeRange: '1h',
+  timeRange: '24h',
   slowThresholdMs: 1000,
   limit: 10
 })

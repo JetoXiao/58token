@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/redis/go-redis/v9"
 	"github.com/tidwall/gjson"
 )
@@ -212,9 +213,10 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	if matchStringList(req.Model, c.cfg.BypassModels) {
 		return ResponseCacheDecision{Reason: "model_bypass"}
 	}
-	if looksLikeImageOrToolRequest(req.Endpoint, req.Body) {
+	if looksLikeImageRequest(req.Endpoint, req.Body) {
 		return ResponseCacheDecision{Reason: "unsupported_request"}
 	}
+	toolRequest := looksLikeToolRequest(req.Body)
 	promptChars := approxPromptChars(req.Body)
 	if c.cfg.MinPromptChars > 0 && promptChars < c.cfg.MinPromptChars {
 		return ResponseCacheDecision{Reason: "prompt_too_short"}
@@ -222,11 +224,34 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	if c.cfg.MaxPromptChars > 0 && promptChars > c.cfg.MaxPromptChars {
 		return ResponseCacheDecision{Reason: "prompt_too_long"}
 	}
-	key, ok := c.cacheKey(req)
+	var key string
+	var ok bool
+	if toolRequest {
+		key, ok = c.toolShadowCacheKey(req)
+	} else {
+		key, ok = c.cacheKey(req)
+	}
 	if !ok {
 		return ResponseCacheDecision{Reason: "invalid_json"}
 	}
 	monitor := c.isMonitorRequest(req)
+	if toolRequest {
+		if !c.cfg.ShadowEnabled {
+			return ResponseCacheDecision{Reason: "tool_request_bypass"}
+		}
+		return ResponseCacheDecision{
+			Enabled:       true,
+			ShadowEnabled: true,
+			Monitor:       true,
+			Key:           key,
+			Reason:        "tool_shadow_only",
+			Endpoint:      strings.TrimSpace(req.Endpoint),
+			Protocol:      strings.TrimSpace(req.Protocol),
+			Model:         strings.TrimSpace(req.Model),
+			APIKeyID:      req.APIKeyID,
+			GroupID:       cloneResponseCacheInt64Ptr(req.GroupID),
+		}
+	}
 	if req.Stream {
 		// Stream exact replay is intentionally deferred in v1 to avoid adding
 		// capture overhead to the user's first-token path.
@@ -933,6 +958,20 @@ func (c *ResponseCache) cacheKey(req ResponseCacheRequest) (string, bool) {
 	if normalized == "" {
 		return "", false
 	}
+	return c.cacheKeyFromSeed(req, normalized), true
+}
+
+func (c *ResponseCache) toolShadowCacheKey(req ResponseCacheRequest) (string, bool) {
+	if !gjson.ValidBytes(req.Body) {
+		return "", false
+	}
+	if seed := promptCacheObservationSeed(req); seed != "" {
+		return c.cacheKeyFromSeed(req, "tool-shadow:"+seed), true
+	}
+	return c.cacheKey(req)
+}
+
+func (c *ResponseCache) cacheKeyFromSeed(req ResponseCacheRequest, seedValue string) string {
 	scope := "global"
 	if req.GroupID != nil {
 		scope = "group:" + strconv.FormatInt(*req.GroupID, 10)
@@ -942,10 +981,10 @@ func (c *ResponseCache) cacheKey(req ResponseCacheRequest) (string, bool) {
 		strings.TrimSpace(req.Endpoint),
 		strings.TrimSpace(req.Model),
 		scope,
-		normalized,
+		seedValue,
 	}, "\n")
 	sum := sha256.Sum256([]byte(seed))
-	return fmt.Sprintf("%x", sum[:]), true
+	return fmt.Sprintf("%x", sum[:])
 }
 
 func (c *ResponseCache) scopeAllowsExact(req ResponseCacheRequest) bool {
@@ -1225,13 +1264,9 @@ func nonDeterministicReason(deterministic, exactAllowed bool) string {
 	return "non_deterministic"
 }
 
-func looksLikeImageOrToolRequest(endpoint string, body []byte) bool {
+func looksLikeImageRequest(endpoint string, body []byte) bool {
 	path := strings.ToLower(endpoint)
 	if strings.Contains(path, "image") {
-		return true
-	}
-	if gjson.GetBytes(body, "tools").Exists() || gjson.GetBytes(body, "tool_choice").Exists() ||
-		gjson.GetBytes(body, "functions").Exists() || gjson.GetBytes(body, "function_call").Exists() {
 		return true
 	}
 	raw := strings.ToLower(string(body))
@@ -1239,6 +1274,57 @@ func looksLikeImageOrToolRequest(endpoint string, body []byte) bool {
 		strings.Contains(raw, `"input_image"`) ||
 		strings.Contains(raw, `"image_generation"`) ||
 		strings.Contains(raw, `"file_id"`)
+}
+
+func looksLikeToolRequest(body []byte) bool {
+	if gjson.GetBytes(body, "tools").Exists() || gjson.GetBytes(body, "tool_choice").Exists() ||
+		gjson.GetBytes(body, "functions").Exists() || gjson.GetBytes(body, "function_call").Exists() {
+		return true
+	}
+	raw := strings.ToLower(string(body))
+	return strings.Contains(raw, `"tool_use"`) ||
+		strings.Contains(raw, `"tool_result"`) ||
+		strings.Contains(raw, `"function_call"`) ||
+		strings.Contains(raw, `"function_call_output"`)
+}
+
+func promptCacheObservationSeed(req ResponseCacheRequest) string {
+	if v := strings.TrimSpace(gjson.GetBytes(req.Body, "prompt_cache_key").String()); v != "" {
+		return "prompt_cache_key:" + v
+	}
+	if seed := anthropicPromptCacheObservationSeed(req); seed != "" {
+		return seed
+	}
+	return ""
+}
+
+func anthropicPromptCacheObservationSeed(req ResponseCacheRequest) string {
+	if !isAnthropicMessagesCacheRequest(req) {
+		return ""
+	}
+	var parsed apicompat.AnthropicRequest
+	if err := json.Unmarshal(req.Body, &parsed); err != nil {
+		return ""
+	}
+	if key := promptCacheKeyFromAnthropicMetadataSession(&parsed); key != "" {
+		return "anthropic_metadata:" + key
+	}
+	if key := deriveAnthropicCacheControlPromptCacheKey(&parsed); key != "" {
+		return "anthropic_cache_control:" + key
+	}
+	if chain := buildOpenAICompatAnthropicDigestChain(&parsed); chain != "" {
+		return "anthropic_digest:" + promptCacheKeyFromAnthropicDigest(chain)
+	}
+	return ""
+}
+
+func isAnthropicMessagesCacheRequest(req ResponseCacheRequest) bool {
+	protocol := strings.ToLower(strings.TrimSpace(req.Protocol))
+	endpoint := strings.ToLower(strings.TrimSpace(req.Endpoint))
+	model := strings.ToLower(strings.TrimSpace(req.Model))
+	return strings.Contains(protocol, "anthropic") ||
+		strings.HasSuffix(endpoint, "/v1/messages") ||
+		strings.HasPrefix(model, "claude")
 }
 
 func approxPromptChars(body []byte) int {

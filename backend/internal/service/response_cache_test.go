@@ -57,8 +57,15 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 			wantShadow:  true,
 		},
 		{
-			name:       "tools are not cached",
-			body:       []byte(`{"model":"gpt-5","temperature":0,"tools":[{"type":"function","function":{"name":"x"}}],"messages":[{"role":"user","content":"please call the tool with this long enough prompt"}]}`),
+			name:        "tools are observed shadow-only",
+			body:        []byte(`{"model":"gpt-5","temperature":0,"tools":[{"type":"function","function":{"name":"x"}}],"messages":[{"role":"user","content":"please call the tool with this long enough prompt"}]}`),
+			wantEnabled: true,
+			wantShadow:  true,
+			wantReason:  "tool_shadow_only",
+		},
+		{
+			name:       "images are not cached or observed",
+			body:       []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/a.png"}},{"type":"text","text":"please describe this image in detail"}]}]}`),
 			wantReason: "unsupported_request",
 		},
 		{
@@ -98,6 +105,111 @@ func TestResponseCacheDecideStreamShadowOnly(t *testing.T) {
 	})
 	if !got.Enabled || got.ExactEnabled || !got.ShadowEnabled || got.Reason != "stream_shadow_only" {
 		t.Fatalf("Decide() = %+v, want shadow-only stream decision", got)
+	}
+}
+
+func TestResponseCacheToolRequestsAreNeverExact(t *testing.T) {
+	rc := newTestResponseCache()
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body:     []byte(`{"model":"claude-sonnet-4-5","temperature":0,"tools":[{"name":"bash","input_schema":{"type":"object"}}],"messages":[{"role":"user","content":"please inspect the repository with the cli tool"}]}`),
+		Headers:  http.Header{},
+	})
+
+	if !got.Enabled || got.ExactEnabled || !got.ShadowEnabled || got.Reason != "tool_shadow_only" {
+		t.Fatalf("Decide() = %+v, want shadow-only tool observation", got)
+	}
+	if !got.Monitor {
+		t.Fatalf("tool shadow traffic should be kept out of exact-cache recommendation candidates")
+	}
+}
+
+func TestResponseCacheToolRequestsBypassWithoutShadow(t *testing.T) {
+	rc := newTestResponseCache()
+	rc.cfg.ShadowEnabled = false
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body:     []byte(`{"model":"claude-sonnet-4-5","temperature":0,"tools":[{"name":"bash","input_schema":{"type":"object"}}],"messages":[{"role":"user","content":"please inspect the repository with the cli tool"}]}`),
+		Headers:  http.Header{},
+	})
+
+	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Reason != "tool_request_bypass" {
+		t.Fatalf("Decide() = %+v, want tool_request_bypass without shadow", got)
+	}
+}
+
+func TestResponseCacheToolShadowUsesAnthropicMetadataAnchor(t *testing.T) {
+	rc := newTestResponseCache()
+	base := ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body: []byte(`{
+			"model":"claude-sonnet-4-5",
+			"temperature":0,
+			"metadata":{"user_id":"user_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_account_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb_session_cccccccc-cccc-cccc-cccc-cccccccccccc"},
+			"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+			"messages":[{"role":"user","content":"please inspect the repository with the cli tool"}]
+		}`),
+		Headers: http.Header{},
+	}
+	extended := base
+	extended.Body = []byte(`{
+		"model":"claude-sonnet-4-5",
+		"temperature":0,
+		"metadata":{"user_id":"user_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_account_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb_session_cccccccc-cccc-cccc-cccc-cccccccccccc"},
+		"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+		"messages":[
+			{"role":"user","content":"please inspect the repository with the cli tool"},
+			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]},
+			{"role":"user","content":"continue from the cli output"}
+		]
+	}`)
+
+	k1 := rc.Decide(base).Key
+	k2 := rc.Decide(extended).Key
+	if k1 == "" || k1 != k2 {
+		t.Fatalf("tool shadow keys should share metadata anchor, got %q vs %q", k1, k2)
+	}
+}
+
+func TestResponseCacheToolShadowUsesAnthropicCacheControlAnchor(t *testing.T) {
+	rc := newTestResponseCache()
+	base := ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body: []byte(`{
+			"model":"claude-sonnet-4-5",
+			"temperature":0,
+			"system":[{"type":"text","text":"project instructions","cache_control":{"type":"ephemeral"}}],
+			"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+			"messages":[{"role":"user","content":[{"type":"text","text":"repo anchor","cache_control":{"type":"ephemeral"}}]}]
+		}`),
+		Headers: http.Header{},
+	}
+	extended := base
+	extended.Body = []byte(`{
+		"model":"claude-sonnet-4-5",
+		"temperature":0,
+		"system":[{"type":"text","text":"project instructions","cache_control":{"type":"ephemeral"}}],
+		"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+		"messages":[
+			{"role":"user","content":[{"type":"text","text":"repo anchor","cache_control":{"type":"ephemeral"}}]},
+			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}
+		]
+	}`)
+
+	k1 := rc.Decide(base).Key
+	k2 := rc.Decide(extended).Key
+	if k1 == "" || k1 != k2 {
+		t.Fatalf("tool shadow keys should share cache_control anchor, got %q vs %q", k1, k2)
 	}
 }
 
