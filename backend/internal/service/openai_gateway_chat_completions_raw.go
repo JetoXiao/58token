@@ -266,6 +266,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 	scanner.Buffer(make([]byte, 0, 64*1024), maxLineSize)
 
 	var usage OpenAIUsage
+	usageSeen := false
 	var firstTokenMs *int
 	clientDisconnected := false
 	clientOutputStarted := false
@@ -313,6 +314,7 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 				usageOnlyChunk := isOpenAIChatUsageOnlyStreamChunk(payload)
 				if u := extractCCStreamUsage(payload); u != nil {
 					usage = *u
+					usageSeen = true
 				}
 				if firstTokenMs == nil && !usageOnlyChunk {
 					elapsed := int(time.Since(startTime).Milliseconds())
@@ -363,18 +365,29 @@ func (s *OpenAIGatewayService) streamRawChatCompletions(
 		}
 	}
 
-	return &OpenAIForwardResult{
-		RequestID:       requestID,
-		Usage:           usage,
-		Model:           originalModel,
-		BillingModel:    billingModel,
-		UpstreamModel:   upstreamModel,
-		ReasoningEffort: reasoningEffort,
-		ServiceTier:     serviceTier,
-		Stream:          true,
-		Duration:        time.Since(startTime),
-		FirstTokenMs:    firstTokenMs,
-	}, nil
+	resultWithUsage := func() *OpenAIForwardResult {
+		return &OpenAIForwardResult{
+			RequestID:       requestID,
+			Usage:           usage,
+			Model:           originalModel,
+			BillingModel:    billingModel,
+			UpstreamModel:   upstreamModel,
+			ReasoningEffort: reasoningEffort,
+			ServiceTier:     serviceTier,
+			Stream:          true,
+			Duration:        time.Since(startTime),
+			FirstTokenMs:    firstTokenMs,
+		}
+	}
+	if !usageSeen {
+		logger.L().Warn("openai chat_completions raw: stream ended without usage chunk",
+			zap.String("request_id", requestID),
+			zap.String("model", originalModel),
+		)
+		return resultWithUsage(), fmt.Errorf("stream usage incomplete: missing usage chunk")
+	}
+
+	return resultWithUsage(), nil
 }
 
 // ensureOpenAIChatStreamUsage 确保 raw Chat Completions 流式请求会让上游返回 usage。

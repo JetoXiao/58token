@@ -88,6 +88,9 @@ func (m *mockAccountRepoForPlatform) ListCRSAccountIDs(ctx context.Context) (map
 func (m *mockAccountRepoForPlatform) Update(ctx context.Context, account *Account) error {
 	return nil
 }
+func (m *mockAccountRepoForPlatform) UpdateSortOrders(ctx context.Context, updates []AccountSortOrderUpdate) error {
+	return nil
+}
 func (m *mockAccountRepoForPlatform) Delete(ctx context.Context, id int64) error { return nil }
 func (m *mockAccountRepoForPlatform) List(ctx context.Context, params pagination.PaginationParams) ([]Account, *pagination.PaginationResult, error) {
 	return nil, nil, nil

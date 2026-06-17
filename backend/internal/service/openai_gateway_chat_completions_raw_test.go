@@ -277,6 +277,8 @@ func TestForwardAsRawChatCompletions_SilentRefusalToolCallsExempt(t *testing.T) 
 		"",
 		`data: {"id":"chatcmpl_tool","object":"chat.completion.chunk","model":"gpt-5.5","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}`,
 		"",
+		`data: {"id":"chatcmpl_tool","object":"chat.completion.chunk","model":"gpt-5.5","choices":[],"usage":{"prompt_tokens":11,"completion_tokens":3,"total_tokens":14}}`,
+		"",
 		"data: [DONE]",
 		"",
 	}, "\n")
@@ -337,7 +339,7 @@ func TestHandleChatStreamingResponse_SilentRefusalReasoningSummaryExempt(t *test
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }
 
-func TestForwardAsRawChatCompletions_SilentRefusalNormalContentExempt(t *testing.T) {
+func TestForwardAsRawChatCompletions_StreamWithoutUsageReturnsIncomplete(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	body := largeRawChatCompletionsBody()
@@ -368,8 +370,11 @@ func TestForwardAsRawChatCompletions_SilentRefusalNormalContentExempt(t *testing
 	}
 
 	result, err := svc.forwardAsRawChatCompletions(context.Background(), c, rawChatCompletionsTestAccount(), body, "")
-	require.NoError(t, err)
+	require.Error(t, err)
 	require.NotNil(t, result)
+	require.Contains(t, err.Error(), "missing usage chunk")
+	require.Zero(t, result.Usage.InputTokens)
+	require.Zero(t, result.Usage.OutputTokens)
 	require.Contains(t, rec.Body.String(), `"content":"ok"`)
 	require.Contains(t, rec.Body.String(), "data: [DONE]")
 }

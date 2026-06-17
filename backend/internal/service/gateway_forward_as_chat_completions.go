@@ -212,6 +212,19 @@ func extractCCReasoningEffortFromBody(body []byte) *string {
 	return &normalized
 }
 
+func parseAnthropicCompatSSEFrame(frame openAICompatSSEFrame) (apicompat.AnthropicStreamEvent, bool) {
+	payload := openAICompatPayloadWithEventType(frame.Data, frame.EventType)
+	if strings.TrimSpace(payload) == "" || strings.TrimSpace(payload) == "[DONE]" {
+		return apicompat.AnthropicStreamEvent{}, false
+	}
+
+	var event apicompat.AnthropicStreamEvent
+	if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		return apicompat.AnthropicStreamEvent{}, false
+	}
+	return event, true
+}
+
 // handleCCBufferedFromAnthropic reads Anthropic SSE events, assembles the full
 // response, then converts Anthropic → Responses → Chat Completions.
 func (s *GatewayService) handleCCBufferedFromAnthropic(
@@ -234,26 +247,11 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 	var finalResp *apicompat.AnthropicResponse
 	var usage ClaudeUsage
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "event: ") {
-			continue
+	processFrame := func(frame openAICompatSSEFrame) bool {
+		event, ok := parseAnthropicCompatSSEFrame(frame)
+		if !ok {
+			return false
 		}
-
-		if !scanner.Scan() {
-			break
-		}
-		dataLine := scanner.Text()
-		if !strings.HasPrefix(dataLine, "data: ") {
-			continue
-		}
-		payload := dataLine[6:]
-
-		var event apicompat.AnthropicStreamEvent
-		if err := json.Unmarshal([]byte(payload), &event); err != nil {
-			continue
-		}
-
 		// message_start carries the initial response structure and cache usage
 		if event.Type == "message_start" && event.Message != nil {
 			finalResp = event.Message
@@ -284,6 +282,25 @@ func (s *GatewayService) handleCCBufferedFromAnthropic(
 					finalResp.Content[idx].Input = appendRawJSON(finalResp.Content[idx].Input, event.Delta.PartialJSON)
 				}
 			}
+		}
+		return event.Type == "message_stop"
+	}
+
+	var parser openAICompatSSEFrameParser
+	sawTerminal := false
+	for scanner.Scan() {
+		frame, ok := parser.AddLine(scanner.Text())
+		if !ok {
+			continue
+		}
+		if processFrame(frame) {
+			sawTerminal = true
+			break
+		}
+	}
+	if !sawTerminal {
+		if frame, ok := parser.Finish(); ok {
+			processFrame(frame)
 		}
 	}
 
@@ -370,6 +387,7 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 	var usage ClaudeUsage
 	var firstTokenMs *int
 	firstChunk := true
+	clientDisconnected := false
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -380,29 +398,36 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 
 	resultWithUsage := func() *ForwardResult {
 		return &ForwardResult{
-			RequestID:       requestID,
-			Usage:           usage,
-			Model:           originalModel,
-			UpstreamModel:   mappedModel,
-			ReasoningEffort: reasoningEffort,
-			Stream:          true,
-			Duration:        time.Since(startTime),
-			FirstTokenMs:    firstTokenMs,
+			RequestID:        requestID,
+			Usage:            usage,
+			Model:            originalModel,
+			UpstreamModel:    mappedModel,
+			ReasoningEffort:  reasoningEffort,
+			Stream:           true,
+			Duration:         time.Since(startTime),
+			FirstTokenMs:     firstTokenMs,
+			ClientDisconnect: clientDisconnected,
 		}
 	}
 
-	writeChunk := func(chunk apicompat.ChatCompletionsChunk) bool {
+	writeChunk := func(chunk apicompat.ChatCompletionsChunk) {
+		if clientDisconnected {
+			return
+		}
 		sse, err := apicompat.ChatChunkToSSE(chunk)
 		if err != nil {
-			return false
+			return
 		}
 		// Reverse tool name mapping: fake → real, per-chunk bytes.Replace.
 		// c 可能持有请求侧注入的 ToolNameRewrite；无则仅做静态前缀还原。
 		out := string(reverseToolNamesIfPresent(c, []byte(sse)))
 		if _, err := fmt.Fprint(c.Writer, out); err != nil {
-			return true // client disconnected
+			clientDisconnected = true
+			logger.L().Debug("forward_as_cc stream: client disconnected, continuing to drain upstream usage",
+				zap.Error(err),
+				zap.String("request_id", requestID),
+			)
 		}
-		return false
 	}
 
 	processAnthropicEvent := func(event *apicompat.AnthropicStreamEvent) bool {
@@ -426,37 +451,36 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 		for _, resEvt := range responsesEvents {
 			ccChunks := apicompat.ResponsesEventToChatChunks(&resEvt, ccState)
 			for _, chunk := range ccChunks {
-				if disconnected := writeChunk(chunk); disconnected {
-					return true
-				}
+				writeChunk(chunk)
 			}
 		}
-		c.Writer.Flush()
-		return false
+		if !clientDisconnected {
+			c.Writer.Flush()
+		}
+		return event.Type == "message_stop"
 	}
 
+	var parser openAICompatSSEFrameParser
+	sawTerminal := false
 	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "event: ") {
+		frame, ok := parser.AddLine(scanner.Text())
+		if !ok {
 			continue
 		}
-
-		if !scanner.Scan() {
+		event, ok := parseAnthropicCompatSSEFrame(frame)
+		if !ok {
+			continue
+		}
+		if processAnthropicEvent(&event) {
+			sawTerminal = true
 			break
 		}
-		dataLine := scanner.Text()
-		if !strings.HasPrefix(dataLine, "data: ") {
-			continue
-		}
-		payload := dataLine[6:]
-
-		var event apicompat.AnthropicStreamEvent
-		if err := json.Unmarshal([]byte(payload), &event); err != nil {
-			continue
-		}
-
-		if processAnthropicEvent(&event) {
-			return resultWithUsage(), nil
+	}
+	if !sawTerminal {
+		if frame, ok := parser.Finish(); ok {
+			if event, ok := parseAnthropicCompatSSEFrame(frame); ok {
+				processAnthropicEvent(&event)
+			}
 		}
 	}
 
@@ -474,17 +498,19 @@ func (s *GatewayService) handleCCStreamingFromAnthropic(
 	for _, resEvt := range finalResEvents {
 		ccChunks := apicompat.ResponsesEventToChatChunks(&resEvt, ccState)
 		for _, chunk := range ccChunks {
-			writeChunk(chunk) //nolint:errcheck
+			writeChunk(chunk)
 		}
 	}
 	finalCCChunks := apicompat.FinalizeResponsesChatStream(ccState)
 	for _, chunk := range finalCCChunks {
-		writeChunk(chunk) //nolint:errcheck
+		writeChunk(chunk)
 	}
 
 	// Write [DONE] marker
-	fmt.Fprint(c.Writer, "data: [DONE]\n\n") //nolint:errcheck
-	c.Writer.Flush()
+	if !clientDisconnected {
+		fmt.Fprint(c.Writer, "data: [DONE]\n\n") //nolint:errcheck
+		c.Writer.Flush()
+	}
 
 	return resultWithUsage(), nil
 }

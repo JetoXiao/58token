@@ -1921,8 +1921,9 @@ func mapGeminiStatusToClaudeErrorType(status string) string {
 }
 
 type geminiStreamResult struct {
-	usage        *ClaudeUsage
-	firstTokenMs *int
+	usage              *ClaudeUsage
+	firstTokenMs       *int
+	clientDisconnected bool
 }
 
 func (s *GeminiMessagesCompatService) handleNonStreamingResponse(c *gin.Context, resp *http.Response, originalModel string) (*ClaudeUsage, error) {

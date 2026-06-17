@@ -66,6 +66,10 @@ func (s *accountRepoStub) Update(ctx context.Context, account *Account) error {
 	panic("unexpected Update call")
 }
 
+func (s *accountRepoStub) UpdateSortOrders(ctx context.Context, updates []AccountSortOrderUpdate) error {
+	panic("unexpected UpdateSortOrders call")
+}
+
 // Delete 记录被删除的账号 ID 并返回预设的错误。
 // 通过 deletedIDs 可以验证删除操作是否被正确调用。
 func (s *accountRepoStub) Delete(ctx context.Context, id int64) error {

@@ -170,6 +170,49 @@ func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *test
 	require.Contains(t, out, "data: [DONE]")
 }
 
+func TestGeminiForwardAsChatCompletions_ClientDisconnectDrainsUsage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstreamBody := `data: {"candidates":[{"content":{"parts":[{"text":"hel"}]}}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":1}}` + "\n\n" +
+		`data: {"candidates":[{"content":{"parts":[{"text":"hello"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":5,"cachedContentTokenCount":2}}` + "\n\n" +
+		"data: [DONE]\n\n"
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream: httpStub,
+		cfg:          &config.Config{},
+	}
+	account := &Account{
+		ID:       103,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "gemini-api-key",
+		},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Writer = &openAIChatFailingWriter{ResponseWriter: c.Writer, failAfter: 0}
+	body := []byte(`{"model":"gemini-2.5-flash","stream":true,"stream_options":{"include_usage":true},"messages":[{"role":"user","content":"hi"}]}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.ClientDisconnect)
+	require.Equal(t, 1, result.Usage.InputTokens)
+	require.Equal(t, 5, result.Usage.OutputTokens)
+	require.Equal(t, 2, result.Usage.CacheReadInputTokens)
+	require.NotContains(t, rec.Body.String(), "data: [DONE]")
+}
+
 // TestConvertClaudeToolsToGeminiTools_CustomType 测试custom类型工具转换
 func TestConvertClaudeToolsToGeminiTools_CustomType(t *testing.T) {
 	tests := []struct {

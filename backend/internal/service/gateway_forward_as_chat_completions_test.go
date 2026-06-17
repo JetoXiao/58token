@@ -69,6 +69,44 @@ func TestHandleCCBufferedFromAnthropic_PreservesMessageStartCacheUsageAndReasoni
 	require.Equal(t, "high", *result.ReasoningEffort)
 }
 
+func TestHandleCCBufferedFromAnthropic_ParsesEventNamedFramesWithoutSpace(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+
+	resp := &http.Response{
+		Header: http.Header{"x-request-id": []string{"rid_cc_buffered_event_named"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`event: message_start`,
+			`data:{"message":{"id":"msg_event","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4.5","stop_reason":"","usage":{"input_tokens":15,"cache_read_input_tokens":6}}}`,
+			``,
+			`event: content_block_start`,
+			`data:{"index":0,"content_block":{"type":"text","text":"he"}}`,
+			``,
+			`event: content_block_delta`,
+			`data:{"index":0,"delta":{"type":"text_delta","text":"llo"}}`,
+			``,
+			`event: message_delta`,
+			`data:{"delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":9}}`,
+			``,
+			`event: message_stop`,
+			`data:{}`,
+			``,
+		}, "\n"))),
+	}
+
+	svc := &GatewayService{}
+	result, err := svc.handleCCBufferedFromAnthropic(resp, c, "gpt-5", "claude-sonnet-4.5", nil, time.Now())
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 15, result.Usage.InputTokens)
+	require.Equal(t, 9, result.Usage.OutputTokens)
+	require.Equal(t, 6, result.Usage.CacheReadInputTokens)
+	require.Contains(t, rec.Body.String(), "hello")
+}
+
 func TestHandleCCStreamingFromAnthropic_PreservesMessageStartCacheUsageAndReasoning(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
@@ -106,4 +144,45 @@ func TestHandleCCStreamingFromAnthropic_PreservesMessageStartCacheUsageAndReason
 	require.NotNil(t, result.ReasoningEffort)
 	require.Equal(t, "medium", *result.ReasoningEffort)
 	require.Contains(t, rec.Body.String(), `[DONE]`)
+}
+
+func TestHandleCCStreamingFromAnthropic_ClientDisconnectDrainsUsage(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Writer = &openAIChatFailingWriter{ResponseWriter: c.Writer, failAfter: 0}
+
+	resp := &http.Response{
+		Header: http.Header{"x-request-id": []string{"rid_cc_stream_disconnect"}},
+		Body: io.NopCloser(strings.NewReader(strings.Join([]string{
+			`event: message_start`,
+			`data: {"type":"message_start","message":{"id":"msg_disconnect","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4.5","stop_reason":"","usage":{"input_tokens":22,"cache_creation_input_tokens":5,"cache_read_input_tokens":7}}}`,
+			``,
+			`event: content_block_start`,
+			`data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`,
+			``,
+			`event: content_block_delta`,
+			`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}`,
+			``,
+			`event: message_delta`,
+			`data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":11}}`,
+			``,
+			`event: message_stop`,
+			`data: {"type":"message_stop"}`,
+			``,
+		}, "\n"))),
+	}
+
+	svc := &GatewayService{}
+	result, err := svc.handleCCStreamingFromAnthropic(resp, c, "gpt-5", "claude-sonnet-4.5", nil, time.Now(), true)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.True(t, result.ClientDisconnect)
+	require.Equal(t, 22, result.Usage.InputTokens)
+	require.Equal(t, 11, result.Usage.OutputTokens)
+	require.Equal(t, 5, result.Usage.CacheCreationInputTokens)
+	require.Equal(t, 7, result.Usage.CacheReadInputTokens)
+	require.NotContains(t, rec.Body.String(), `[DONE]`)
 }
