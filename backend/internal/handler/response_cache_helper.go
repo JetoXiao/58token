@@ -95,11 +95,19 @@ func finishResponseCacheAfterForward(
 	rc *service.ResponseCache,
 	decision service.ResponseCacheDecision,
 	entry *service.ResponseCacheEntry,
+	captureReason string,
 	inflightOwner bool,
 ) {
-	rc.ObserveShadowAsync(decision, responseCacheFinalStatus(c, entry))
+	if !shouldCaptureResponseForCache(decision) {
+		return
+	}
 	stored := false
-	if entry != nil {
+	if reason := strings.TrimSpace(captureReason); reason != "" {
+		markResponseCacheBypass(c, reason)
+	} else if reason := rc.ResponseEntryBypassReason(entry); reason != "" {
+		markResponseCacheBypass(c, reason)
+	} else {
+		rc.ObserveShadowAsync(decision, entry.StatusCode)
 		stored = rc.StoreAsync(decision, entry)
 	}
 	if inflightOwner && !stored {
@@ -107,14 +115,8 @@ func finishResponseCacheAfterForward(
 	}
 }
 
-func responseCacheFinalStatus(c *gin.Context, entry *service.ResponseCacheEntry) int {
-	if entry != nil && entry.StatusCode > 0 {
-		return entry.StatusCode
-	}
-	if c != nil && c.Writer != nil {
-		return c.Writer.Status()
-	}
-	return 0
+func shouldCaptureResponseForCache(decision service.ResponseCacheDecision) bool {
+	return decision.ExactEnabled || decision.ShadowEnabled
 }
 
 func markResponseCacheBypass(c *gin.Context, reason string) {
@@ -157,9 +159,9 @@ func replayResponseCacheEntry(c *gin.Context, entry *service.ResponseCacheEntry)
 	return true
 }
 
-func captureResponseForCache(c *gin.Context, maxBytes int) (*responseCacheCaptureWriter, func() *service.ResponseCacheEntry) {
+func captureResponseForCache(c *gin.Context, maxBytes int) (*responseCacheCaptureWriter, func() (*service.ResponseCacheEntry, string)) {
 	if c == nil || c.Writer == nil || maxBytes <= 0 {
-		return nil, func() *service.ResponseCacheEntry { return nil }
+		return nil, func() (*service.ResponseCacheEntry, string) { return nil, "response_not_captured" }
 	}
 	original := c.Writer
 	cw := &responseCacheCaptureWriter{
@@ -167,14 +169,14 @@ func captureResponseForCache(c *gin.Context, maxBytes int) (*responseCacheCaptur
 		maxBytes:       maxBytes,
 	}
 	c.Writer = cw
-	return cw, func() *service.ResponseCacheEntry {
+	return cw, func() (*service.ResponseCacheEntry, string) {
 		c.Writer = original
 		if cw.overflow.Load() {
-			return nil
+			return nil, "response_too_large"
 		}
 		body := cw.body.Bytes()
 		if len(body) == 0 {
-			return nil
+			return nil, "response_empty"
 		}
 		status := cw.Status()
 		if status <= 0 {
@@ -185,7 +187,7 @@ func captureResponseForCache(c *gin.Context, maxBytes int) (*responseCacheCaptur
 			Header:     cloneHeader(cw.Header()),
 			Body:       append([]byte(nil), body...),
 			StoredAt:   time.Now(),
-		}
+		}, ""
 	}
 }
 

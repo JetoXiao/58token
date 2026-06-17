@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"net/http/httptest"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,4 +79,56 @@ func TestBuildSanitizedOpenAIImagesRequestParams_MultipartSummary(t *testing.T) 
 	require.NotContains(t, got, "uploads")
 	require.NotContains(t, got, "file_name")
 	require.NotContains(t, got, "image")
+}
+
+func TestBuildTTFTObservationParamsIncludesResponseCacheBypassReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Header(service.ResponseCacheHeader, service.ResponseCacheStatusBypass+"; reason=prompt_too_long")
+
+	got := buildTTFTObservationParams(c, nil, nil)
+
+	require.Equal(t, service.ResponseCacheStatusBypass, got["response_cache_status"])
+	require.Equal(t, "prompt_too_long", got["response_cache_bypass_reason"])
+}
+
+func TestShouldCaptureResponseForCacheIncludesShadowCandidates(t *testing.T) {
+	require.True(t, shouldCaptureResponseForCache(service.ResponseCacheDecision{ExactEnabled: true}))
+	require.True(t, shouldCaptureResponseForCache(service.ResponseCacheDecision{ShadowEnabled: true}))
+	require.False(t, shouldCaptureResponseForCache(service.ResponseCacheDecision{}))
+}
+
+func TestCaptureResponseForCacheKeepsStoreableBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	_, finalize := captureResponseForCache(c, 8)
+	c.Status(201)
+	_, err := c.Writer.Write([]byte("ok"))
+	require.NoError(t, err)
+
+	entry, reason := finalize()
+	require.NotNil(t, entry)
+	require.Empty(t, reason)
+	require.Equal(t, 201, entry.StatusCode)
+	require.Equal(t, []byte("ok"), entry.Body)
+	require.Equal(t, "ok", w.Body.String())
+}
+
+func TestCaptureResponseForCacheRejectsResponsesOverLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	_, finalize := captureResponseForCache(c, 4)
+	c.Status(200)
+	_, err := c.Writer.Write([]byte("too-large"))
+	require.NoError(t, err)
+
+	entry, reason := finalize()
+	require.Nil(t, entry)
+	require.Equal(t, "response_too_large", reason)
+	require.Equal(t, "too-large", w.Body.String())
 }

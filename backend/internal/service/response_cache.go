@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/redis/go-redis/v9"
 	"github.com/tidwall/gjson"
 )
@@ -216,75 +215,33 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	if looksLikeImageRequest(req.Endpoint, req.Body) {
 		return ResponseCacheDecision{Reason: "unsupported_request"}
 	}
-	toolRequest := looksLikeToolRequest(req.Body)
 	promptChars := approxPromptChars(req.Body)
-	if toolRequest {
-		if userInputChars := userInputPromptChars(req.Body); userInputChars > 0 {
-			promptChars = userInputChars
-		}
-	}
 	if c.cfg.MinPromptChars > 0 && promptChars < c.cfg.MinPromptChars {
 		return ResponseCacheDecision{Reason: "prompt_too_short"}
 	}
 	if c.cfg.MaxPromptChars > 0 && promptChars > c.cfg.MaxPromptChars {
 		return ResponseCacheDecision{Reason: "prompt_too_long"}
 	}
-	var key string
-	var ok bool
-	if toolRequest {
-		key, ok = c.toolShadowCacheKey(req)
-	} else {
-		key, ok = c.cacheKey(req)
-	}
+	key, ok := c.cacheKey(req)
 	if !ok {
 		return ResponseCacheDecision{Reason: "invalid_json"}
 	}
 	monitor := c.isMonitorRequest(req)
-	if toolRequest {
-		if !c.cfg.ShadowEnabled {
-			return ResponseCacheDecision{Reason: "tool_request_bypass"}
-		}
-		return ResponseCacheDecision{
-			Enabled:       true,
-			ShadowEnabled: true,
-			Monitor:       true,
-			Key:           key,
-			Reason:        "tool_shadow_only",
-			Endpoint:      strings.TrimSpace(req.Endpoint),
-			Protocol:      strings.TrimSpace(req.Protocol),
-			Model:         strings.TrimSpace(req.Model),
-			APIKeyID:      req.APIKeyID,
-			GroupID:       cloneResponseCacheInt64Ptr(req.GroupID),
-		}
-	}
-	if req.Stream {
-		// Stream exact replay is intentionally deferred in v1 to avoid adding
-		// capture overhead to the user's first-token path.
-		if !c.cfg.ShadowEnabled {
-			return ResponseCacheDecision{Reason: "stream_bypass"}
-		}
-		return ResponseCacheDecision{
-			Enabled:       true,
-			ShadowEnabled: true,
-			Monitor:       monitor,
-			Key:           key,
-			Reason:        "stream_shadow_only",
-			Endpoint:      strings.TrimSpace(req.Endpoint),
-			Protocol:      strings.TrimSpace(req.Protocol),
-			Model:         strings.TrimSpace(req.Model),
-			APIKeyID:      req.APIKeyID,
-			GroupID:       cloneResponseCacheInt64Ptr(req.GroupID),
-		}
-	}
 	deterministic := isDeterministicRequest(req.Body)
-	exactAllowed := c.cfg.Enabled && deterministic && !monitor && c.scopeAllowsExact(req)
+	scopeAllowed := c.scopeAllowsExact(req)
+	exactCandidate := deterministic && !monitor && scopeAllowed
+	exactAllowed := c.cfg.Enabled && exactCandidate
+	shadowAllowed := c.cfg.ShadowEnabled && exactCandidate
+	if !exactAllowed && !shadowAllowed {
+		return ResponseCacheDecision{Reason: cacheEligibilityBypassReason(deterministic, monitor, scopeAllowed)}
+	}
 	return ResponseCacheDecision{
-		Enabled:       exactAllowed || c.cfg.ShadowEnabled,
+		Enabled:       exactAllowed || shadowAllowed,
 		ExactEnabled:  exactAllowed,
-		ShadowEnabled: c.cfg.ShadowEnabled,
+		ShadowEnabled: shadowAllowed,
 		Monitor:       monitor,
 		Key:           key,
-		Reason:        nonDeterministicReason(deterministic, exactAllowed),
+		Reason:        cacheEligibilityReason(deterministic, monitor, exactAllowed),
 		Endpoint:      strings.TrimSpace(req.Endpoint),
 		Protocol:      strings.TrimSpace(req.Protocol),
 		Model:         strings.TrimSpace(req.Model),
@@ -318,17 +275,8 @@ func (c *ResponseCache) StoreAsync(decision ResponseCacheDecision, entry *Respon
 	if c == nil || !decision.ExactEnabled || decision.Key == "" || entry == nil || c.rdb == nil {
 		return false
 	}
-	if entry.StatusCode < 200 || entry.StatusCode >= 300 {
-		return false
-	}
-	if len(entry.Body) == 0 || (c.cfg.MaxValueBytes > 0 && len(entry.Body) > c.cfg.MaxValueBytes) {
-		return false
-	}
-	payload, err := encodeResponseCacheEntry(entry)
-	if err != nil || len(payload) == 0 {
-		return false
-	}
-	if c.cfg.MaxValueBytes > 0 && len(payload) > c.cfg.MaxValueBytes {
+	payload, reason := c.cacheableEntryPayload(entry)
+	if reason != "" {
 		return false
 	}
 	ttl := time.Duration(c.cfg.TTLSeconds) * time.Second
@@ -344,6 +292,37 @@ func (c *ResponseCache) StoreAsync(decision ResponseCacheDecision, entry *Respon
 		}
 	}()
 	return true
+}
+
+func (c *ResponseCache) ResponseEntryBypassReason(entry *ResponseCacheEntry) string {
+	_, reason := c.cacheableEntryPayload(entry)
+	return reason
+}
+
+func (c *ResponseCache) cacheableEntryPayload(entry *ResponseCacheEntry) ([]byte, string) {
+	if c == nil {
+		return nil, "response_cache_unavailable"
+	}
+	if entry == nil {
+		return nil, "response_not_captured"
+	}
+	if entry.StatusCode < 200 || entry.StatusCode >= 300 {
+		return nil, "response_status_not_cacheable"
+	}
+	if len(entry.Body) == 0 {
+		return nil, "response_empty"
+	}
+	if c.cfg.MaxValueBytes > 0 && len(entry.Body) > c.cfg.MaxValueBytes {
+		return nil, "response_too_large"
+	}
+	payload, err := encodeResponseCacheEntry(entry)
+	if err != nil || len(payload) == 0 {
+		return nil, "response_encode_failed"
+	}
+	if c.cfg.MaxValueBytes > 0 && len(payload) > c.cfg.MaxValueBytes {
+		return nil, "response_too_large"
+	}
+	return payload, ""
 }
 
 func (c *ResponseCache) ObserveShadowAsync(decision ResponseCacheDecision, statusCode int) {
@@ -966,16 +945,6 @@ func (c *ResponseCache) cacheKey(req ResponseCacheRequest) (string, bool) {
 	return c.cacheKeyFromSeed(req, normalized), true
 }
 
-func (c *ResponseCache) toolShadowCacheKey(req ResponseCacheRequest) (string, bool) {
-	if !gjson.ValidBytes(req.Body) {
-		return "", false
-	}
-	if seed := promptCacheObservationSeed(req); seed != "" {
-		return c.cacheKeyFromSeed(req, "tool-shadow:"+seed), true
-	}
-	return c.cacheKey(req)
-}
-
 func (c *ResponseCache) cacheKeyFromSeed(req ResponseCacheRequest, seedValue string) string {
 	scope := "global"
 	if req.GroupID != nil {
@@ -1262,11 +1231,27 @@ func isDeterministicRequest(body []byte) bool {
 	return true
 }
 
-func nonDeterministicReason(deterministic, exactAllowed bool) string {
-	if deterministic || exactAllowed {
+func cacheEligibilityReason(deterministic, monitor, exactAllowed bool) string {
+	if exactAllowed {
+		return ""
+	}
+	if deterministic {
 		return ""
 	}
 	return "non_deterministic"
+}
+
+func cacheEligibilityBypassReason(deterministic, monitor, scopeAllowed bool) string {
+	if !deterministic {
+		return "non_deterministic"
+	}
+	if monitor {
+		return "monitor_bypass"
+	}
+	if !scopeAllowed {
+		return "scope_bypass"
+	}
+	return "exact_cache_disabled"
 }
 
 func looksLikeImageRequest(endpoint string, body []byte) bool {
@@ -1281,135 +1266,6 @@ func looksLikeImageRequest(endpoint string, body []byte) bool {
 		strings.Contains(raw, `"file_id"`)
 }
 
-func looksLikeToolRequest(body []byte) bool {
-	if gjson.GetBytes(body, "tools").Exists() || gjson.GetBytes(body, "tool_choice").Exists() ||
-		gjson.GetBytes(body, "functions").Exists() || gjson.GetBytes(body, "function_call").Exists() {
-		return true
-	}
-	raw := strings.ToLower(string(body))
-	return strings.Contains(raw, `"tool_use"`) ||
-		strings.Contains(raw, `"tool_result"`) ||
-		strings.Contains(raw, `"function_call"`) ||
-		strings.Contains(raw, `"function_call_output"`)
-}
-
-func promptCacheObservationSeed(req ResponseCacheRequest) string {
-	if v := strings.TrimSpace(gjson.GetBytes(req.Body, "prompt_cache_key").String()); v != "" {
-		return "prompt_cache_key:" + v
-	}
-	anthropicDigestSeed := ""
-	if anchorSeed, digestSeed := anthropicPromptCacheObservationSeeds(req); anchorSeed != "" {
-		return anchorSeed
-	} else {
-		anthropicDigestSeed = digestSeed
-	}
-	if seed := userInputObservationSeed(req.Body); seed != "" {
-		return "user_input:" + seed
-	}
-	if anthropicDigestSeed != "" {
-		return anthropicDigestSeed
-	}
-	return ""
-}
-
-func anthropicPromptCacheObservationSeeds(req ResponseCacheRequest) (anchorSeed string, digestSeed string) {
-	if !isAnthropicMessagesCacheRequest(req) {
-		return "", ""
-	}
-	var parsed apicompat.AnthropicRequest
-	if err := json.Unmarshal(req.Body, &parsed); err != nil {
-		return "", ""
-	}
-	if key := promptCacheKeyFromAnthropicMetadataSession(&parsed); key != "" {
-		return "anthropic_metadata:" + key, ""
-	}
-	if key := deriveAnthropicCacheControlPromptCacheKey(&parsed); key != "" {
-		return "anthropic_cache_control:" + key, ""
-	}
-	if chain := buildOpenAICompatAnthropicDigestChain(&parsed); chain != "" {
-		return "", "anthropic_digest:" + promptCacheKeyFromAnthropicDigest(chain)
-	}
-	return "", ""
-}
-
-func isAnthropicMessagesCacheRequest(req ResponseCacheRequest) bool {
-	protocol := strings.ToLower(strings.TrimSpace(req.Protocol))
-	endpoint := strings.ToLower(strings.TrimSpace(req.Endpoint))
-	model := strings.ToLower(strings.TrimSpace(req.Model))
-	return strings.Contains(protocol, "anthropic") ||
-		strings.HasSuffix(endpoint, "/v1/messages") ||
-		strings.HasPrefix(model, "claude")
-}
-
-func userInputObservationSeed(body []byte) string {
-	parts := userInputObservationParts(body)
-	if len(parts) == 0 {
-		return ""
-	}
-	return hashSensitiveValueForLog(strings.Join(parts, "\n"))
-}
-
-func userInputPromptChars(body []byte) int {
-	parts := userInputObservationParts(body)
-	total := 0
-	for _, part := range parts {
-		total += len([]rune(part))
-	}
-	return total
-}
-
-func userInputObservationParts(body []byte) []string {
-	var parts []string
-	if input := userInputTextFromResult(gjson.GetBytes(body, "input")); input != "" {
-		parts = append(parts, "input:"+input)
-	}
-	if instructions := userInputTextFromResult(gjson.GetBytes(body, "instructions")); instructions != "" {
-		parts = append(parts, "instructions:"+instructions)
-	}
-	for _, msg := range gjson.GetBytes(body, "messages").Array() {
-		role := strings.TrimSpace(strings.ToLower(msg.Get("role").String()))
-		if role != "user" {
-			continue
-		}
-		if text := userInputTextFromResult(msg.Get("content")); text != "" {
-			parts = append(parts, "user:"+text)
-		}
-	}
-	return parts
-}
-
-func userInputTextFromResult(r gjson.Result) string {
-	if !r.Exists() {
-		return ""
-	}
-	switch {
-	case r.IsArray():
-		parts := make([]string, 0, len(r.Array()))
-		for _, item := range r.Array() {
-			if text := userInputTextFromResult(item); text != "" {
-				parts = append(parts, text)
-			}
-		}
-		return strings.TrimSpace(strings.Join(parts, "\n"))
-	case r.IsObject():
-		blockType := strings.TrimSpace(strings.ToLower(r.Get("type").String()))
-		if blockType == "tool_result" || blockType == "tool_use" || blockType == "function_call" || blockType == "function_call_output" {
-			return ""
-		}
-		parts := make([]string, 0, 4)
-		for _, key := range []string{"text", "input_text", "content", "message"} {
-			if text := userInputTextFromResult(r.Get(key)); text != "" {
-				parts = append(parts, text)
-			}
-		}
-		return strings.TrimSpace(strings.Join(parts, "\n"))
-	case r.Type == gjson.String:
-		return strings.TrimSpace(r.String())
-	default:
-		return ""
-	}
-}
-
 func approxPromptChars(body []byte) int {
 	var total int
 	paths := []string{
@@ -1417,6 +1273,10 @@ func approxPromptChars(body []byte) int {
 		"instructions",
 		"system",
 		"messages.#.content",
+		"tools",
+		"tool_choice",
+		"functions",
+		"function_call",
 	}
 	for _, path := range paths {
 		total += promptCharsFromResult(gjson.GetBytes(body, path))
@@ -1440,7 +1300,7 @@ func promptCharsFromResult(r gjson.Result) int {
 		return total
 	case r.IsObject():
 		total := 0
-		for _, key := range []string{"text", "input_text", "content", "message"} {
+		for _, key := range []string{"text", "input_text", "content", "message", "output", "arguments", "description", "input_schema", "parameters", "function", "name"} {
 			total += promptCharsFromResult(r.Get(key))
 		}
 		return total

@@ -453,8 +453,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
-			var cacheCaptureFinalize func() *service.ResponseCacheEntry
-			if cacheDecision.ExactEnabled && !reqStream {
+			var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
+			if shouldCaptureResponseForCache(cacheDecision) {
 				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 			}
 			if account.Platform == service.PlatformAntigravity {
@@ -466,8 +466,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				accountReleaseFunc()
 			}
 			var cacheEntry *service.ResponseCacheEntry
+			var cacheCaptureReason string
 			if cacheCaptureFinalize != nil {
-				cacheEntry = cacheCaptureFinalize()
+				cacheEntry, cacheCaptureReason = cacheCaptureFinalize()
 			}
 			if err != nil {
 				var failoverErr *service.UpstreamFailoverError
@@ -509,7 +510,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
-			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
 			cacheInflightFinished = true
 
 			// RPM 计数递增（Forward 成功后）
@@ -785,8 +786,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			// 记录 Forward 前已写入字节数，Forward 后若增加则说明 SSE 内容已发，禁止 failover
 			writerSizeBeforeForward := c.Writer.Size()
-			var cacheCaptureFinalize func() *service.ResponseCacheEntry
-			if cacheDecision.ExactEnabled && !reqStream && !fallbackUsed {
+			var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
+			if shouldCaptureResponseForCache(cacheDecision) && !fallbackUsed {
 				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 			}
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
@@ -806,8 +807,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				accountReleaseFunc()
 			}
 			var cacheEntry *service.ResponseCacheEntry
+			var cacheCaptureReason string
 			if cacheCaptureFinalize != nil {
-				cacheEntry = cacheCaptureFinalize()
+				cacheEntry, cacheCaptureReason = cacheCaptureFinalize()
 			}
 			if err != nil {
 				// Beta policy block: return 400 immediately, no failover
@@ -902,7 +904,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
 			}
-			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner && !fallbackUsed)
+			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner && !fallbackUsed)
 			if !fallbackUsed {
 				cacheInflightFinished = true
 			}

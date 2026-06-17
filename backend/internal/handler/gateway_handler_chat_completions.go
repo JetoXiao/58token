@@ -254,15 +254,15 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		var result *service.ForwardResult
-		var cacheCaptureFinalize func() *service.ResponseCacheEntry
-		if cacheDecision.ExactEnabled && !reqStream {
+		var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
+		if shouldCaptureResponseForCache(cacheDecision) {
 			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 		}
 		if account.Platform == service.PlatformGemini {
 			if h.geminiCompatService == nil {
 				h.chatCompletionsErrorResponse(c, http.StatusBadGateway, "upstream_error", "Gemini compatibility service is not configured")
 				if cacheCaptureFinalize != nil {
-					_ = cacheCaptureFinalize()
+					_, _ = cacheCaptureFinalize()
 				}
 				if accountReleaseFunc != nil {
 					accountReleaseFunc()
@@ -278,8 +278,9 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			accountReleaseFunc()
 		}
 		var cacheEntry *service.ResponseCacheEntry
+		var cacheCaptureReason string
 		if cacheCaptureFinalize != nil {
-			cacheEntry = cacheCaptureFinalize()
+			cacheEntry, cacheCaptureReason = cacheCaptureFinalize()
 		}
 
 		if err != nil {
@@ -307,7 +308,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			)
 			return
 		}
-		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
 		cacheInflightFinished = true
 
 		// 6. Record usage

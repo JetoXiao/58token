@@ -156,6 +156,18 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		return
 	}
 
+	cacheReq := responseCacheRequest(c, "/v1/responses", "gateway_responses", reqModel, reqStream, body, apiKey)
+	cacheDecision, cacheInflightOwner, cacheServed := tryResponseCacheBeforeForward(c, h.responseCache, cacheReq)
+	if cacheServed {
+		return
+	}
+	cacheInflightFinished := false
+	defer func() {
+		if cacheInflightOwner && !cacheInflightFinished {
+			h.responseCache.ReleaseInflightAsync(cacheDecision)
+		}
+	}()
+
 	// Parse request for session hash
 	parsedReq, _ := service.ParseGatewayRequest(body, "responses")
 	if parsedReq == nil {
@@ -227,10 +239,19 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
+		var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
+		if shouldCaptureResponseForCache(cacheDecision) {
+			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
+		}
 		result, err := h.gatewayService.ForwardAsResponses(c.Request.Context(), c, account, forwardBody, parsedReq)
 
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
+		}
+		var cacheEntry *service.ResponseCacheEntry
+		var cacheCaptureReason string
+		if cacheCaptureFinalize != nil {
+			cacheEntry, cacheCaptureReason = cacheCaptureFinalize()
 		}
 
 		if err != nil {
@@ -259,6 +280,8 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			)
 			return
 		}
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
+		cacheInflightFinished = true
 
 		// 6. Record usage
 		userAgent := c.GetHeader("User-Agent")

@@ -38,11 +38,9 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 			wantReason: "prompt_too_short",
 		},
 		{
-			name:        "implicit temperature can be counted in shadow but not exact cache",
-			body:        []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please summarize this fairly long paragraph"}]}`),
-			wantEnabled: true,
-			wantShadow:  true,
-			wantReason:  "non_deterministic",
+			name:       "implicit temperature is not a real-cache candidate",
+			body:       []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please summarize this fairly long paragraph"}]}`),
+			wantReason: "non_deterministic",
 		},
 		{
 			name:        "long text block prompt is eligible",
@@ -59,11 +57,11 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 			wantShadow:  true,
 		},
 		{
-			name:        "tools are observed shadow-only",
+			name:        "deterministic tools can use exact cache",
 			body:        []byte(`{"model":"gpt-5","temperature":0,"tools":[{"type":"function","function":{"name":"x"}}],"messages":[{"role":"user","content":"please call the tool with this long enough prompt"}]}`),
 			wantEnabled: true,
+			wantExact:   true,
 			wantShadow:  true,
-			wantReason:  "tool_shadow_only",
 		},
 		{
 			name:       "images are not cached or observed",
@@ -105,12 +103,12 @@ func TestResponseCacheDecideStreamShadowOnly(t *testing.T) {
 		Body:     []byte(`{"model":"claude-sonnet","temperature":0,"messages":[{"role":"user","content":"please answer this deterministic request"}]}`),
 		Headers:  http.Header{},
 	})
-	if !got.Enabled || got.ExactEnabled || !got.ShadowEnabled || got.Reason != "stream_shadow_only" {
-		t.Fatalf("Decide() = %+v, want shadow-only stream decision", got)
+	if !got.Enabled || !got.ExactEnabled || !got.ShadowEnabled || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want exact-capable stream decision", got)
 	}
 }
 
-func TestResponseCacheToolRequestsAreNeverExact(t *testing.T) {
+func TestResponseCacheToolRequestsUseRealCacheCandidatePath(t *testing.T) {
 	rc := newTestResponseCache()
 	got := rc.Decide(ResponseCacheRequest{
 		Endpoint: "/v1/messages",
@@ -120,15 +118,15 @@ func TestResponseCacheToolRequestsAreNeverExact(t *testing.T) {
 		Headers:  http.Header{},
 	})
 
-	if !got.Enabled || got.ExactEnabled || !got.ShadowEnabled || got.Reason != "tool_shadow_only" {
-		t.Fatalf("Decide() = %+v, want shadow-only tool observation", got)
+	if !got.Enabled || !got.ExactEnabled || !got.ShadowEnabled || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want exact-capable tool candidate", got)
 	}
-	if !got.Monitor {
-		t.Fatalf("tool shadow traffic should be kept out of exact-cache recommendation candidates")
+	if got.Monitor {
+		t.Fatalf("tool business traffic must not be marked as monitor")
 	}
 }
 
-func TestResponseCacheToolRequestsBypassWithoutShadow(t *testing.T) {
+func TestResponseCacheToolRequestsStillWorkWithoutShadowWhenExactEnabled(t *testing.T) {
 	rc := newTestResponseCache()
 	rc.cfg.ShadowEnabled = false
 	got := rc.Decide(ResponseCacheRequest{
@@ -139,12 +137,57 @@ func TestResponseCacheToolRequestsBypassWithoutShadow(t *testing.T) {
 		Headers:  http.Header{},
 	})
 
-	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Reason != "tool_request_bypass" {
-		t.Fatalf("Decide() = %+v, want tool_request_bypass without shadow", got)
+	if !got.Enabled || !got.ExactEnabled || got.ShadowEnabled || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want exact tool candidate without shadow", got)
 	}
 }
 
-func TestResponseCacheToolShadowUsesAnthropicMetadataAnchor(t *testing.T) {
+func TestResponseCacheShadowOnlyUsesRealCacheCandidateRules(t *testing.T) {
+	rc := newTestResponseCache()
+	rc.cfg.Enabled = false
+
+	deterministic := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body:     []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":"please answer this deterministic request"}]}`),
+		Headers:  http.Header{},
+	})
+	if !deterministic.Enabled || deterministic.ExactEnabled || !deterministic.ShadowEnabled || deterministic.Key == "" || deterministic.Reason != "" {
+		t.Fatalf("Decide() = %+v, want shadow observation for real-cache candidate", deterministic)
+	}
+
+	nonDeterministic := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body:     []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please answer this non deterministic request"}]}`),
+		Headers:  http.Header{},
+	})
+	if nonDeterministic.Enabled || nonDeterministic.ShadowEnabled || nonDeterministic.Key != "" || nonDeterministic.Reason != "non_deterministic" {
+		t.Fatalf("Decide() = %+v, want non-candidate bypass", nonDeterministic)
+	}
+}
+
+func TestResponseCacheMonitorTrafficBypassesCandidateObservation(t *testing.T) {
+	rc := newTestResponseCache()
+	rc.cfg.Enabled = false
+	rc.cfg.MonitorAPIKeyIDs = []int64{99}
+
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		APIKeyID: 99,
+		Body:     []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":"please answer this deterministic request"}]}`),
+		Headers:  http.Header{},
+	})
+	if got.Enabled || got.ShadowEnabled || got.Key != "" || got.Reason != "monitor_bypass" {
+		t.Fatalf("Decide() = %+v, want monitor traffic excluded from response-cache candidates", got)
+	}
+}
+
+func TestResponseCacheToolKeysIncludeFullContextDespiteAnthropicMetadataAnchor(t *testing.T) {
 	rc := newTestResponseCache()
 	base := ResponseCacheRequest{
 		Endpoint: "/v1/messages",
@@ -175,12 +218,12 @@ func TestResponseCacheToolShadowUsesAnthropicMetadataAnchor(t *testing.T) {
 
 	k1 := rc.Decide(base).Key
 	k2 := rc.Decide(extended).Key
-	if k1 == "" || k1 != k2 {
-		t.Fatalf("tool shadow keys should share metadata anchor, got %q vs %q", k1, k2)
+	if k1 == "" || k2 == "" || k1 == k2 {
+		t.Fatalf("tool real-cache keys must include full context, got %q vs %q", k1, k2)
 	}
 }
 
-func TestResponseCacheToolShadowUsesAnthropicCacheControlAnchor(t *testing.T) {
+func TestResponseCacheToolKeysIncludeFullContextDespiteAnthropicCacheControlAnchor(t *testing.T) {
 	rc := newTestResponseCache()
 	base := ResponseCacheRequest{
 		Endpoint: "/v1/messages",
@@ -210,12 +253,12 @@ func TestResponseCacheToolShadowUsesAnthropicCacheControlAnchor(t *testing.T) {
 
 	k1 := rc.Decide(base).Key
 	k2 := rc.Decide(extended).Key
-	if k1 == "" || k1 != k2 {
-		t.Fatalf("tool shadow keys should share cache_control anchor, got %q vs %q", k1, k2)
+	if k1 == "" || k2 == "" || k1 == k2 {
+		t.Fatalf("tool real-cache keys must include full context, got %q vs %q", k1, k2)
 	}
 }
 
-func TestResponseCacheToolShadowFallsBackToUserInput(t *testing.T) {
+func TestResponseCacheToolKeysIncludeToolHistory(t *testing.T) {
 	rc := newTestResponseCache()
 	base := ResponseCacheRequest{
 		Endpoint: "/v1/chat/completions",
@@ -241,17 +284,85 @@ func TestResponseCacheToolShadowFallsBackToUserInput(t *testing.T) {
 	k1 := rc.Decide(base).Key
 	k2 := rc.Decide(withToolHistory).Key
 	k3 := rc.Decide(changedUserInput).Key
-	if k1 == "" || k1 != k2 {
-		t.Fatalf("tool shadow keys should fall back to user input, got %q vs %q", k1, k2)
+	if k1 == "" || k2 == "" || k1 == k2 {
+		t.Fatalf("tool real-cache keys must include tool history, got %q vs %q", k1, k2)
 	}
 	if k1 == k3 {
-		t.Fatalf("different user input should produce a different tool shadow key, got %q", k1)
+		t.Fatalf("different user input should produce a different tool real-cache key, got %q", k1)
 	}
 }
 
-func TestResponseCacheClaudeToolShadowUsesUserInputWhenNoAnchor(t *testing.T) {
+func TestResponseCacheResponsesToolKeysIncludeFullInput(t *testing.T) {
 	rc := newTestResponseCache()
-	largeToolOutput := strings.Repeat("tool output ", 2000)
+	base := ResponseCacheRequest{
+		Endpoint: "/v1/responses",
+		Protocol: "openai_responses",
+		Model:    "gpt-5",
+		Body: []byte(`{
+			"model":"gpt-5",
+			"temperature":0,
+			"tools":[{"type":"function","name":"bash"}],
+			"input":[
+				{"role":"developer","content":[{"type":"input_text","text":"always be concise"}]},
+				{"role":"user","content":[{"type":"input_text","text":"please inspect the repository"}]},
+				{"type":"function_call","call_id":"call_1","name":"bash","arguments":"{\"command\":\"ls\"}"},
+				{"type":"function_call_output","call_id":"call_1","output":"very large cli output"}
+			]
+		}`),
+		Headers: http.Header{},
+	}
+	changedToolOutput := base
+	changedToolOutput.Body = []byte(`{
+		"model":"gpt-5",
+		"temperature":0,
+		"tools":[{"type":"function","name":"bash"}],
+		"input":[
+			{"role":"developer","content":[{"type":"input_text","text":"always be concise"}]},
+			{"role":"user","content":[{"type":"input_text","text":"please inspect the repository"}]},
+			{"type":"function_call","call_id":"call_1","name":"bash","arguments":"{\"command\":\"ls\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"different cli output"}
+		]
+	}`)
+	changedDeveloper := base
+	changedDeveloper.Body = []byte(`{
+		"model":"gpt-5",
+		"temperature":0,
+		"tools":[{"type":"function","name":"bash"}],
+		"input":[
+			{"role":"developer","content":[{"type":"input_text","text":"always be verbose"}]},
+			{"role":"user","content":[{"type":"input_text","text":"please inspect the repository"}]},
+			{"type":"function_call","call_id":"call_1","name":"bash","arguments":"{\"command\":\"ls\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"very large cli output"}
+		]
+	}`)
+	changedUser := base
+	changedUser.Body = []byte(`{
+		"model":"gpt-5",
+		"temperature":0,
+		"tools":[{"type":"function","name":"bash"}],
+		"input":[
+			{"role":"developer","content":[{"type":"input_text","text":"always be concise"}]},
+			{"role":"user","content":[{"type":"input_text","text":"please inspect the database"}]},
+			{"type":"function_call","call_id":"call_1","name":"bash","arguments":"{\"command\":\"ls\"}"},
+			{"type":"function_call_output","call_id":"call_1","output":"very large cli output"}
+		]
+	}`)
+
+	k1 := rc.Decide(base).Key
+	k2 := rc.Decide(changedToolOutput).Key
+	k3 := rc.Decide(changedDeveloper).Key
+	k4 := rc.Decide(changedUser).Key
+	if k1 == "" || k2 == "" || k3 == "" || k1 == k2 || k1 == k3 {
+		t.Fatalf("GPT tool real-cache key should include tool output and developer input, got base=%q tool=%q developer=%q", k1, k2, k3)
+	}
+	if k1 == k4 {
+		t.Fatalf("different GPT user input should produce a different tool real-cache key, got %q", k1)
+	}
+}
+
+func TestResponseCacheClaudeToolKeysIncludeToolOutputWhenNoAnchor(t *testing.T) {
+	rc := newTestResponseCache()
+	toolOutput := strings.Repeat("tool output ", 200)
 	base := ResponseCacheRequest{
 		Endpoint: "/v1/messages",
 		Protocol: "openai_anthropic_messages",
@@ -267,17 +378,64 @@ func TestResponseCacheClaudeToolShadowUsesUserInputWhenNoAnchor(t *testing.T) {
 		"messages":[
 			{"role":"user","content":"please inspect the repository with the cli tool"},
 			{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
-			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":` + strconv.Quote(largeToolOutput) + `}]}
+			{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":` + strconv.Quote(toolOutput) + `}]}
 		]
 	}`)
 
 	d1 := rc.Decide(base)
 	d2 := rc.Decide(withToolHistory)
-	if d1.Reason != "tool_shadow_only" || d2.Reason != "tool_shadow_only" {
-		t.Fatalf("Decide() reasons = %q/%q, want tool shadow collection", d1.Reason, d2.Reason)
+	if !d1.Enabled || !d2.Enabled || !d1.ExactEnabled || !d2.ExactEnabled {
+		t.Fatalf("Decide() = %+v/%+v, want real-cache tool candidates", d1, d2)
 	}
-	if d1.Key == "" || d1.Key != d2.Key {
-		t.Fatalf("Claude tool shadow keys should ignore tool output without losing collection, got %q vs %q", d1.Key, d2.Key)
+	if d1.Key == "" || d2.Key == "" || d1.Key == d2.Key {
+		t.Fatalf("Claude tool real-cache keys must include tool output, got %q vs %q", d1.Key, d2.Key)
+	}
+}
+
+func TestResponseCacheClaudeToolCandidateUsesFullPromptLengthForSafety(t *testing.T) {
+	rc := newTestResponseCache()
+	largeToolOutput := strings.Repeat("tool output ", 6000)
+	req := ResponseCacheRequest{
+		Endpoint: "/v1/messages",
+		Protocol: "openai_anthropic_messages",
+		Model:    "claude-sonnet-4-5",
+		Body: []byte(`{
+			"model":"claude-sonnet-4-5",
+			"temperature":0,
+			"tools":[{"name":"bash","input_schema":{"type":"object"}}],
+			"messages":[
+				{"role":"user","content":"inspect"},
+				{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"bash","input":{"command":"ls"}}]},
+				{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":` + strconv.Quote(largeToolOutput) + `}]}
+			]
+		}`),
+		Headers: http.Header{},
+	}
+
+	got := rc.Decide(req)
+	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Key != "" || got.Reason != "prompt_too_long" {
+		t.Fatalf("Decide() = %+v, want large Claude tool context excluded from real-cache candidates", got)
+	}
+}
+
+func TestResponseCacheToolSchemaCountsTowardPromptLength(t *testing.T) {
+	rc := newTestResponseCache()
+	largeSchema := strings.Repeat("schema field ", 2000)
+
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body: []byte(`{
+			"model":"gpt-5",
+			"temperature":0,
+			"tools":[{"type":"function","function":{"name":"big_tool","description":` + strconv.Quote(largeSchema) + `}}],
+			"messages":[{"role":"user","content":"please call the deterministic tool"}]
+		}`),
+		Headers: http.Header{},
+	})
+	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Key != "" || got.Reason != "prompt_too_long" {
+		t.Fatalf("Decide() = %+v, want large tool schema excluded from real-cache candidates", got)
 	}
 }
 
@@ -432,6 +590,46 @@ func TestResponseCacheShadowOnlyCountsSuccessfulResponses(t *testing.T) {
 		if got := responseCacheStatusAllowsShadow(tt.status); got != tt.want {
 			t.Fatalf("responseCacheStatusAllowsShadow(%d) = %v, want %v", tt.status, got, tt.want)
 		}
+	}
+}
+
+func TestResponseCacheEntryBypassReasonMatchesStoreability(t *testing.T) {
+	rc := newTestResponseCache()
+	rc.cfg.MaxValueBytes = 256
+
+	tests := []struct {
+		name string
+		item *ResponseCacheEntry
+		want string
+	}{
+		{
+			name: "storeable response",
+			item: &ResponseCacheEntry{StatusCode: 200, Body: []byte("ok")},
+		},
+		{
+			name: "empty response",
+			item: &ResponseCacheEntry{StatusCode: 200},
+			want: "response_empty",
+		},
+		{
+			name: "non success response",
+			item: &ResponseCacheEntry{StatusCode: 429, Body: []byte("rate limited")},
+			want: "response_status_not_cacheable",
+		},
+		{
+			name: "oversized response body",
+			item: &ResponseCacheEntry{StatusCode: 200, Body: []byte(strings.Repeat("x", 257))},
+			want: "response_too_large",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := rc.ResponseEntryBypassReason(tt.item)
+			if got != tt.want {
+				t.Fatalf("ResponseEntryBypassReason() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 

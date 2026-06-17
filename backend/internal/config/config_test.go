@@ -244,6 +244,15 @@ func TestLoadResponseCacheListsFromEnv(t *testing.T) {
 	require.Equal(t, 0.75, cfg.ResponseCache.RecommendationTop5MaxHitShare)
 }
 
+func TestLoadResponseCacheDefaultBodyLimit(t *testing.T) {
+	resetViperWithJWTSecret(t)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+
+	require.Equal(t, 512*1024, cfg.ResponseCache.MaxBodyBytes)
+}
+
 func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	resetViperWithJWTSecret(t)
 	t.Setenv("GATEWAY_SCHEDULING_STICKY_SESSION_MAX_WAITING", "5")

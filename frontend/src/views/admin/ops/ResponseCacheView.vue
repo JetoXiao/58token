@@ -258,9 +258,9 @@
               <option value="last_seen_at">按最近出现</option>
             </select>
             <select v-model="keyStatsFilters.monitor" class="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200" @change="fetchKeyStats">
-              <option value="no">排除监控 Key</option>
-              <option value="all">全部</option>
-              <option value="yes">仅监控 Key</option>
+              <option value="no">真实缓存候选</option>
+              <option value="all">全部观察</option>
+              <option value="yes">仅监控/探活</option>
             </select>
           </div>
         </div>
@@ -275,7 +275,7 @@
                 <th class="whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">模型</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">API Key</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">分组</th>
-                <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">候选</th>
+                <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">真实候选</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">命中</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">命中率</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">贡献</th>
@@ -315,7 +315,7 @@
         <div class="flex flex-col gap-2 border-b border-gray-200 p-5 dark:border-dark-700 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">小时明细</h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">按小时查看 shadow 候选、命中和监控 Key 数据。</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-dark-400">按小时查看可真实缓存候选、命中和监控 Key 数据。</p>
           </div>
           <span class="text-sm text-gray-500 dark:text-dark-400">
             {{ visibleHours.length }} 条
@@ -327,7 +327,7 @@
             <thead class="bg-gray-50 dark:bg-dark-900">
               <tr>
                 <th class="whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">时间</th>
-                <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">候选</th>
+                <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">真实候选</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">命中</th>
                 <th class="whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">命中率</th>
                 <th class="whitespace-nowrap px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-dark-400">监控候选</th>

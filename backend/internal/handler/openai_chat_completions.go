@@ -192,8 +192,8 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
 		writerSizeBeforeForward := c.Writer.Size()
-		var cacheCaptureFinalize func() *service.ResponseCacheEntry
-		if cacheDecision.ExactEnabled && !reqStream {
+		var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
+		if shouldCaptureResponseForCache(cacheDecision) {
 			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 		}
 		result, err := func() (*service.OpenAIForwardResult, error) {
@@ -205,8 +205,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			return h.gatewayService.ForwardAsChatCompletions(c.Request.Context(), c, account, forwardBody, promptCacheKey, "")
 		}()
 		var cacheEntry *service.ResponseCacheEntry
+		var cacheCaptureReason string
 		if cacheCaptureFinalize != nil {
-			cacheEntry = cacheCaptureFinalize()
+			cacheEntry, cacheCaptureReason = cacheCaptureFinalize()
 		}
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
@@ -288,7 +289,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}
-		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheInflightOwner)
+		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
 		cacheInflightFinished = true
 
 		userAgent := c.GetHeader("User-Agent")

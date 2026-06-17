@@ -205,6 +205,9 @@ func buildTTFTObservationParams(c *gin.Context, account *service.Account, result
 			out["route_source"] = opsRequestParamTTFTSourceCache
 		}
 	}
+	if reason := responseCacheBypassReasonFromContext(c); reason != "" {
+		out["response_cache_bypass_reason"] = reason
+	}
 
 	if firstTokenMs, ok := ttftFirstTokenMsFromResult(result); ok {
 		out["first_token_ms"] = firstTokenMs
@@ -251,6 +254,28 @@ func responseCacheStatusFromContext(c *gin.Context) string {
 	default:
 		return status
 	}
+}
+
+func responseCacheBypassReasonFromContext(c *gin.Context) string {
+	if c == nil || c.Writer == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(c.Writer.Header().Get(service.ResponseCacheHeader))
+	if raw == "" {
+		return ""
+	}
+	parts := strings.Split(raw, ";")
+	if len(parts) < 2 || strings.TrimSpace(parts[0]) != service.ResponseCacheStatusBypass {
+		return ""
+	}
+	for _, part := range parts[1:] {
+		key, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok || strings.TrimSpace(key) != "reason" {
+			continue
+		}
+		return strings.TrimSpace(value)
+	}
+	return ""
 }
 
 func ttftFirstTokenMsFromResult(result interface{}) (int64, bool) {
