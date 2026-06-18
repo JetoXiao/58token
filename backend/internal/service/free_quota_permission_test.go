@@ -285,7 +285,9 @@ func (r *freeQuotaPermissionGroupRepo) UpdateSortOrders(context.Context, []Group
 	panic("unexpected")
 }
 
-type freeQuotaPermissionUserSubRepo struct{}
+type freeQuotaPermissionUserSubRepo struct {
+	activeSubscriptions []UserSubscription
+}
 
 func (r *freeQuotaPermissionUserSubRepo) Create(context.Context, *UserSubscription) error {
 	panic("unexpected")
@@ -296,7 +298,13 @@ func (r *freeQuotaPermissionUserSubRepo) GetByID(context.Context, int64) (*UserS
 func (r *freeQuotaPermissionUserSubRepo) GetByUserIDAndGroupID(context.Context, int64, int64) (*UserSubscription, error) {
 	panic("unexpected")
 }
-func (r *freeQuotaPermissionUserSubRepo) GetActiveByUserIDAndGroupID(context.Context, int64, int64) (*UserSubscription, error) {
+func (r *freeQuotaPermissionUserSubRepo) GetActiveByUserIDAndGroupID(_ context.Context, userID, groupID int64) (*UserSubscription, error) {
+	for i := range r.activeSubscriptions {
+		sub := r.activeSubscriptions[i]
+		if sub.UserID == userID && sub.GroupID == groupID {
+			return &sub, nil
+		}
+	}
 	return nil, ErrSubscriptionNotFound
 }
 func (r *freeQuotaPermissionUserSubRepo) Update(context.Context, *UserSubscription) error {
@@ -306,8 +314,14 @@ func (r *freeQuotaPermissionUserSubRepo) Delete(context.Context, int64) error { 
 func (r *freeQuotaPermissionUserSubRepo) ListByUserID(context.Context, int64) ([]UserSubscription, error) {
 	panic("unexpected")
 }
-func (r *freeQuotaPermissionUserSubRepo) ListActiveByUserID(context.Context, int64) ([]UserSubscription, error) {
-	return nil, nil
+func (r *freeQuotaPermissionUserSubRepo) ListActiveByUserID(_ context.Context, userID int64) ([]UserSubscription, error) {
+	out := make([]UserSubscription, 0, len(r.activeSubscriptions))
+	for _, sub := range r.activeSubscriptions {
+		if sub.UserID == userID {
+			out = append(out, sub)
+		}
+	}
+	return out, nil
 }
 func (r *freeQuotaPermissionUserSubRepo) ListByGroupID(context.Context, int64, pagination.PaginationParams) ([]UserSubscription, *pagination.PaginationResult, error) {
 	panic("unexpected")
@@ -517,6 +531,42 @@ func TestAPIKeyServiceCreateRejectsUnassignedExclusiveGroup(t *testing.T) {
 
 	require.ErrorIs(t, err, ErrGroupNotAllowed)
 	require.Nil(t, apiKeyRepo.created, "backend must not persist an API key bound to an unassigned exclusive group")
+}
+
+func TestAPIKeyServiceCreateAllowsSubscribedExclusiveSubscriptionGroup(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10)
+	user := &User{ID: 1, Status: StatusActive, Balance: 0}
+
+	apiKeyRepo := &freeQuotaPermissionAPIKeyRepo{}
+	svc := NewAPIKeyService(
+		apiKeyRepo,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{group: &Group{
+			ID:               groupID,
+			Status:           StatusActive,
+			IsExclusive:      true,
+			SubscriptionType: SubscriptionTypeSubscription,
+		}},
+		&freeQuotaPermissionUserSubRepo{activeSubscriptions: []UserSubscription{{
+			UserID:  user.ID,
+			GroupID: groupID,
+		}}},
+		nil,
+		nil,
+		nil,
+	)
+
+	customKey := "subscribed-exclusive-key"
+	_, err := svc.Create(ctx, user.ID, CreateAPIKeyRequest{
+		Name:      "subscribed-exclusive",
+		GroupID:   &groupID,
+		CustomKey: &customKey,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, apiKeyRepo.created)
+	require.Equal(t, groupID, *apiKeyRepo.created.GroupID)
 }
 
 func TestAPIKeyServiceUpdateRejectsNonFreeQuotaGroupForZeroBalanceUser(t *testing.T) {
@@ -730,6 +780,40 @@ func TestAPIKeyServiceGetAvailableGroupsIncludesOnlyAssignedExclusiveGroups(t *t
 	require.False(t, groups[0].IsExclusive)
 	require.Equal(t, assignedExclusiveGroupID, groups[1].ID)
 	require.True(t, groups[1].IsExclusive)
+}
+
+func TestAPIKeyServiceGetAvailableGroupsIncludesSubscribedExclusiveSubscriptionGroup(t *testing.T) {
+	ctx := context.Background()
+	publicGroupID := int64(10)
+	subscribedSubscriptionGroupID := int64(20)
+	unsubscribedSubscriptionGroupID := int64(30)
+	user := &User{ID: 1, Status: StatusActive, Balance: 0}
+
+	svc := NewAPIKeyService(
+		nil,
+		&freeQuotaPermissionUserRepo{user: user},
+		&freeQuotaPermissionGroupRepo{groups: []Group{
+			{ID: publicGroupID, Name: "public", Status: StatusActive, SubscriptionType: SubscriptionTypeStandard},
+			{ID: subscribedSubscriptionGroupID, Name: "subscribed", Status: StatusActive, IsExclusive: true, SubscriptionType: SubscriptionTypeSubscription},
+			{ID: unsubscribedSubscriptionGroupID, Name: "unsubscribed", Status: StatusActive, IsExclusive: true, SubscriptionType: SubscriptionTypeSubscription},
+		}},
+		&freeQuotaPermissionUserSubRepo{activeSubscriptions: []UserSubscription{{
+			UserID:  user.ID,
+			GroupID: subscribedSubscriptionGroupID,
+		}}},
+		nil,
+		nil,
+		nil,
+	)
+
+	groups, err := svc.GetAvailableGroups(ctx, user.ID)
+
+	require.NoError(t, err)
+	require.Len(t, groups, 2)
+	require.Equal(t, publicGroupID, groups[0].ID)
+	require.Equal(t, subscribedSubscriptionGroupID, groups[1].ID)
+	require.True(t, groups[1].IsExclusive)
+	require.Equal(t, SubscriptionTypeSubscription, groups[1].SubscriptionType)
 }
 
 func TestAPIKeyServiceGetAvailableGroupsShowsLockedGroupsWhenSettingEnabled(t *testing.T) {

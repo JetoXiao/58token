@@ -324,13 +324,16 @@ func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group 
 	if user == nil || group == nil {
 		return false
 	}
-	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
-		return false
-	}
 	// 订阅类型分组：需要有效订阅
 	if group.IsSubscriptionType() {
+		if s.userSubRepo == nil {
+			return false
+		}
 		_, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, user.ID, group.ID)
 		return err == nil // 有有效订阅则允许
+	}
+	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
+		return false
 	}
 	// 标准类型分组：使用原有逻辑
 	if s.freeQuotaService != nil {
@@ -356,11 +359,11 @@ func (s *APIKeyService) CanUserUseGroup(ctx context.Context, user *User, group *
 	if user == nil || group == nil {
 		return true
 	}
-	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
-		return false
-	}
 	if group.IsSubscriptionType() {
 		return true
+	}
+	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
+		return false
 	}
 	if s.freeQuotaService != nil {
 		return s.freeQuotaService.CanUnpaidUserBindGroup(ctx, user, group.ID, group.IsExclusive)
@@ -815,7 +818,8 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 		showLockedGroups = err == nil && settings.ShowLockedGroups
 	}
 	for _, group := range allGroups {
-		if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
+		hasActiveSubscription := subscribedGroupIDs[group.ID]
+		if group.IsExclusive && !user.CanBindGroup(group.ID, true) && !(group.IsSubscriptionType() && hasActiveSubscription) {
 			continue
 		}
 		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
@@ -838,12 +842,12 @@ func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subsc
 	if user == nil || group == nil {
 		return false
 	}
-	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
-		return false
-	}
 	// 订阅类型分组：需要有效订阅
 	if group.IsSubscriptionType() {
 		return subscribedGroupIDs[group.ID]
+	}
+	if group.IsExclusive && !user.CanBindGroup(group.ID, true) {
+		return false
 	}
 	// 标准类型分组：使用原有逻辑
 	if s.freeQuotaService != nil {
