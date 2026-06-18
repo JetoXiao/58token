@@ -390,6 +390,21 @@ const UsersIcon = {
     )
 }
 
+const SupportContactIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z'
+        })
+      ]
+    )
+}
+
 const FolderIcon = {
   render: () =>
     h(
@@ -725,6 +740,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'orders', permissionKey: 'orders' },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, menuKey: 'redeem', permissionKey: 'redeem' },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate, menuKey: 'affiliate', permissionKey: 'affiliate' },
+    { path: '/support-contact', label: t('nav.supportContact'), icon: SupportContactIcon, menuKey: 'support_contact', permissionKey: 'support_contact' },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon, menuKey: 'profile', permissionKey: 'profile' },
     ...customMenuItemsForUser.value.map((item): NavItem => ({
       path: `/custom/${item.id}`,

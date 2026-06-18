@@ -334,6 +334,12 @@ export const useAppStore = defineStore('app', () => {
         site_subtitle: '',
         api_base_url: apiBaseUrl.value,
         contact_info: contactInfo.value,
+        support_contact_config: {
+          enabled: true,
+          title: '售后联系',
+          description: '如需售后支持，请添加下方客服微信联系。',
+          contacts: [],
+        },
         doc_url: docUrl.value,
         home_content: '',
         hide_ccs_import_button: false,

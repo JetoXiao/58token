@@ -25,6 +25,20 @@ type CustomEndpoint struct {
 	Description string `json:"description"`
 }
 
+// SupportContactConfig represents the user-facing after-sales support page config.
+type SupportContactConfig struct {
+	Enabled     bool                 `json:"enabled"`
+	Title       string               `json:"title"`
+	Description string               `json:"description"`
+	Contacts    []SupportContactItem `json:"contacts"`
+}
+
+type SupportContactItem struct {
+	Name      string `json:"name"`
+	WorkHours string `json:"work_hours"`
+	QRImage   string `json:"qr_image"`
+}
+
 // SystemSettings represents the admin settings API response payload.
 type SystemSettings struct {
 	RegistrationEnabled              bool                     `json:"registration_enabled"`
@@ -127,22 +141,23 @@ type SystemSettings struct {
 	GoogleOAuthRedirectURL            string `json:"google_oauth_redirect_url"`
 	GoogleOAuthFrontendRedirectURL    string `json:"google_oauth_frontend_redirect_url"`
 
-	SiteName                    string           `json:"site_name"`
-	SiteLogo                    string           `json:"site_logo"`
-	SiteSubtitle                string           `json:"site_subtitle"`
-	APIBaseURL                  string           `json:"api_base_url"`
-	ContactInfo                 string           `json:"contact_info"`
-	DocURL                      string           `json:"doc_url"`
-	HomeContent                 string           `json:"home_content"`
-	HideCcsImportButton         bool             `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled bool             `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     string           `json:"purchase_subscription_url"`
-	TableDefaultPageSize        int              `json:"table_default_page_size"`
-	TablePageSizeOptions        []int            `json:"table_page_size_options"`
-	CustomMenuItems             []CustomMenuItem `json:"custom_menu_items"`
-	MarketingNavItems           []string         `json:"marketing_nav_items"`
-	UserMenuItems               []string         `json:"user_menu_items"`
-	CustomEndpoints             []CustomEndpoint `json:"custom_endpoints"`
+	SiteName                    string               `json:"site_name"`
+	SiteLogo                    string               `json:"site_logo"`
+	SiteSubtitle                string               `json:"site_subtitle"`
+	APIBaseURL                  string               `json:"api_base_url"`
+	ContactInfo                 string               `json:"contact_info"`
+	SupportContactConfig        SupportContactConfig `json:"support_contact_config"`
+	DocURL                      string               `json:"doc_url"`
+	HomeContent                 string               `json:"home_content"`
+	HideCcsImportButton         bool                 `json:"hide_ccs_import_button"`
+	PurchaseSubscriptionEnabled bool                 `json:"purchase_subscription_enabled"`
+	PurchaseSubscriptionURL     string               `json:"purchase_subscription_url"`
+	TableDefaultPageSize        int                  `json:"table_default_page_size"`
+	TablePageSizeOptions        []int                `json:"table_page_size_options"`
+	CustomMenuItems             []CustomMenuItem     `json:"custom_menu_items"`
+	MarketingNavItems           []string             `json:"marketing_nav_items"`
+	UserMenuItems               []string             `json:"user_menu_items"`
+	CustomEndpoints             []CustomEndpoint     `json:"custom_endpoints"`
 
 	DefaultConcurrency           int                            `json:"default_concurrency"`
 	DefaultBalance               float64                        `json:"default_balance"`
@@ -284,6 +299,7 @@ type PublicSettings struct {
 	SiteSubtitle                     string                   `json:"site_subtitle"`
 	APIBaseURL                       string                   `json:"api_base_url"`
 	ContactInfo                      string                   `json:"contact_info"`
+	SupportContactConfig             SupportContactConfig     `json:"support_contact_config"`
 	DocURL                           string                   `json:"doc_url"`
 	HomeContent                      string                   `json:"home_content"`
 	HideCcsImportButton              bool                     `json:"hide_ccs_import_button"`
@@ -488,4 +504,31 @@ func ParseCustomEndpoints(raw string) []CustomEndpoint {
 		return []CustomEndpoint{}
 	}
 	return items
+}
+
+// ParseSupportContactConfig parses and normalizes the support contact setting.
+func ParseSupportContactConfig(raw string) SupportContactConfig {
+	normalized := service.NormalizeSupportContactConfigJSON(raw)
+	var cfg SupportContactConfig
+	if err := json.Unmarshal([]byte(normalized), &cfg); err != nil {
+		return SupportContactConfig{
+			Enabled:     true,
+			Title:       "售后联系",
+			Description: "如需售后支持，请添加下方客服微信联系。",
+			Contacts:    []SupportContactItem{},
+		}
+	}
+	if cfg.Contacts == nil {
+		cfg.Contacts = []SupportContactItem{}
+	}
+	return cfg
+}
+
+// SupportContactConfigJSON serializes and normalizes admin-provided support contacts.
+func SupportContactConfigJSON(cfg SupportContactConfig) string {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return service.NormalizeSupportContactConfigJSON("")
+	}
+	return service.NormalizeSupportContactConfigJSON(string(data))
 }

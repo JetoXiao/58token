@@ -640,12 +640,13 @@ func TestAPIContracts(t *testing.T) {
 					service.SettingKeyOIDCConnectUserInfoIDPath:       "",
 					service.SettingKeyOIDCConnectUserInfoUsernamePath: "",
 
-					service.SettingKeySiteName:     "UseAiForMe",
-					service.SettingKeySiteLogo:     "",
-					service.SettingKeySiteSubtitle: "Subtitle",
-					service.SettingKeyAPIBaseURL:   "https://api.example.com",
-					service.SettingKeyContactInfo:  "support",
-					service.SettingKeyDocURL:       "https://docs.example.com",
+					service.SettingKeySiteName:             "UseAiForMe",
+					service.SettingKeySiteLogo:             "",
+					service.SettingKeySiteSubtitle:         "Subtitle",
+					service.SettingKeyAPIBaseURL:           "https://api.example.com",
+					service.SettingKeyContactInfo:          "support",
+					service.SettingKeySupportContactConfig: `{"enabled":true,"title":"售后联系","description":"如需售后支持，请添加下方客服微信联系。","contacts":[]}`,
+					service.SettingKeyDocURL:               "https://docs.example.com",
 
 					service.SettingKeyDefaultConcurrency:   "5",
 					service.SettingKeyDefaultBalance:       "1.25",
@@ -756,9 +757,15 @@ func TestAPIContracts(t *testing.T) {
 						"site_name": "UseAiForMe",
 						"site_logo": "",
 						"site_subtitle": "Subtitle",
-						"api_base_url": "https://api.example.com",
-						"api_key_acl_trust_forwarded_ip": false,
+					"api_base_url": "https://api.example.com",
+					"api_key_acl_trust_forwarded_ip": false,
 					"contact_info": "support",
+					"support_contact_config": {
+						"enabled": true,
+						"title": "售后联系",
+						"description": "如需售后支持，请添加下方客服微信联系。",
+						"contacts": []
+					},
 					"doc_url": "https://docs.example.com",
 					"auth_source_default_email_balance": 0,
 					"auth_source_default_email_concurrency": 5,
@@ -1018,6 +1025,12 @@ func TestAPIContracts(t *testing.T) {
 					"api_base_url": "",
 					"api_key_acl_trust_forwarded_ip": false,
 					"contact_info": "",
+					"support_contact_config": {
+						"enabled": true,
+						"title": "售后联系",
+						"description": "如需售后支持，请添加下方客服微信联系。",
+						"contacts": []
+					},
 					"doc_url": "",
 					"home_content": "",
 					"hide_ccs_import_button": false,
@@ -1625,6 +1638,10 @@ func (s *stubAccountRepo) FindByExtraField(ctx context.Context, key string, valu
 
 func (s *stubAccountRepo) Update(ctx context.Context, account *service.Account) error {
 	return errors.New("not implemented")
+}
+
+func (s *stubAccountRepo) UpdateSortOrders(ctx context.Context, updates []service.AccountSortOrderUpdate) error {
+	return nil
 }
 
 func (s *stubAccountRepo) Delete(ctx context.Context, id int64) error {

@@ -281,6 +281,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/support-contact',
+    name: 'SupportContact',
+    component: () => import('@/views/user/SupportContactView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Support Contact',
+      titleKey: 'supportContact.title',
+      descriptionKey: 'supportContact.description',
+      userMenuKey: 'support_contact'
+    }
+  },
+  {
     path: '/available-channels',
     name: 'UserAvailableChannels',
     component: () => import('@/views/user/AvailableChannelsView.vue'),

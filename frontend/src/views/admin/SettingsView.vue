@@ -4672,6 +4672,120 @@
                 />
               </div>
 
+              <!-- Support Contact Page -->
+              <div class="rounded-lg border border-gray-100 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/50">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 class="text-sm font-medium text-gray-900 dark:text-white">
+                      {{ localText("售后联系页面", "Support Contact Page") }}
+                    </h3>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      {{ localText("配置用户侧售后联系页面展示的微信客服二维码、名称和上班时间。", "Configure the WeChat support contacts shown on the user-facing support page.") }}
+                    </p>
+                  </div>
+                  <Toggle v-model="form.support_contact_config.enabled" />
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ localText("页面标题", "Page Title") }}
+                    </label>
+                    <input
+                      v-model="form.support_contact_config.title"
+                      type="text"
+                      class="input"
+                      :placeholder="localText('售后联系', 'Support Contact')"
+                    />
+                  </div>
+                  <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ localText("页面说明", "Page Description") }}
+                    </label>
+                    <input
+                      v-model="form.support_contact_config.description"
+                      type="text"
+                      class="input"
+                      :placeholder="localText('如需售后支持，请添加下方客服微信联系。', 'Add a support contact below for help.')"
+                    />
+                  </div>
+                </div>
+
+                <div class="mt-5 space-y-4">
+                  <div
+                    v-for="(contact, index) in form.support_contact_config.contacts"
+                    :key="`support-contact-${index}`"
+                    class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-600 dark:bg-dark-900/60"
+                  >
+                    <div class="mb-4 flex items-center justify-between gap-3">
+                      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ localText(`客服 ${index + 1}`, `Contact ${index + 1}`) }}
+                      </span>
+                      <button
+                        type="button"
+                        class="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                        :title="localText('删除客服', 'Remove contact')"
+                        @click="removeSupportContact(index)"
+                      >
+                        <Icon name="trash" size="sm" />
+                      </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+                      <div class="space-y-4">
+                        <div>
+                          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ localText("客服名称", "Contact Name") }}
+                          </label>
+                          <input
+                            v-model="contact.name"
+                            type="text"
+                            class="input"
+                            :placeholder="localText('客服小助手', 'Support Agent')"
+                          />
+                        </div>
+                        <div>
+                          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ localText("上班时间", "Working Hours") }}
+                          </label>
+                          <input
+                            v-model="contact.work_hours"
+                            type="text"
+                            class="input"
+                            :placeholder="localText('周一至周五 09:00-18:00', 'Mon-Fri 09:00-18:00')"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {{ localText("微信二维码", "WeChat QR Code") }}
+                        </label>
+                        <ImageUpload
+                          v-model="contact.qr_image"
+                          mode="image"
+                          size="md"
+                          :upload-label="t('admin.settings.site.uploadImage')"
+                          :remove-label="t('admin.settings.site.remove')"
+                          :hint="localText('建议上传正方形二维码截图，最大 500KB。', 'Square QR screenshots are recommended, max 500KB.')"
+                          :max-size="500 * 1024"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-4 py-2.5 text-sm text-gray-500 transition-colors hover:border-primary-400 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50 dark:border-dark-600 dark:text-gray-400 dark:hover:border-primary-500 dark:hover:text-primary-400"
+                  :disabled="form.support_contact_config.contacts.length >= 3"
+                  @click="addSupportContact"
+                >
+                  <Icon name="plus" size="sm" />
+                  {{ localText("添加客服", "Add Contact") }}
+                </button>
+              </div>
+
               <!-- Home Content -->
               <div>
                 <label
@@ -6903,6 +7017,8 @@ import type {
   LoginAgreementDocument,
   NotifyEmailEntry,
   Proxy,
+  SupportContactConfig,
+  SupportContactItem,
 } from "@/types";
 import type { ProviderInstance } from "@/types/payment";
 import AppLayout from "@/components/layout/AppLayout.vue";
@@ -7030,6 +7146,11 @@ const userMenuOptions = computed<
     description: localText("邀请返利和合伙人入口。", "Referral rebate and partner entry."),
   },
   {
+    value: "support_contact",
+    label: t("nav.supportContact"),
+    description: localText("售后联系和微信客服二维码展示入口。", "Support contact and WeChat QR code page."),
+  },
+  {
     value: "profile",
     label: t("nav.profile"),
     description: localText("个人资料、安全和偏好设置。", "Profile, security, and preferences."),
@@ -7046,6 +7167,7 @@ const userMenuSelection = reactive<Record<UserMenuItem, boolean>>({
   orders: true,
   redeem: true,
   affiliate: true,
+  support_contact: true,
   profile: true,
 });
 
@@ -7530,6 +7652,12 @@ const form = reactive<SettingsForm>({
   site_subtitle: "让AI为我所用",
   api_base_url: "",
   contact_info: "",
+  support_contact_config: {
+    enabled: true,
+    title: "售后联系",
+    description: "如需售后支持，请添加下方客服微信联系。",
+    contacts: [],
+  },
   doc_url: "",
   home_content: "",
   backend_mode_enabled: false,
@@ -8275,6 +8403,58 @@ function userMenuItemsFromSelection(): UserMenuItem[] {
   return DEFAULT_USER_MENU_ITEMS.filter((item) => userMenuSelection[item]);
 }
 
+function defaultSupportContactConfig(): SupportContactConfig {
+  return {
+    enabled: true,
+    title: "售后联系",
+    description: "如需售后支持，请添加下方客服微信联系。",
+    contacts: [],
+  };
+}
+
+function normalizeSupportContactConfig(
+  value: SupportContactConfig | null | undefined,
+): SupportContactConfig {
+  const fallback = defaultSupportContactConfig();
+  const contacts = Array.isArray(value?.contacts)
+    ? value.contacts
+        .slice(0, 3)
+        .map((contact): SupportContactItem => ({
+          name: String(contact.name ?? "").trim(),
+          work_hours: String(contact.work_hours ?? "").trim(),
+          qr_image: String(contact.qr_image ?? "").trim(),
+        }))
+        .filter(
+          (contact) =>
+            contact.name !== "" ||
+            contact.work_hours !== "" ||
+            contact.qr_image !== "",
+        )
+    : [];
+
+  return {
+    enabled: value?.enabled !== false,
+    title: String(value?.title ?? fallback.title).trim() || fallback.title,
+    description:
+      String(value?.description ?? fallback.description).trim() ||
+      fallback.description,
+    contacts,
+  };
+}
+
+function addSupportContact(): void {
+  if (form.support_contact_config.contacts.length >= 3) return;
+  form.support_contact_config.contacts.push({
+    name: "",
+    work_hours: "",
+    qr_image: "",
+  });
+}
+
+function removeSupportContact(index: number): void {
+  form.support_contact_config.contacts.splice(index, 1);
+}
+
 function normalizeAffiliatePartnerTierRate(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -8451,6 +8631,9 @@ async function loadSettings() {
         : defaultLoginAgreementDocuments();
     Object.assign(authSourceDefaults, buildAuthSourceDefaultsState(settings));
     form.backend_mode_enabled = settings.backend_mode_enabled;
+    form.support_contact_config = normalizeSupportContactConfig(
+      settings.support_contact_config,
+    );
     form.default_subscriptions = normalizeDefaultSubscriptionSettings(
       settings.default_subscriptions,
     );
@@ -8770,6 +8953,10 @@ async function saveSettings() {
     const requestedMarketingNavItems = marketingNavItemsFromSelection();
     const requestedUserMenuItems = userMenuItemsFromSelection();
     const requestedAffiliatePartnerTiers = affiliatePartnerTiersPayload();
+    const requestedSupportContactConfig = normalizeSupportContactConfig(
+      form.support_contact_config,
+    );
+    form.support_contact_config = requestedSupportContactConfig;
 
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
@@ -8805,6 +8992,7 @@ async function saveSettings() {
       site_subtitle: form.site_subtitle,
       api_base_url: form.api_base_url,
       contact_info: form.contact_info,
+      support_contact_config: requestedSupportContactConfig,
       doc_url: form.doc_url,
       home_content: form.home_content,
       backend_mode_enabled: form.backend_mode_enabled,
@@ -9041,6 +9229,9 @@ async function saveSettings() {
       Array.isArray(updated.user_menu_items)
         ? updated.user_menu_items
         : requestedUserMenuItems,
+    );
+    form.support_contact_config = normalizeSupportContactConfig(
+      updated.support_contact_config ?? requestedSupportContactConfig,
     );
     form.payment_marketplace_group_multipliers =
       await fetchPersistedMarketplaceGroupMultipliers(

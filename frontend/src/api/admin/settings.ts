@@ -10,6 +10,7 @@ import type {
   CustomMenuItem,
   LoginAgreementDocument,
   NotifyEmailEntry,
+  SupportContactConfig,
 } from "@/types";
 
 export interface DefaultSubscriptionSetting {
@@ -379,6 +380,7 @@ export interface SystemSettings {
   site_subtitle: string;
   api_base_url: string;
   contact_info: string;
+  support_contact_config: SupportContactConfig;
   doc_url: string;
   home_content: string;
   hide_ccs_import_button: boolean;
@@ -632,6 +634,7 @@ export interface UpdateSettingsRequest {
   site_subtitle?: string;
   api_base_url?: string;
   contact_info?: string;
+  support_contact_config?: SupportContactConfig;
   doc_url?: string;
   home_content?: string;
   hide_ccs_import_button?: boolean;

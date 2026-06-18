@@ -107,6 +107,7 @@ const userLabelKeys: Record<UserMenuItem, string> = {
   orders: 'nav.myOrders',
   redeem: 'nav.redeem',
   affiliate: 'nav.affiliate',
+  support_contact: 'nav.supportContact',
   profile: 'nav.profile',
 }
 

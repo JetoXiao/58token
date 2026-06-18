@@ -9,6 +9,7 @@ export const DEFAULT_USER_MENU_ITEMS = [
   'orders',
   'redeem',
   'affiliate',
+  'support_contact',
   'profile',
 ] as const
 
@@ -25,6 +26,7 @@ export const USER_MENU_PATHS: Record<UserMenuItem, string> = {
   orders: '/orders',
   redeem: '/redeem',
   affiliate: '/affiliate',
+  support_contact: '/support-contact',
   profile: '/profile',
 }
 
@@ -95,6 +97,11 @@ function normalizeUserMenuItemKey(value: unknown): UserMenuItem | undefined {
       return 'redeem'
     case 'affiliate':
       return 'affiliate'
+    case 'support_contact':
+    case 'support':
+    case 'after_sales':
+    case 'after-sales':
+      return 'support_contact'
     case 'profile':
       return 'profile'
     default:

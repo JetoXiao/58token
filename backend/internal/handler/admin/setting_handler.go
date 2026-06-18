@@ -216,6 +216,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		SiteSubtitle:                           settings.SiteSubtitle,
 		APIBaseURL:                             settings.APIBaseURL,
 		ContactInfo:                            settings.ContactInfo,
+		SupportContactConfig:                   dto.ParseSupportContactConfig(settings.SupportContactConfig),
 		DocURL:                                 settings.DocURL,
 		HomeContent:                            settings.HomeContent,
 		HideCcsImportButton:                    settings.HideCcsImportButton,
@@ -490,22 +491,23 @@ type UpdateSettingsRequest struct {
 	GoogleOAuthFrontendRedirectURL string `json:"google_oauth_frontend_redirect_url"`
 
 	// OEM设置
-	SiteName                    string                `json:"site_name"`
-	SiteLogo                    string                `json:"site_logo"`
-	SiteSubtitle                string                `json:"site_subtitle"`
-	APIBaseURL                  string                `json:"api_base_url"`
-	ContactInfo                 string                `json:"contact_info"`
-	DocURL                      string                `json:"doc_url"`
-	HomeContent                 string                `json:"home_content"`
-	HideCcsImportButton         bool                  `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled *bool                 `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     *string               `json:"purchase_subscription_url"`
-	TableDefaultPageSize        int                   `json:"table_default_page_size"`
-	TablePageSizeOptions        []int                 `json:"table_page_size_options"`
-	CustomMenuItems             *[]dto.CustomMenuItem `json:"custom_menu_items"`
-	MarketingNavItems           *[]string             `json:"marketing_nav_items"`
-	UserMenuItems               *[]string             `json:"user_menu_items"`
-	CustomEndpoints             *[]dto.CustomEndpoint `json:"custom_endpoints"`
+	SiteName                    string                    `json:"site_name"`
+	SiteLogo                    string                    `json:"site_logo"`
+	SiteSubtitle                string                    `json:"site_subtitle"`
+	APIBaseURL                  string                    `json:"api_base_url"`
+	ContactInfo                 string                    `json:"contact_info"`
+	SupportContactConfig        *dto.SupportContactConfig `json:"support_contact_config"`
+	DocURL                      string                    `json:"doc_url"`
+	HomeContent                 string                    `json:"home_content"`
+	HideCcsImportButton         bool                      `json:"hide_ccs_import_button"`
+	PurchaseSubscriptionEnabled *bool                     `json:"purchase_subscription_enabled"`
+	PurchaseSubscriptionURL     *string                   `json:"purchase_subscription_url"`
+	TableDefaultPageSize        int                       `json:"table_default_page_size"`
+	TablePageSizeOptions        []int                     `json:"table_page_size_options"`
+	CustomMenuItems             *[]dto.CustomMenuItem     `json:"custom_menu_items"`
+	MarketingNavItems           *[]string                 `json:"marketing_nav_items"`
+	UserMenuItems               *[]string                 `json:"user_menu_items"`
+	CustomEndpoints             *[]dto.CustomEndpoint     `json:"custom_endpoints"`
 
 	// 默认配置
 	DefaultConcurrency                        int                               `json:"default_concurrency"`
@@ -1368,6 +1370,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	if req.UserMenuItems != nil {
 		userMenuItemsJSON = service.UserMenuItemsJSON(*req.UserMenuItems)
 	}
+	supportContactConfigJSON := previousSettings.SupportContactConfig
+	if req.SupportContactConfig != nil {
+		supportContactConfigJSON = dto.SupportContactConfigJSON(*req.SupportContactConfig)
+	}
 
 	customEndpointsJSON := previousSettings.CustomEndpoints
 	if req.CustomEndpoints != nil {
@@ -1572,6 +1578,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:                           req.SiteSubtitle,
 		APIBaseURL:                             req.APIBaseURL,
 		ContactInfo:                            req.ContactInfo,
+		SupportContactConfig:                   supportContactConfigJSON,
 		DocURL:                                 req.DocURL,
 		HomeContent:                            req.HomeContent,
 		HideCcsImportButton:                    req.HideCcsImportButton,
@@ -2002,6 +2009,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		SiteSubtitle:                           updatedSettings.SiteSubtitle,
 		APIBaseURL:                             updatedSettings.APIBaseURL,
 		ContactInfo:                            updatedSettings.ContactInfo,
+		SupportContactConfig:                   dto.ParseSupportContactConfig(updatedSettings.SupportContactConfig),
 		DocURL:                                 updatedSettings.DocURL,
 		HomeContent:                            updatedSettings.HomeContent,
 		HideCcsImportButton:                    updatedSettings.HideCcsImportButton,
@@ -2497,6 +2505,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.UserMenuItems != after.UserMenuItems {
 		changed = append(changed, "user_menu_items")
+	}
+	if before.SupportContactConfig != after.SupportContactConfig {
+		changed = append(changed, "support_contact_config")
 	}
 	if before.CustomEndpoints != after.CustomEndpoints {
 		changed = append(changed, "custom_endpoints")

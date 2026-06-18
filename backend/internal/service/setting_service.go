@@ -656,6 +656,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeySiteSubtitle,
 		SettingKeyAPIBaseURL,
 		SettingKeyContactInfo,
+		SettingKeySupportContactConfig,
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
 		SettingKeyHideCcsImportButton,
@@ -782,6 +783,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "让AI为我所用"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
 		ContactInfo:                      settings[SettingKeyContactInfo],
+		SupportContactConfig:             settings[SettingKeySupportContactConfig],
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
@@ -854,7 +856,22 @@ func clampChannelMonitorInterval(v int) int {
 }
 
 const defaultMarketingNavItemsJSON = `["models","docs","partner"]`
-const defaultUserMenuItemsJSON = `["dashboard","api_keys","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","profile"]`
+const defaultUserMenuItemsJSON = `["dashboard","api_keys","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","support_contact","profile"]`
+const defaultSupportContactConfigJSON = `{"enabled":true,"title":"售后联系","description":"如需售后支持，请添加下方客服微信联系。","contacts":[]}`
+const maxSupportContactItems = 3
+
+type SupportContactConfig struct {
+	Enabled     bool                 `json:"enabled"`
+	Title       string               `json:"title"`
+	Description string               `json:"description"`
+	Contacts    []SupportContactItem `json:"contacts"`
+}
+
+type SupportContactItem struct {
+	Name      string `json:"name"`
+	WorkHours string `json:"work_hours"`
+	QRImage   string `json:"qr_image"`
+}
 
 var marketingNavItemOrder = []string{"models", "docs", "partner"}
 var userMenuItemOrder = []string{
@@ -868,7 +885,66 @@ var userMenuItemOrder = []string{
 	"orders",
 	"redeem",
 	"affiliate",
+	"support_contact",
 	"profile",
+}
+
+func NormalizeSupportContactConfigJSON(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultSupportContactConfigJSON
+	}
+	var decoded struct {
+		Enabled     *bool                `json:"enabled"`
+		Title       string               `json:"title"`
+		Description string               `json:"description"`
+		Contacts    []SupportContactItem `json:"contacts"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return defaultSupportContactConfigJSON
+	}
+
+	cfg := SupportContactConfig{
+		Enabled:     true,
+		Title:       decoded.Title,
+		Description: decoded.Description,
+		Contacts:    decoded.Contacts,
+	}
+	if decoded.Enabled != nil {
+		cfg.Enabled = *decoded.Enabled
+	}
+
+	cfg.Title = strings.TrimSpace(cfg.Title)
+	if cfg.Title == "" {
+		cfg.Title = "售后联系"
+	}
+	cfg.Description = strings.TrimSpace(cfg.Description)
+	if cfg.Description == "" {
+		cfg.Description = "如需售后支持，请添加下方客服微信联系。"
+	}
+
+	contacts := make([]SupportContactItem, 0, min(len(cfg.Contacts), maxSupportContactItems))
+	for _, item := range cfg.Contacts {
+		normalized := SupportContactItem{
+			Name:      strings.TrimSpace(item.Name),
+			WorkHours: strings.TrimSpace(item.WorkHours),
+			QRImage:   strings.TrimSpace(item.QRImage),
+		}
+		if normalized.Name == "" && normalized.WorkHours == "" && normalized.QRImage == "" {
+			continue
+		}
+		contacts = append(contacts, normalized)
+		if len(contacts) >= maxSupportContactItems {
+			break
+		}
+	}
+	cfg.Contacts = contacts
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return defaultSupportContactConfigJSON
+	}
+	return string(data)
 }
 
 // ParseMarketingNavItems parses the stored marketing navbar item list.
@@ -988,6 +1064,8 @@ func normalizeUserMenuItems(items []string) []string {
 			enabled["redeem"] = struct{}{}
 		case "affiliate":
 			enabled["affiliate"] = struct{}{}
+		case "support_contact", "support", "after_sales", "after-sales":
+			enabled["support_contact"] = struct{}{}
 		case "profile":
 			enabled["profile"] = struct{}{}
 		}
@@ -1185,6 +1263,7 @@ type PublicSettingsInjectionPayload struct {
 	SiteSubtitle                     string                   `json:"site_subtitle"`
 	APIBaseURL                       string                   `json:"api_base_url"`
 	ContactInfo                      string                   `json:"contact_info"`
+	SupportContactConfig             json.RawMessage          `json:"support_contact_config"`
 	DocURL                           string                   `json:"doc_url"`
 	HomeContent                      string                   `json:"home_content"`
 	HideCcsImportButton              bool                     `json:"hide_ccs_import_button"`
@@ -1252,6 +1331,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		SiteSubtitle:                     settings.SiteSubtitle,
 		APIBaseURL:                       settings.APIBaseURL,
 		ContactInfo:                      settings.ContactInfo,
+		SupportContactConfig:             json.RawMessage(NormalizeSupportContactConfigJSON(settings.SupportContactConfig)),
 		DocURL:                           settings.DocURL,
 		HomeContent:                      settings.HomeContent,
 		HideCcsImportButton:              settings.HideCcsImportButton,
@@ -1846,6 +1926,7 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeySiteSubtitle] = settings.SiteSubtitle
 	updates[SettingKeyAPIBaseURL] = settings.APIBaseURL
 	updates[SettingKeyContactInfo] = settings.ContactInfo
+	updates[SettingKeySupportContactConfig] = NormalizeSupportContactConfigJSON(settings.SupportContactConfig)
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
 	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
@@ -2679,6 +2760,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyAPIKeyACLTrustForwardedIP:                 "false",
 		SettingKeySiteName:                                  "UseAiForMe",
 		SettingKeySiteLogo:                                  "",
+		SettingKeySupportContactConfig:                      defaultSupportContactConfigJSON,
 		SettingKeyPurchaseSubscriptionEnabled:               "false",
 		SettingKeyPurchaseSubscriptionURL:                   "",
 		SettingKeyTableDefaultPageSize:                      "20",
@@ -2879,6 +2961,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "让AI为我所用"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
 		ContactInfo:                      settings[SettingKeyContactInfo],
+		SupportContactConfig:             NormalizeSupportContactConfigJSON(settings[SettingKeySupportContactConfig]),
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",

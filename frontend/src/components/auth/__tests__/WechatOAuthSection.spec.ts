@@ -71,6 +71,12 @@ function buildPublicSettings(overrides: Partial<WeChatPublicSettings> = {}): WeC
     site_subtitle: '',
     api_base_url: '/api/v1',
     contact_info: '',
+    support_contact_config: {
+      enabled: true,
+      title: '售后联系',
+      description: '如需售后支持，请添加下方客服微信联系。',
+      contacts: [],
+    },
     doc_url: '',
     home_content: '',
     hide_ccs_import_button: false,

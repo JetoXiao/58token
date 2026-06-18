@@ -232,6 +232,19 @@ export interface CustomEndpoint {
   description: string
 }
 
+export interface SupportContactItem {
+  name: string
+  work_hours: string
+  qr_image: string
+}
+
+export interface SupportContactConfig {
+  enabled: boolean
+  title: string
+  description: string
+  contacts: SupportContactItem[]
+}
+
 export interface LoginAgreementDocument {
   id: string
   title: string
@@ -258,6 +271,7 @@ export interface PublicSettings {
   site_subtitle: string
   api_base_url: string
   contact_info: string
+  support_contact_config: SupportContactConfig
   doc_url: string
   home_content: string
   hide_ccs_import_button: boolean
