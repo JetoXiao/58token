@@ -23,24 +23,32 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name:       "short prompt bypasses probes",
-			body:       []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":"hi"}]}`),
-			wantReason: "prompt_too_short",
+			name:        "short prompt is eligible",
+			body:        []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":"hi"}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
-			name:       "short text block prompt bypasses probes",
-			body:       []byte(`{"model":"claude-sonnet","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
-			wantReason: "prompt_too_short",
+			name:        "short text block prompt is eligible",
+			body:        []byte(`{"model":"claude-sonnet","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
-			name:       "short openai text block prompt bypasses probes",
-			body:       []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
-			wantReason: "prompt_too_short",
+			name:        "short openai text block prompt is eligible",
+			body:        []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
-			name:       "implicit temperature is not a real-cache candidate",
-			body:       []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please summarize this fairly long paragraph"}]}`),
-			wantReason: "non_deterministic",
+			name:        "implicit temperature is eligible",
+			body:        []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please summarize this fairly long paragraph"}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
 			name:        "long text block prompt is eligible",
@@ -64,9 +72,11 @@ func TestResponseCacheDecideExactSafetyRules(t *testing.T) {
 			wantShadow:  true,
 		},
 		{
-			name:       "images are not cached or observed",
-			body:       []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/a.png"}},{"type":"text","text":"please describe this image in detail"}]}]}`),
-			wantReason: "unsupported_request",
+			name:        "image inputs are eligible with full request identity",
+			body:        []byte(`{"model":"gpt-5","temperature":0,"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://example.com/a.png"}},{"type":"text","text":"please describe this image in detail"}]}]}`),
+			wantEnabled: true,
+			wantExact:   true,
+			wantShadow:  true,
 		},
 		{
 			name:        "deterministic medium prompt can use exact cache",
@@ -157,15 +167,15 @@ func TestResponseCacheShadowOnlyUsesRealCacheCandidateRules(t *testing.T) {
 		t.Fatalf("Decide() = %+v, want shadow observation for real-cache candidate", deterministic)
 	}
 
-	nonDeterministic := rc.Decide(ResponseCacheRequest{
+	implicitTemperature := rc.Decide(ResponseCacheRequest{
 		Endpoint: "/v1/chat/completions",
 		Protocol: "openai",
 		Model:    "gpt-5",
 		Body:     []byte(`{"model":"gpt-5","messages":[{"role":"user","content":"please answer this non deterministic request"}]}`),
 		Headers:  http.Header{},
 	})
-	if nonDeterministic.Enabled || nonDeterministic.ShadowEnabled || nonDeterministic.Key != "" || nonDeterministic.Reason != "non_deterministic" {
-		t.Fatalf("Decide() = %+v, want non-candidate bypass", nonDeterministic)
+	if !implicitTemperature.Enabled || implicitTemperature.ExactEnabled || !implicitTemperature.ShadowEnabled || implicitTemperature.Key == "" || implicitTemperature.Reason != "" {
+		t.Fatalf("Decide() = %+v, want shadow observation when temperature is omitted", implicitTemperature)
 	}
 }
 
@@ -392,7 +402,7 @@ func TestResponseCacheClaudeToolKeysIncludeToolOutputWhenNoAnchor(t *testing.T) 
 	}
 }
 
-func TestResponseCacheClaudeToolCandidateUsesFullPromptLengthForSafety(t *testing.T) {
+func TestResponseCacheClaudeToolCandidateAllowsLargeContextWithFullRequestKey(t *testing.T) {
 	rc := newTestResponseCache()
 	largeToolOutput := strings.Repeat("tool output ", 6000)
 	req := ResponseCacheRequest{
@@ -413,12 +423,12 @@ func TestResponseCacheClaudeToolCandidateUsesFullPromptLengthForSafety(t *testin
 	}
 
 	got := rc.Decide(req)
-	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Key != "" || got.Reason != "prompt_too_long" {
-		t.Fatalf("Decide() = %+v, want large Claude tool context excluded from real-cache candidates", got)
+	if !got.Enabled || !got.ExactEnabled || !got.ShadowEnabled || got.Key == "" || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want large Claude tool context included in exact candidates", got)
 	}
 }
 
-func TestResponseCacheToolSchemaCountsTowardPromptLength(t *testing.T) {
+func TestResponseCacheToolSchemaDoesNotExcludeExactCandidate(t *testing.T) {
 	rc := newTestResponseCache()
 	largeSchema := strings.Repeat("schema field ", 2000)
 
@@ -434,8 +444,84 @@ func TestResponseCacheToolSchemaCountsTowardPromptLength(t *testing.T) {
 		}`),
 		Headers: http.Header{},
 	})
-	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Key != "" || got.Reason != "prompt_too_long" {
-		t.Fatalf("Decide() = %+v, want large tool schema excluded from real-cache candidates", got)
+	if !got.Enabled || !got.ExactEnabled || !got.ShadowEnabled || got.Key == "" || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want large tool schema included in exact candidates", got)
+	}
+}
+
+func TestResponseCacheCodexImageToolMentionDoesNotExcludeTextRequest(t *testing.T) {
+	rc := newTestResponseCache()
+
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/responses",
+		Protocol: "openai_responses",
+		Model:    "gpt-5.5",
+		Body: []byte(`{
+			"model":"gpt-5.5",
+			"stream":true,
+			"instructions":"The local client may mention image_generation, but this turn is text only.",
+			"tools":[
+				{"type":"function","name":"shell","description":"Run commands"},
+				{"type":"image_generation","description":"Available only when the user explicitly asks for images"}
+			],
+			"input":[
+				{"role":"user","content":[{"type":"input_text","text":"确认本地候选请求数是否正常"}]}
+			]
+		}`),
+		Headers: http.Header{},
+	})
+
+	if !got.Enabled || !got.ExactEnabled || !got.ShadowEnabled || got.Key == "" || got.Reason != "" {
+		t.Fatalf("Decide() = %+v, want Codex text request with image tool mention included", got)
+	}
+}
+
+func TestResponseCacheToolChoiceImageGenerationStillExcluded(t *testing.T) {
+	rc := newTestResponseCache()
+
+	got := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/responses",
+		Protocol: "openai_responses",
+		Model:    "gpt-5.5",
+		Body:     []byte(`{"model":"gpt-5.5","input":"draw a cat","tools":[{"type":"image_generation"}],"tool_choice":{"type":"image_generation"}}`),
+		Headers:  http.Header{},
+	})
+
+	if got.Enabled || got.ExactEnabled || got.ShadowEnabled || got.Key != "" || got.Reason != "unsupported_request" {
+		t.Fatalf("Decide() = %+v, want explicit image generation request excluded", got)
+	}
+}
+
+func TestResponseCacheLargeBodyUsesRawRequestIdentity(t *testing.T) {
+	rc := newTestResponseCache()
+	rc.cfg.MaxBodyBytes = 256
+	largeText := strings.Repeat("large context ", 80)
+	bodyA := []byte(`{"model":"gpt-5","messages":[{"role":"user","content":` + strconv.Quote(largeText) + `}]}`)
+	bodyB := []byte(`{"messages":[{"content":` + strconv.Quote(largeText) + `,"role":"user"}],"model":"gpt-5"}`)
+
+	gotA := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body:     bodyA,
+		Headers:  http.Header{},
+	})
+	gotB := rc.Decide(ResponseCacheRequest{
+		Endpoint: "/v1/chat/completions",
+		Protocol: "openai",
+		Model:    "gpt-5",
+		Body:     bodyB,
+		Headers:  http.Header{},
+	})
+
+	if !gotA.Enabled || !gotA.ExactEnabled || !gotA.ShadowEnabled || gotA.Key == "" || gotA.Reason != "" {
+		t.Fatalf("Decide(A) = %+v, want large body exact candidate", gotA)
+	}
+	if !gotB.Enabled || !gotB.ExactEnabled || !gotB.ShadowEnabled || gotB.Key == "" || gotB.Reason != "" {
+		t.Fatalf("Decide(B) = %+v, want large body exact candidate", gotB)
+	}
+	if gotA.Key == gotB.Key {
+		t.Fatalf("large raw body keys should preserve exact request identity, got same key %q", gotA.Key)
 	}
 }
 

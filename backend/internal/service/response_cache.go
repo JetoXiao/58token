@@ -197,9 +197,6 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	if len(req.Body) == 0 {
 		return ResponseCacheDecision{Reason: "empty_body"}
 	}
-	if c.cfg.MaxBodyBytes > 0 && len(req.Body) > c.cfg.MaxBodyBytes {
-		return ResponseCacheDecision{Reason: "body_too_large"}
-	}
 	if shouldBypassCacheControl(req.Headers) {
 		return ResponseCacheDecision{Reason: "request_bypass"}
 	}
@@ -215,25 +212,17 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 	if looksLikeImageRequest(req.Endpoint, req.Body) {
 		return ResponseCacheDecision{Reason: "unsupported_request"}
 	}
-	promptChars := approxPromptChars(req.Body)
-	if c.cfg.MinPromptChars > 0 && promptChars < c.cfg.MinPromptChars {
-		return ResponseCacheDecision{Reason: "prompt_too_short"}
-	}
-	if c.cfg.MaxPromptChars > 0 && promptChars > c.cfg.MaxPromptChars {
-		return ResponseCacheDecision{Reason: "prompt_too_long"}
-	}
 	key, ok := c.cacheKey(req)
 	if !ok {
 		return ResponseCacheDecision{Reason: "invalid_json"}
 	}
 	monitor := c.isMonitorRequest(req)
-	deterministic := isDeterministicRequest(req.Body)
 	scopeAllowed := c.scopeAllowsExact(req)
-	exactCandidate := deterministic && !monitor && scopeAllowed
+	exactCandidate := !monitor && scopeAllowed
 	exactAllowed := c.cfg.Enabled && exactCandidate
 	shadowAllowed := c.cfg.ShadowEnabled && exactCandidate
 	if !exactAllowed && !shadowAllowed {
-		return ResponseCacheDecision{Reason: cacheEligibilityBypassReason(deterministic, monitor, scopeAllowed)}
+		return ResponseCacheDecision{Reason: cacheEligibilityBypassReason(monitor, scopeAllowed)}
 	}
 	return ResponseCacheDecision{
 		Enabled:       exactAllowed || shadowAllowed,
@@ -241,7 +230,7 @@ func (c *ResponseCache) Decide(req ResponseCacheRequest) ResponseCacheDecision {
 		ShadowEnabled: shadowAllowed,
 		Monitor:       monitor,
 		Key:           key,
-		Reason:        cacheEligibilityReason(deterministic, monitor, exactAllowed),
+		Reason:        cacheEligibilityReason(exactAllowed),
 		Endpoint:      strings.TrimSpace(req.Endpoint),
 		Protocol:      strings.TrimSpace(req.Protocol),
 		Model:         strings.TrimSpace(req.Model),
@@ -938,11 +927,11 @@ func (c *ResponseCache) cacheKey(req ResponseCacheRequest) (string, bool) {
 	if !gjson.ValidBytes(req.Body) {
 		return "", false
 	}
-	normalized := canonicalRawJSON(string(req.Body))
-	if normalized == "" {
+	seed := responseCacheRequestSeed(req.Body, c.cfg.MaxBodyBytes)
+	if seed == "" {
 		return "", false
 	}
-	return c.cacheKeyFromSeed(req, normalized), true
+	return c.cacheKeyFromSeed(req, seed), true
 }
 
 func (c *ResponseCache) cacheKeyFromSeed(req ResponseCacheRequest, seedValue string) string {
@@ -1220,31 +1209,14 @@ func shouldBypassCacheControl(h http.Header) bool {
 	return false
 }
 
-func isDeterministicRequest(body []byte) bool {
-	temperature := gjson.GetBytes(body, "temperature")
-	if !temperature.Exists() || temperature.Type != gjson.Number || temperature.Num != 0 {
-		return false
-	}
-	if topP := gjson.GetBytes(body, "top_p"); topP.Exists() && (topP.Type != gjson.Number || (topP.Num != 0 && topP.Num != 1)) {
-		return false
-	}
-	return true
-}
-
-func cacheEligibilityReason(deterministic, monitor, exactAllowed bool) string {
+func cacheEligibilityReason(exactAllowed bool) string {
 	if exactAllowed {
 		return ""
 	}
-	if deterministic {
-		return ""
-	}
-	return "non_deterministic"
+	return ""
 }
 
-func cacheEligibilityBypassReason(deterministic, monitor, scopeAllowed bool) string {
-	if !deterministic {
-		return "non_deterministic"
-	}
+func cacheEligibilityBypassReason(monitor, scopeAllowed bool) string {
 	if monitor {
 		return "monitor_bypass"
 	}
@@ -1255,60 +1227,29 @@ func cacheEligibilityBypassReason(deterministic, monitor, scopeAllowed bool) str
 }
 
 func looksLikeImageRequest(endpoint string, body []byte) bool {
-	path := strings.ToLower(endpoint)
-	if strings.Contains(path, "image") {
+	if IsImageGenerationEndpoint(endpoint) {
 		return true
 	}
-	raw := strings.ToLower(string(body))
-	return strings.Contains(raw, `"image_url"`) ||
-		strings.Contains(raw, `"input_image"`) ||
-		strings.Contains(raw, `"image_generation"`) ||
-		strings.Contains(raw, `"file_id"`)
+	if isOpenAIImageGenerationModel(strings.TrimSpace(gjson.GetBytes(body, "model").String())) {
+		return true
+	}
+	return openAIJSONToolChoiceSelectsImageGeneration(gjson.GetBytes(body, "tool_choice"))
 }
 
-func approxPromptChars(body []byte) int {
-	var total int
-	paths := []string{
-		"input",
-		"instructions",
-		"system",
-		"messages.#.content",
-		"tools",
-		"tool_choice",
-		"functions",
-		"function_call",
+func responseCacheRequestSeed(body []byte, canonicalLimit int) string {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return ""
 	}
-	for _, path := range paths {
-		total += promptCharsFromResult(gjson.GetBytes(body, path))
-	}
-	if total == 0 {
-		total = len(bytes.TrimSpace(body))
-	}
-	return total
-}
-
-func promptCharsFromResult(r gjson.Result) int {
-	if !r.Exists() {
-		return 0
-	}
-	switch {
-	case r.IsArray():
-		total := 0
-		for _, item := range r.Array() {
-			total += promptCharsFromResult(item)
+	if canonicalLimit <= 0 || len(trimmed) <= canonicalLimit {
+		normalized := canonicalRawJSON(string(trimmed))
+		if normalized == "" {
+			return ""
 		}
-		return total
-	case r.IsObject():
-		total := 0
-		for _, key := range []string{"text", "input_text", "content", "message", "output", "arguments", "description", "input_schema", "parameters", "function", "name"} {
-			total += promptCharsFromResult(r.Get(key))
-		}
-		return total
-	case r.Type == gjson.String:
-		return len([]rune(strings.TrimSpace(r.String())))
-	default:
-		return len(r.Raw)
+		return "json:" + normalized
 	}
+	sum := sha256.Sum256(trimmed)
+	return "raw-sha256:" + fmt.Sprintf("%x", sum[:])
 }
 
 func canonicalRawJSON(raw string) string {

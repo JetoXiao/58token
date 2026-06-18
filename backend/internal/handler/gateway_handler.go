@@ -116,6 +116,8 @@ func NewGatewayHandler(
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
+	requestStart := time.Now()
+
 	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
 	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
@@ -211,6 +213,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	// 获取订阅信息（可能为nil）- 提前获取用于后续检查
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
+	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
+	routingStart := time.Now()
 
 	// 0. 检查wait队列是否已满
 	maxWait := service.CalculateMaxWait(subject.Concurrency)
@@ -457,11 +461,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if shouldCaptureResponseForCache(cacheDecision) {
 				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 			}
+			service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
+			forwardStart := time.Now()
 			if account.Platform == service.PlatformAntigravity {
 				result, err = h.antigravityGatewayService.ForwardGemini(requestCtx, c, account, reqModel, "generateContent", reqStream, body, hasBoundSession)
 			} else {
 				result, err = h.geminiCompatService.Forward(requestCtx, c, account, body)
 			}
+			recordOpsForwardTTFTLatencies(c, forwardStart, result)
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
 			}
@@ -790,11 +797,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			if shouldCaptureResponseForCache(cacheDecision) && !fallbackUsed {
 				_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 			}
+			service.SetOpsLatencyMs(c, service.OpsRoutingLatencyMsKey, time.Since(routingStart).Milliseconds())
+			forwardStart := time.Now()
 			if account.Platform == service.PlatformAntigravity && account.Type != service.AccountTypeAPIKey {
 				result, err = h.antigravityGatewayService.Forward(requestCtx, c, account, body, hasBoundSession)
 			} else {
 				result, err = h.gatewayService.Forward(requestCtx, c, account, parsedReq)
 			}
+			recordOpsForwardTTFTLatencies(c, forwardStart, result)
 
 			// 兜底释放串行锁（正常情况已通过回调提前释放）
 			if queueRelease != nil {
@@ -975,6 +985,22 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		if !retryWithFallback {
 			return
 		}
+	}
+}
+
+func recordOpsForwardTTFTLatencies(c *gin.Context, forwardStart time.Time, result *service.ForwardResult) {
+	if c == nil {
+		return
+	}
+	forwardDurationMs := time.Since(forwardStart).Milliseconds()
+	upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
+	responseLatencyMs := forwardDurationMs
+	if upstreamLatencyMs > 0 && forwardDurationMs > upstreamLatencyMs {
+		responseLatencyMs = forwardDurationMs - upstreamLatencyMs
+	}
+	service.SetOpsLatencyMs(c, service.OpsResponseLatencyMsKey, responseLatencyMs)
+	if result != nil && result.FirstTokenMs != nil {
+		service.SetOpsLatencyMs(c, service.OpsTimeToFirstTokenMsKey, int64(*result.FirstTokenMs))
 	}
 }
 
