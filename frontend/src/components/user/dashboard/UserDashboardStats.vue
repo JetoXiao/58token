@@ -11,7 +11,7 @@
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('dashboard.balance') }}</p>
-          <p class="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">${{ formatBalance(balance) }}</p>
+          <p class="text-2xl font-semibold tracking-tight text-emerald-600 dark:text-emerald-300">${{ formatBalance(displayBalance ?? balance) }}</p>
           <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('common.available') }}</p>
         </div>
       </div>
@@ -191,6 +191,7 @@ import type { UserDashboardStats as UserStatsType } from '@/api/usage'
 const props = defineProps<{
   stats: UserStatsType
   balance: number
+  displayBalance?: number
   isSimple: boolean
 }>()
 const { t } = useI18n()

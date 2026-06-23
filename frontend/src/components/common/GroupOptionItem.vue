@@ -15,8 +15,13 @@
       />
       <!-- Row 2: description with top spacing -->
       <span
-        v-if="description"
-        class="mt-1.5 w-full text-left text-xs leading-relaxed text-gray-500 dark:text-gray-400 line-clamp-2"
+        v-if="description || disabledReason"
+        :class="[
+          'mt-1.5 w-full text-left text-xs leading-relaxed line-clamp-2',
+          disabledReason
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-gray-500 dark:text-gray-400'
+        ]"
       >
         {{ description }}
       </span>
@@ -61,6 +66,7 @@ interface Props {
   rateMultiplier?: number
   userRateMultiplier?: number | null
   description?: string | null
+  disabledReason?: string | null
   selected?: boolean
   showCheckmark?: boolean
 }

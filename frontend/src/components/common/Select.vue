@@ -66,7 +66,7 @@
               role="option"
               :aria-selected="isSelected(option)"
               :aria-disabled="isOptionDisabled(option)"
-              @click.stop="!isOptionDisabled(option) && selectOption(option)"
+              @click.stop="handleOptionClick(option)"
               @mouseenter="handleOptionMouseEnter(option, index)"
               :class="[
                 'select-option',
@@ -140,6 +140,7 @@ interface Props {
 interface Emits {
   (e: 'update:modelValue', value: string | number | boolean | null): void
   (e: 'change', value: string | number | boolean | null, option: SelectOption | null): void
+  (e: 'disabled-option-click', option: SelectOption): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -355,6 +356,14 @@ const selectOption = (option: any) => {
   triggerRef.value?.focus()
 }
 
+const handleOptionClick = (option: any) => {
+  if (isOptionDisabled(option)) {
+    emit('disabled-option-click', option)
+    return
+  }
+  selectOption(option)
+}
+
 // Keyboards
 const onTriggerKeyDown = () => {
   if (!isOpen.value) {
@@ -509,7 +518,7 @@ onUnmounted(() => {
 }
 
 .select-dropdown-portal .select-option-disabled {
-  @apply cursor-not-allowed opacity-40;
+  @apply cursor-not-allowed opacity-75;
 }
 
 .select-dropdown-portal .select-option-group {

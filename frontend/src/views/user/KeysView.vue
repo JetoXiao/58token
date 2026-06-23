@@ -422,6 +422,7 @@
             :searchable="true"
             :search-placeholder="t('keys.searchGroup')"
             data-tour="key-form-group"
+            @disabled-option-click="showLockedGroupReason"
           >
             <template #selected="{ option }">
               <GroupBadge
@@ -442,6 +443,7 @@
                 :rate-multiplier="(option as unknown as GroupOption).rate"
                 :user-rate-multiplier="(option as unknown as GroupOption).userRate"
                 :description="(option as unknown as GroupOption).description"
+                :disabled-reason="(option as unknown as GroupOption).disabledReason"
                 :selected="selected"
               />
             </template>
@@ -1027,17 +1029,17 @@
           <button
             v-for="option in filteredGroupOptions"
             :key="option.value ?? 'null'"
-            @click="!option.disabled && changeGroup(selectedKeyForGroup!, option.value)"
+            @click="handleGroupSelectorOptionClick(option)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
-              option.disabled && 'cursor-not-allowed opacity-50',
+              option.disabled && 'cursor-not-allowed opacity-75',
               selectedKeyForGroup?.group_id === option.value ||
               (!selectedKeyForGroup?.group_id && option.value === null)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
                 : 'hover:bg-gray-100 dark:hover:bg-dark-700'
             ]"
-            :title="option.description || undefined"
+            :title="option.disabledReason || option.description || undefined"
           >
             <GroupOptionItem
               :name="option.label"
@@ -1046,6 +1048,7 @@
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
               :description="option.description"
+              :disabled-reason="option.disabledReason"
               :selected="
                 selectedKeyForGroup?.group_id === option.value ||
                 (!selectedKeyForGroup?.group_id && option.value === null)
@@ -1113,6 +1116,16 @@ interface GroupOption {
   subscriptionType: SubscriptionType
   platform: GroupPlatform
   disabled?: boolean
+  disabledReason?: string | null
+}
+
+const lockedGroupReasonMessages: Record<string, string> = {
+  payment_required: '\u8be5\u5206\u7ec4\u5c5e\u4e8eVIP\u5206\u7ec4\uff0c\u9700\u8981\u5145\u503c\u89e3\u9501\u3002'
+}
+
+const formatLockedGroupReason = (reason?: string | null) => {
+  if (!reason) return null
+  return lockedGroupReasonMessages[reason] || reason
 }
 
 const appStore = useAppStore()
@@ -1272,7 +1285,8 @@ const groupOptions = computed(() =>
     userRate: userGroupRates.value[group.id] ?? null,
     subscriptionType: group.subscription_type,
     platform: group.platform,
-    disabled: !!group.locked
+    disabled: !!group.locked,
+    disabledReason: formatLockedGroupReason(group.lock_reason) || (group.locked ? t('keys.groupLocked') : null)
   }))
 )
 
@@ -1495,7 +1509,7 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   if (key.group_id === newGroupId) return
   const nextGroup = newGroupId !== null ? groups.value.find((group) => group.id === newGroupId) : undefined
   if (nextGroup?.locked) {
-    appStore.showError(t('keys.groupLocked'))
+    appStore.showError(formatLockedGroupReason(nextGroup.lock_reason) || t('keys.groupLocked'))
     return
   }
 
@@ -1506,6 +1520,20 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   } catch (error) {
     appStore.showError(t('keys.failedToChangeGroup'))
   }
+}
+
+const showLockedGroupReason = (option: unknown) => {
+  const groupOption = option as GroupOption
+  appStore.showError(groupOption.disabledReason || t('keys.groupLocked'))
+}
+
+const handleGroupSelectorOptionClick = (option: GroupOption) => {
+  if (option.disabled) {
+    showLockedGroupReason(option)
+    return
+  }
+  if (!selectedKeyForGroup.value) return
+  changeGroup(selectedKeyForGroup.value, option.value)
 }
 
 const closeGroupSelector = (event: MouseEvent) => {
@@ -1530,7 +1558,7 @@ const handleSubmit = async () => {
   }
   const selectedGroup = groups.value.find((group) => group.id === formData.value.group_id)
   if (selectedGroup?.locked) {
-    appStore.showError(t('keys.groupLocked'))
+    appStore.showError(formatLockedGroupReason(selectedGroup.lock_reason) || t('keys.groupLocked'))
     return
   }
 

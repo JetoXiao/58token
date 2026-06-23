@@ -493,6 +493,38 @@ const groupNameMap = computed(() => {
   return map
 })
 
+const trialCardErrorMessages: Record<string, string> = {
+  TRIAL_CARD_NOT_FOUND: '\u4f53\u9a8c\u5361\u4e0d\u5b58\u5728',
+  'trial card not found': '\u4f53\u9a8c\u5361\u4e0d\u5b58\u5728',
+  TRIAL_CARD_INACTIVE: '\u4f53\u9a8c\u5361\u5df2\u7981\u7528',
+  'trial card is inactive': '\u4f53\u9a8c\u5361\u5df2\u7981\u7528',
+  TRIAL_CARD_EXPIRED: '\u4f53\u9a8c\u5361\u5df2\u8fc7\u671f',
+  'trial card has expired': '\u4f53\u9a8c\u5361\u5df2\u8fc7\u671f',
+  TRIAL_CARD_EXHAUSTED: '\u4f53\u9a8c\u5361\u53ef\u5151\u6362\u6b21\u6570\u5df2\u7528\u5b8c',
+  'trial card has no remaining redemptions': '\u4f53\u9a8c\u5361\u53ef\u5151\u6362\u6b21\u6570\u5df2\u7528\u5b8c',
+  TRIAL_CARD_USER_LIMIT: '\u5df2\u8fbe\u5230\u8be5\u4f53\u9a8c\u5361\u7684\u5151\u6362\u6b21\u6570\u9650\u5236',
+  'trial card redemption limit reached': '\u5df2\u8fbe\u5230\u8be5\u4f53\u9a8c\u5361\u7684\u5151\u6362\u6b21\u6570\u9650\u5236'
+}
+
+const getTrialCardErrorMessage = (error: any) => {
+  const candidates = [
+    error?.code,
+    error?.reason,
+    error?.message,
+    error?.response?.data?.code,
+    error?.response?.data?.reason,
+    error?.response?.data?.message,
+    error?.response?.data?.detail
+  ]
+  for (const candidate of candidates) {
+    const key = String(candidate || '').trim()
+    if (key && trialCardErrorMessages[key]) {
+      return trialCardErrorMessages[key]
+    }
+  }
+  return error?.message || error?.response?.data?.detail || t('redeem.failedToRedeemTrialCard')
+}
+
 // Helper functions for history display
 const isBalanceType = (type: string) => {
   return type === 'balance' || type === 'admin_balance'
@@ -640,7 +672,7 @@ const handleTrialRedeem = async () => {
     await fetchAvailableGroups()
     appStore.showSuccess(t('redeem.trialCardRedeemSuccess'))
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.detail || error.message || t('redeem.failedToRedeemTrialCard')
+    errorMessage.value = getTrialCardErrorMessage(error)
     appStore.showError(t('redeem.redeemFailed'))
   } finally {
     submittingTrial.value = false
