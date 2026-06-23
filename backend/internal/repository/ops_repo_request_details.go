@@ -64,9 +64,10 @@ func (r *opsRepository) ListRequestDetails(ctx context.Context, filter *service.
 		if q := strings.TrimSpace(filter.Query); q != "" {
 			like := "%" + strings.ToLower(q) + "%"
 			startIdx := len(args) + 1
+			safeRequestParamsExpr := "LOWER(COALESCE((request_params - 'prompt_preview' - 'input_preview' - 'last_user_message_preview' - 'last_input_preview' - 'last_user_content_preview' - '_encrypted_sensitive_request_params')::text,''))"
 			addCondition(
-				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d OR LOWER(COALESCE(request_params::text,'')) LIKE $%d OR LOWER(COALESCE(user_email,'')) LIKE $%d OR LOWER(COALESCE(username,'')) LIKE $%d OR LOWER(COALESCE(api_key_name,'')) LIKE $%d OR LOWER(COALESCE(account_name,'')) LIKE $%d OR LOWER(COALESCE(group_name,'')) LIKE $%d)",
-					startIdx, startIdx+1, startIdx+2, startIdx+3, startIdx+4, startIdx+5, startIdx+6, startIdx+7, startIdx+8,
+				fmt.Sprintf("(LOWER(COALESCE(request_id,'')) LIKE $%d OR LOWER(COALESCE(model,'')) LIKE $%d OR LOWER(COALESCE(message,'')) LIKE $%d OR %s LIKE $%d OR LOWER(COALESCE(user_email,'')) LIKE $%d OR LOWER(COALESCE(username,'')) LIKE $%d OR LOWER(COALESCE(api_key_name,'')) LIKE $%d OR LOWER(COALESCE(account_name,'')) LIKE $%d OR LOWER(COALESCE(group_name,'')) LIKE $%d)",
+					startIdx, startIdx+1, startIdx+2, safeRequestParamsExpr, startIdx+3, startIdx+4, startIdx+5, startIdx+6, startIdx+7, startIdx+8,
 				),
 				like, like, like, like, like, like, like, like, like,
 			)
@@ -396,7 +397,7 @@ LIMIT $%d OFFSET $%d
 			UpstreamEndpoint: strings.TrimSpace(upstreamEndpoint.String),
 			RequestedModel:   strings.TrimSpace(requestedModel.String),
 			UpstreamModel:    strings.TrimSpace(upstreamModel.String),
-			RequestParams:    requestParamsFromNullJSON(requestParams),
+			RequestParams:    service.SanitizeRequestParamsForResponse(requestParamsFromNullJSON(requestParams)),
 		}
 
 		if item.Platform == "" {

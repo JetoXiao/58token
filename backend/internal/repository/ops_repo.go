@@ -13,7 +13,8 @@ import (
 )
 
 type opsRepository struct {
-	db *sql.DB
+	db        *sql.DB
+	encryptor service.SecretEncryptor
 }
 
 const insertOpsErrorLogSQL = `
@@ -60,8 +61,8 @@ INSERT INTO ops_error_logs (
   $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38
 )`
 
-func NewOpsRepository(db *sql.DB) service.OpsRepository {
-	return &opsRepository{db: db}
+func NewOpsRepository(db *sql.DB, encryptor service.SecretEncryptor) service.OpsRepository {
+	return &opsRepository{db: db, encryptor: encryptor}
 }
 
 func (r *opsRepository) InsertErrorLog(ctx context.Context, input *service.OpsInsertErrorLogInput) (int64, error) {
@@ -76,7 +77,7 @@ func (r *opsRepository) InsertErrorLog(ctx context.Context, input *service.OpsIn
 	err := r.db.QueryRowContext(
 		ctx,
 		insertOpsErrorLogSQL+" RETURNING id",
-		opsInsertErrorLogArgs(input)...,
+		opsInsertErrorLogArgs(input, r.encryptor)...,
 	).Scan(&id)
 	if err != nil {
 		return 0, err
@@ -115,7 +116,7 @@ func (r *opsRepository) BatchInsertErrorLogs(ctx context.Context, inputs []*serv
 		if input == nil {
 			continue
 		}
-		if _, err = stmt.ExecContext(ctx, opsInsertErrorLogArgs(input)...); err != nil {
+		if _, err = stmt.ExecContext(ctx, opsInsertErrorLogArgs(input, r.encryptor)...); err != nil {
 			return inserted, err
 		}
 		inserted++
@@ -127,7 +128,11 @@ func (r *opsRepository) BatchInsertErrorLogs(ctx context.Context, inputs []*serv
 	return inserted, nil
 }
 
-func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput) []any {
+func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput, encryptor ...service.SecretEncryptor) []any {
+	var enc service.SecretEncryptor
+	if len(encryptor) > 0 {
+		enc = encryptor[0]
+	}
 	return []any{
 		opsNullString(input.RequestID),
 		opsNullString(input.ClientRequestID),
@@ -165,7 +170,7 @@ func opsInsertErrorLogArgs(input *service.OpsInsertErrorLogInput) []any {
 		opsNullInt64(input.UpstreamLatencyMs),
 		opsNullInt64(input.ResponseLatencyMs),
 		opsNullInt64(input.TimeToFirstTokenMs),
-		opsNullRequestParamsJSON(input.RequestParams),
+		opsNullRequestParamsJSON(service.ProtectRequestParamsForStorage(input.RequestParams, enc)),
 		input.CreatedAt,
 	}
 }

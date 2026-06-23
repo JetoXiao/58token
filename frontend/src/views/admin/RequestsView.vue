@@ -342,19 +342,14 @@
                       </div>
 
                       <div>
-                        <div class="mb-2 flex items-center justify-between">
-                          <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ ui.paramsJson }}</div>
-                          <button
-                            type="button"
-                            class="btn btn-secondary btn-sm"
-                            :disabled="!hasParams(row.request_params)"
-                            @click="copyText(formatParamsJson(row.request_params), ui.copied)"
-                          >
-                            <Icon name="copy" size="xs" class="mr-1.5" />
-                            {{ ui.copy }}
-                          </button>
+                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ ui.paramsSummary }}</div>
+                        <div v-if="hasParams(row.request_params)" class="flex flex-wrap gap-2 rounded-md border border-gray-200 bg-white p-3 dark:border-dark-700 dark:bg-dark-800">
+                          <span v-for="param in detailParams(row.request_params)" :key="param.key" class="param-chip" :title="`${param.key}: ${param.value}`">
+                            <span class="text-gray-500 dark:text-gray-400">{{ param.key }}</span>
+                            <span class="ml-1 font-medium text-gray-800 dark:text-gray-100">{{ param.value }}</span>
+                          </span>
                         </div>
-                        <pre class="max-h-96 overflow-auto rounded-md border border-gray-200 bg-white p-3 text-xs leading-relaxed text-gray-800 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-100">{{ formatParamsJson(row.request_params) }}</pre>
+                        <div v-else class="rounded-md border border-gray-200 bg-white p-3 text-xs text-gray-400 dark:border-dark-700 dark:bg-dark-800">-</div>
                       </div>
                     </div>
                   </td>
@@ -436,7 +431,7 @@ const zh = {
   sortCreated: '最新请求',
   sortDuration: '耗时最长',
   search: '搜索',
-  searchPlaceholder: '模型、请求 ID、用户、邮箱、密钥或参数',
+  searchPlaceholder: '模型、请求 ID、用户、邮箱或密钥',
   requestId: '请求 ID',
   model: '模型',
   platform: '平台',
@@ -471,7 +466,7 @@ const zh = {
   expand: '展开',
   collapse: '收起',
   errorMessage: '错误信息',
-  paramsJson: '完整入参摘要'
+  paramsSummary: '安全入参摘要'
 }
 
 const en: typeof zh = {
@@ -498,7 +493,7 @@ const en: typeof zh = {
   sortCreated: 'Newest',
   sortDuration: 'Slowest',
   search: 'Search',
-  searchPlaceholder: 'Model, request ID, user, email, key, or params',
+  searchPlaceholder: 'Model, request ID, user, email, or key',
   requestId: 'Request ID',
   model: 'Model',
   platform: 'Platform',
@@ -533,7 +528,7 @@ const en: typeof zh = {
   expand: 'Expand',
   collapse: 'Collapse',
   errorMessage: 'Error message',
-  paramsJson: 'Full params JSON'
+  paramsSummary: 'Safe params summary'
 }
 
 const { locale } = useI18n()
@@ -585,6 +580,15 @@ const priorityParamKeys = [
   'prompt_chars',
   'tool_types'
 ]
+
+const sensitiveParamKeys = new Set([
+  '_encrypted_sensitive_request_params',
+  'prompt_preview',
+  'input_preview',
+  'last_user_message_preview',
+  'last_input_preview',
+  'last_user_content_preview'
+])
 
 onMounted(() => {
   void refreshAll()
@@ -726,7 +730,7 @@ function toggleExpanded(key: string) {
 }
 
 function hasParams(params: OpsRequestDetail['request_params']): params is Record<string, unknown> {
-  return !!params && typeof params === 'object' && Object.keys(params).length > 0
+  return !!params && typeof params === 'object' && Object.keys(params).some((key) => !sensitiveParamKeys.has(key))
 }
 
 function summaryParams(params: OpsRequestDetail['request_params']): Array<{ key: string; value: string }> {
@@ -737,6 +741,7 @@ function summaryParams(params: OpsRequestDetail['request_params']): Array<{ key:
 
   for (const key of priorityParamKeys) {
     if (!(key in params)) continue
+    if (sensitiveParamKeys.has(key)) continue
     result.push({ key, value: formatParamValue(params[key]) })
     used.add(key)
     if (result.length >= maxSummaryParams) return result
@@ -744,6 +749,7 @@ function summaryParams(params: OpsRequestDetail['request_params']): Array<{ key:
 
   for (const [key, value] of Object.entries(params)) {
     if (used.has(key)) continue
+    if (sensitiveParamKeys.has(key)) continue
     result.push({ key, value: formatParamValue(value) })
     if (result.length >= maxSummaryParams) break
   }
@@ -752,12 +758,15 @@ function summaryParams(params: OpsRequestDetail['request_params']): Array<{ key:
 
 function hiddenParamCount(params: OpsRequestDetail['request_params']): number {
   if (!hasParams(params)) return 0
-  return Math.max(0, Object.keys(params).length - summaryParams(params).length)
+  return Math.max(0, Object.keys(params).filter((key) => !sensitiveParamKeys.has(key)).length - summaryParams(params).length)
 }
 
-function formatParamsJson(params: OpsRequestDetail['request_params']): string {
-  if (!hasParams(params)) return '{}'
-  return JSON.stringify(params, null, 2)
+function detailParams(params: OpsRequestDetail['request_params']): Array<{ key: string; value: string }> {
+  if (!hasParams(params)) return []
+  return Object.entries(params)
+    .filter(([key]) => !sensitiveParamKeys.has(key))
+    .map(([key, value]) => ({ key, value: formatParamValue(value) }))
+    .sort((a, b) => a.key.localeCompare(b.key))
 }
 
 function formatParamValue(value: unknown): string {

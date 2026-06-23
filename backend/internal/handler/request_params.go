@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	opsRequestParamsKey        = "ops_request_params"
-	requestParamPreviewMaxRune = 512
-	requestParamListMaxItems   = 8
+	opsRequestParamsKey      = "ops_request_params"
+	requestParamListMaxItems = 8
 )
 
 const (
@@ -441,17 +440,15 @@ func buildSanitizedRequestParamsFromBody(body []byte) map[string]any {
 	putJSONNumber(out, body, "partial_images", "partial_images")
 
 	if prompt := strings.TrimSpace(gjson.GetBytes(body, "prompt").String()); prompt != "" {
-		out["prompt_preview"] = previewText(prompt)
 		out["prompt_chars"] = utf8.RuneCountInString(prompt)
 	}
 	if input := strings.TrimSpace(gjson.GetBytes(body, "input").String()); input != "" && gjson.GetBytes(body, "input").Type == gjson.String {
-		out["input_preview"] = previewText(input)
 		out["input_chars"] = utf8.RuneCountInString(input)
 	}
 
-	captureArraySummary(out, body, "messages", "messages_count", "last_user_message_preview")
-	captureArraySummary(out, body, "input", "input_items_count", "last_input_preview")
-	captureArraySummary(out, body, "contents", "contents_count", "last_user_content_preview")
+	captureArraySummary(out, body, "messages", "messages_count")
+	captureArraySummary(out, body, "input", "input_items_count")
+	captureArraySummary(out, body, "contents", "contents_count")
 	captureToolSummary(out, body)
 
 	if len(out) == 0 {
@@ -492,7 +489,6 @@ func buildSanitizedOpenAIImagesRequestParams(req *service.OpenAIImagesRequest) m
 		out["partial_images"] = *req.PartialImages
 	}
 	if prompt := strings.TrimSpace(req.Prompt); prompt != "" {
-		out["prompt_preview"] = previewText(prompt)
 		out["prompt_chars"] = utf8.RuneCountInString(prompt)
 	}
 	if req.Multipart {
@@ -558,26 +554,19 @@ func putJSONNumber(out map[string]any, body []byte, path string, key string) {
 	out[key] = v.Int()
 }
 
-func captureArraySummary(out map[string]any, body []byte, path string, countKey string, previewKey string) {
+func captureArraySummary(out map[string]any, body []byte, path string, countKey string) {
 	arr := gjson.GetBytes(body, path)
 	if !arr.IsArray() {
 		return
 	}
 
 	count := 0
-	lastPreview := ""
 	arr.ForEach(func(_, item gjson.Result) bool {
 		count++
-		if text := previewTextFromJSONItem(item); text != "" {
-			lastPreview = text
-		}
 		return true
 	})
 	if count > 0 {
 		out[countKey] = count
-	}
-	if lastPreview != "" {
-		out[previewKey] = lastPreview
 	}
 }
 
@@ -629,54 +618,4 @@ func putJSONItemNumber(out map[string]any, item gjson.Result, path string, key s
 		return
 	}
 	out[key] = v.Int()
-}
-
-func previewTextFromJSONItem(item gjson.Result) string {
-	if item.Type == gjson.String {
-		return previewText(item.String())
-	}
-	if text := strings.TrimSpace(item.Get("text").String()); text != "" {
-		return previewText(text)
-	}
-	if content := item.Get("content"); content.Exists() {
-		if content.Type == gjson.String {
-			return previewText(content.String())
-		}
-		if content.IsArray() {
-			last := ""
-			content.ForEach(func(_, part gjson.Result) bool {
-				partType := strings.TrimSpace(part.Get("type").String())
-				if partType == "text" || partType == "input_text" {
-					if text := strings.TrimSpace(part.Get("text").String()); text != "" {
-						last = previewText(text)
-					}
-				}
-				return true
-			})
-			return last
-		}
-	}
-	if parts := item.Get("parts"); parts.IsArray() {
-		last := ""
-		parts.ForEach(func(_, part gjson.Result) bool {
-			if text := strings.TrimSpace(part.Get("text").String()); text != "" {
-				last = previewText(text)
-			}
-			return true
-		})
-		return last
-	}
-	return ""
-}
-
-func previewText(text string) string {
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return ""
-	}
-	runes := []rune(text)
-	if len(runes) <= requestParamPreviewMaxRune {
-		return text
-	}
-	return string(runes[:requestParamPreviewMaxRune]) + "..."
 }

@@ -35,8 +35,10 @@ func TestBuildSanitizedRequestParamsFromBody_SummarizesWithoutImagePayload(t *te
 	require.Equal(t, "high", got["quality"])
 	require.Equal(t, []string{"image_generation"}, got["tool_types"])
 	require.Equal(t, 1, got["input_items_count"])
-	require.Equal(t, "make a small launch graphic", got["last_input_preview"])
+	require.NotContains(t, got, "last_input_preview")
+	require.NotContains(t, got, "last_user_message_preview")
 	require.NotContains(t, got, "image_url")
+	require.NotContains(t, got, "make a small launch graphic")
 }
 
 func TestBuildSanitizedOpenAIImagesRequestParams_MultipartSummary(t *testing.T) {
@@ -75,10 +77,12 @@ func TestBuildSanitizedOpenAIImagesRequestParams_MultipartSummary(t *testing.T) 
 	require.Equal(t, true, got["multipart"])
 	require.Equal(t, 1, got["input_image_count"])
 	require.Equal(t, true, got["has_mask"])
-	require.Equal(t, "edit the product photo", got["prompt_preview"])
+	require.Equal(t, 22, got["prompt_chars"])
+	require.NotContains(t, got, "prompt_preview")
 	require.NotContains(t, got, "uploads")
 	require.NotContains(t, got, "file_name")
 	require.NotContains(t, got, "image")
+	require.NotContains(t, got, "edit the product photo")
 }
 
 func TestBuildTTFTObservationParamsIncludesResponseCacheBypassReason(t *testing.T) {

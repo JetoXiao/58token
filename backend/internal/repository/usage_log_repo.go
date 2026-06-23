@@ -172,9 +172,10 @@ func appendRawUsageLogModelQueryFilter(query string, args []any, model string) (
 }
 
 type usageLogRepository struct {
-	client *dbent.Client
-	sql    sqlExecutor
-	db     *sql.DB
+	client    *dbent.Client
+	sql       sqlExecutor
+	db        *sql.DB
+	encryptor service.SecretEncryptor
 
 	createBatchOnce     sync.Once
 	createBatchCh       chan usageLogCreateRequest
@@ -245,15 +246,18 @@ const (
 	usageLogCreateStateCanceled
 )
 
-func NewUsageLogRepository(client *dbent.Client, sqlDB *sql.DB) service.UsageLogRepository {
-	return newUsageLogRepositoryWithSQL(client, sqlDB)
+func NewUsageLogRepository(client *dbent.Client, sqlDB *sql.DB, encryptor service.SecretEncryptor) service.UsageLogRepository {
+	return newUsageLogRepositoryWithSQL(client, sqlDB, encryptor)
 }
 
-func newUsageLogRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *usageLogRepository {
+func newUsageLogRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor, encryptor ...service.SecretEncryptor) *usageLogRepository {
 	// 使用 scanSingleRow 替代 QueryRowContext，保证 ent.Tx 作为 sqlExecutor 可用。
 	repo := &usageLogRepository{client: client, sql: sqlq}
 	if db, ok := sqlq.(*sql.DB); ok {
 		repo.db = db
+	}
+	if len(encryptor) > 0 {
+		repo.encryptor = encryptor[0]
 	}
 	repo.bestEffortRecent = gocache.New(usageLogBestEffortRecentTTL, time.Minute)
 	return repo
@@ -319,7 +323,7 @@ func (r *usageLogRepository) CreateBestEffort(ctx context.Context, log *service.
 	}
 
 	req := usageLogBestEffortRequest{
-		prepared: prepareUsageLogInsert(log),
+		prepared: r.prepareUsageLogInsert(log),
 		apiKeyID: log.APIKeyID,
 		resultCh: make(chan error, 1),
 	}
@@ -346,7 +350,7 @@ func (r *usageLogRepository) CreateBestEffort(ctx context.Context, log *service.
 }
 
 func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor, log *service.UsageLog) (bool, error) {
-	prepared := prepareUsageLogInsert(log)
+	prepared := r.prepareUsageLogInsert(log)
 	if sqlq == nil {
 		sqlq = r.sql
 	}
@@ -446,7 +450,7 @@ func (r *usageLogRepository) createBatched(ctx context.Context, log *service.Usa
 
 	req := usageLogCreateRequest{
 		log:      log,
-		prepared: prepareUsageLogInsert(log),
+		prepared: r.prepareUsageLogInsert(log),
 		shared:   &usageLogCreateShared{},
 		resultCh: make(chan usageLogCreateResult, 1),
 	}
@@ -1284,7 +1288,19 @@ func execUsageLogInsertNoResult(ctx context.Context, sqlq sqlExecutor, prepared 
 	return err
 }
 
+func (r *usageLogRepository) prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
+	var encryptor service.SecretEncryptor
+	if r != nil {
+		encryptor = r.encryptor
+	}
+	return prepareUsageLogInsertWithEncryptor(log, encryptor)
+}
+
 func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
+	return prepareUsageLogInsertWithEncryptor(log, nil)
+}
+
+func prepareUsageLogInsertWithEncryptor(log *service.UsageLog, encryptor service.SecretEncryptor) usageLogInsertPrepared {
 	createdAt := log.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now()
@@ -1316,7 +1332,7 @@ func prepareUsageLogInsert(log *service.UsageLog) usageLogInsertPrepared {
 	modelMappingChain := nullString(log.ModelMappingChain)
 	billingTier := nullString(log.BillingTier)
 	billingMode := nullString(log.BillingMode)
-	requestParams := nullAnyMapJSON(log.RequestParams)
+	requestParams := nullAnyMapJSON(service.ProtectRequestParamsForStorage(log.RequestParams, encryptor))
 	requestedModel := strings.TrimSpace(log.RequestedModel)
 	if requestedModel == "" {
 		requestedModel = strings.TrimSpace(log.Model)
@@ -4342,7 +4358,7 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		RequestType:           service.RequestTypeFromInt16(requestTypeRaw),
 		ImageCount:            imageCount,
 		CacheTTLOverridden:    cacheTTLOverridden,
-		RequestParams:         anyMapFromNullJSON(requestParams),
+		RequestParams:         service.SanitizeRequestParamsForResponse(anyMapFromNullJSON(requestParams)),
 		CreatedAt:             createdAt,
 	}
 	// 先回填 legacy 字段，再基于 legacy + request_type 计算最终请求类型，保证历史数据兼容。

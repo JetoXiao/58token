@@ -726,7 +726,7 @@ LIMIT $` + fmt.Sprint(len(args)+2)
 			v := schedulerLoadSkew.Float64
 			item.SchedulerLoadSkew = &v
 		}
-		item.RequestParams = decodeJSONMap(requestParamsRaw)
+		item.RequestParams = service.SanitizeRequestParamsForResponse(decodeJSONMap(requestParamsRaw))
 		out = append(out, item)
 	}
 	return out, rows.Err()
