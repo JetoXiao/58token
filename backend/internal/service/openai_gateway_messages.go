@@ -456,14 +456,15 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 	c.JSON(http.StatusOK, anthropicResp)
 
 	return &OpenAIForwardResult{
-		RequestID:     requestID,
-		ResponseID:    finalResponse.ID,
-		Usage:         usage,
-		Model:         originalModel,
-		BillingModel:  billingModel,
-		UpstreamModel: upstreamModel,
-		Stream:        false,
-		Duration:      time.Since(startTime),
+		RequestID:       requestID,
+		ResponseID:      finalResponse.ID,
+		Usage:           usage,
+		UsageIncomplete: finalResponse.Usage == nil,
+		Model:           originalModel,
+		BillingModel:    billingModel,
+		UpstreamModel:   upstreamModel,
+		Stream:          false,
+		Duration:        time.Since(startTime),
 	}, nil
 }
 
@@ -656,6 +657,8 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	state := apicompat.NewResponsesEventToAnthropicState()
 	state.Model = originalModel
 	var usage OpenAIUsage
+	terminalSeen := false
+	terminalUsageSeen := false
 	responseID := ""
 	var firstTokenMs *int
 	firstChunk := true
@@ -685,15 +688,16 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	// resultWithUsage builds the final result snapshot.
 	resultWithUsage := func() *OpenAIForwardResult {
 		return &OpenAIForwardResult{
-			RequestID:     requestID,
-			ResponseID:    responseID,
-			Usage:         usage,
-			Model:         originalModel,
-			BillingModel:  billingModel,
-			UpstreamModel: upstreamModel,
-			Stream:        true,
-			Duration:      time.Since(startTime),
-			FirstTokenMs:  firstTokenMs,
+			RequestID:       requestID,
+			ResponseID:      responseID,
+			Usage:           usage,
+			UsageIncomplete: terminalSeen && !terminalUsageSeen,
+			Model:           originalModel,
+			BillingModel:    billingModel,
+			UpstreamModel:   upstreamModel,
+			Stream:          true,
+			Duration:        time.Since(startTime),
+			FirstTokenMs:    firstTokenMs,
 		}
 	}
 
@@ -716,12 +720,16 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 
 		// 仅按兼容转换器支持的终止事件提取 usage，避免无意扩大事件语义。
 		isTerminalEvent := isOpenAICompatResponsesTerminalEvent(event.Type)
-		if isTerminalEvent && event.Response != nil {
-			if id := strings.TrimSpace(event.Response.ID); id != "" {
-				responseID = id
-			}
-			if event.Response.Usage != nil {
-				usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
+		if isTerminalEvent {
+			terminalSeen = true
+			if event.Response != nil {
+				if id := strings.TrimSpace(event.Response.ID); id != "" {
+					responseID = id
+				}
+				if event.Response.Usage != nil {
+					usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
+					terminalUsageSeen = true
+				}
 			}
 		}
 

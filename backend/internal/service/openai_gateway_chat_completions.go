@@ -398,13 +398,14 @@ func (s *OpenAIGatewayService) handleChatBufferedStreamingResponse(
 	c.JSON(http.StatusOK, chatResp)
 
 	return &OpenAIForwardResult{
-		RequestID:     requestID,
-		Usage:         usage,
-		Model:         originalModel,
-		BillingModel:  billingModel,
-		UpstreamModel: upstreamModel,
-		Stream:        false,
-		Duration:      time.Since(startTime),
+		RequestID:       requestID,
+		Usage:           usage,
+		UsageIncomplete: finalResponse.Usage == nil,
+		Model:           originalModel,
+		BillingModel:    billingModel,
+		UpstreamModel:   upstreamModel,
+		Stream:          false,
+		Duration:        time.Since(startTime),
 	}, nil
 }
 
@@ -441,9 +442,11 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	state := apicompat.NewResponsesEventToChatState()
 	state.Model = originalModel
-	state.IncludeUsage = includeUsage
+	state.IncludeUsage = true
 
 	var usage OpenAIUsage
+	terminalSeen := false
+	terminalUsageSeen := false
 	var firstTokenMs *int
 	firstChunk := true
 	clientDisconnected := false
@@ -474,14 +477,15 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 	resultWithUsage := func() *OpenAIForwardResult {
 		return &OpenAIForwardResult{
-			RequestID:     requestID,
-			Usage:         usage,
-			Model:         originalModel,
-			BillingModel:  billingModel,
-			UpstreamModel: upstreamModel,
-			Stream:        true,
-			Duration:      time.Since(startTime),
-			FirstTokenMs:  firstTokenMs,
+			RequestID:       requestID,
+			Usage:           usage,
+			UsageIncomplete: terminalSeen && !terminalUsageSeen,
+			Model:           originalModel,
+			BillingModel:    billingModel,
+			UpstreamModel:   upstreamModel,
+			Stream:          true,
+			Duration:        time.Since(startTime),
+			FirstTokenMs:    firstTokenMs,
 		}
 	}
 
@@ -504,8 +508,12 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 
 		// 仅按兼容转换器支持的终止事件提取 usage，避免无意扩大事件语义。
 		isTerminalEvent := isOpenAICompatResponsesTerminalEvent(event.Type)
-		if isTerminalEvent && event.Response != nil && event.Response.Usage != nil {
-			usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
+		if isTerminalEvent {
+			terminalSeen = true
+			if event.Response != nil && event.Response.Usage != nil {
+				usage = copyOpenAIUsageFromResponsesUsage(event.Response.Usage)
+				terminalUsageSeen = true
+			}
 		}
 
 		chunks := apicompat.ResponsesEventToChatChunks(&event, state)

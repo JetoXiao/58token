@@ -216,7 +216,10 @@ type OpenAIForwardResult struct {
 	RequestID  string
 	ResponseID string
 	Usage      OpenAIUsage
-	Model      string // 原始模型（用于响应和日志显示）
+	// UsageIncomplete means the upstream completed but did not include a usage object.
+	// Such responses are forwarded to the client, but must not create billing rows.
+	UsageIncomplete bool
+	Model           string // 原始模型（用于响应和日志显示）
 	// BillingModel is the model used for cost calculation.
 	// When non-empty, CalculateCost uses this instead of Model.
 	// This is set by the Anthropic Messages conversion path where
@@ -5502,6 +5505,16 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	if s.rateLimitService != nil && input.Account != nil && input.Account.Platform == PlatformOpenAI {
 		s.rateLimitService.ResetOpenAI403Counter(ctx, input.Account.ID)
+	}
+	if result.UsageIncomplete {
+		logger.L().Warn("openai usage incomplete; skip usage record",
+			zap.String("request_id", result.RequestID),
+			zap.String("model", result.Model),
+			zap.Bool("stream", result.Stream),
+			zap.String("inbound_endpoint", input.InboundEndpoint),
+			zap.String("upstream_endpoint", input.UpstreamEndpoint),
+		)
+		return nil
 	}
 
 	apiKey := input.APIKey
