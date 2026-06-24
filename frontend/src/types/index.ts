@@ -87,6 +87,7 @@ export interface User {
   role: 'admin' | 'sub_admin' | 'user' // User role for authorization
   admin_menu_permissions?: string[] // Read-only delegated admin menu permissions
   balance: number // User balance for API usage
+  allow_balance_subscription_purchase?: boolean // Whether balance can pay for subscription plans
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
   status: 'active' | 'disabled' // Account status
@@ -1618,6 +1619,7 @@ export interface UpdateUserRequest {
   role?: 'admin' | 'sub_admin' | 'user'
   admin_menu_permissions?: string[]
   balance?: number
+  allow_balance_subscription_purchase?: boolean
   concurrency?: number
   status?: 'active' | 'disabled'
   allowed_groups?: number[] | null

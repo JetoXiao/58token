@@ -20,6 +20,7 @@ const (
 	TypeAirwallex    PaymentType = "airwallex"
 	TypeUSDT         PaymentType = "usdt"
 	TypeInfini       PaymentType = "infini"
+	TypeBalance      PaymentType = "balance"
 )
 
 // Order status constants shared across payment and service layers.

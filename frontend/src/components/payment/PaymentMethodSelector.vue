@@ -20,7 +20,13 @@
         @click="method.available && emit('select', method.type)"
       >
         <span class="flex items-center gap-2">
-          <img :src="methodIcon(method.type)" :alt="t(`payment.methods.${method.type}`)" class="h-7 w-7 object-contain" />
+          <span
+            v-if="method.type === 'balance'"
+            class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+          >
+            <Icon name="dollar" size="sm" :stroke-width="2.2" />
+          </span>
+          <img v-else :src="methodIcon(method.type)" :alt="t(`payment.methods.${method.type}`)" class="h-7 w-7 object-contain" />
           <span class="flex flex-col items-start leading-none">
             <span class="text-base font-semibold">{{ t(`payment.methods.${method.type}`) }}</span>
             <span
@@ -45,6 +51,7 @@ import wxpayIcon from '@/assets/icons/wxpay.svg'
 import stripeIcon from '@/assets/icons/stripe.svg'
 import airwallexIcon from '@/assets/icons/airwallex.svg'
 import infiniIcon from '@/assets/icons/infini.png'
+import Icon from '@/components/icons/Icon.vue'
 
 export interface PaymentMethodOption {
   type: string
@@ -83,6 +90,7 @@ const sortedMethods = computed(() => {
 function methodIcon(type: string): string {
   if (type.includes('alipay')) return METHOD_ICONS.alipay
   if (type.includes('wxpay')) return METHOD_ICONS.wxpay
+  if (type === 'balance') return METHOD_ICONS.usdt
   if (type === 'usdt') return METHOD_ICONS.usdt
   if (type === 'airwallex') return METHOD_ICONS.airwallex
   return METHOD_ICONS[type] || alipayIcon
@@ -91,6 +99,7 @@ function methodIcon(type: string): string {
 function methodSelectedClass(type: string): string {
   if (type.includes('alipay')) return 'border-[#02A9F1] bg-blue-50 text-gray-900 shadow-sm dark:bg-blue-950 dark:text-gray-100'
   if (type.includes('wxpay')) return 'border-[#09BB07] bg-green-50 text-gray-900 shadow-sm dark:bg-green-950 dark:text-gray-100'
+  if (type === 'balance') return 'border-emerald-400 bg-emerald-50 text-gray-900 shadow-sm dark:border-emerald-500 dark:bg-emerald-950 dark:text-gray-100'
   if (type === 'usdt') return 'border-emerald-400 bg-emerald-50 text-gray-900 shadow-sm dark:border-emerald-500 dark:bg-emerald-950 dark:text-gray-100'
   if (type === 'stripe') return 'border-[#676BE5] bg-indigo-50 text-gray-900 shadow-sm dark:bg-indigo-950 dark:text-gray-100'
   if (type === 'airwallex') return 'border-[#FF6B3D] bg-orange-50 text-gray-900 shadow-sm dark:border-[#FF8E3C] dark:bg-orange-950 dark:text-gray-100'

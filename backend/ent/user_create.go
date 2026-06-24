@@ -339,6 +339,20 @@ func (_c *UserCreate) SetNillableTotalRecharged(v *float64) *UserCreate {
 	return _c
 }
 
+// SetAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field.
+func (_c *UserCreate) SetAllowBalanceSubscriptionPurchase(v bool) *UserCreate {
+	_c.mutation.SetAllowBalanceSubscriptionPurchase(v)
+	return _c
+}
+
+// SetNillableAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field if the given value is not nil.
+func (_c *UserCreate) SetNillableAllowBalanceSubscriptionPurchase(v *bool) *UserCreate {
+	if v != nil {
+		_c.SetAllowBalanceSubscriptionPurchase(*v)
+	}
+	return _c
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_c *UserCreate) SetRpmLimit(v int) *UserCreate {
 	_c.mutation.SetRpmLimit(v)
@@ -636,6 +650,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultTotalRecharged
 		_c.mutation.SetTotalRecharged(v)
 	}
+	if _, ok := _c.mutation.AllowBalanceSubscriptionPurchase(); !ok {
+		v := user.DefaultAllowBalanceSubscriptionPurchase
+		_c.mutation.SetAllowBalanceSubscriptionPurchase(v)
+	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		v := user.DefaultRpmLimit
 		_c.mutation.SetRpmLimit(v)
@@ -725,6 +743,9 @@ func (_c *UserCreate) check() error {
 	}
 	if _, ok := _c.mutation.TotalRecharged(); !ok {
 		return &ValidationError{Name: "total_recharged", err: errors.New(`ent: missing required field "User.total_recharged"`)}
+	}
+	if _, ok := _c.mutation.AllowBalanceSubscriptionPurchase(); !ok {
+		return &ValidationError{Name: "allow_balance_subscription_purchase", err: errors.New(`ent: missing required field "User.allow_balance_subscription_purchase"`)}
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "User.rpm_limit"`)}
@@ -847,6 +868,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TotalRecharged(); ok {
 		_spec.SetField(user.FieldTotalRecharged, field.TypeFloat64, value)
 		_node.TotalRecharged = value
+	}
+	if value, ok := _c.mutation.AllowBalanceSubscriptionPurchase(); ok {
+		_spec.SetField(user.FieldAllowBalanceSubscriptionPurchase, field.TypeBool, value)
+		_node.AllowBalanceSubscriptionPurchase = value
 	}
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)
@@ -1424,6 +1449,18 @@ func (u *UserUpsert) AddTotalRecharged(v float64) *UserUpsert {
 	return u
 }
 
+// SetAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field.
+func (u *UserUpsert) SetAllowBalanceSubscriptionPurchase(v bool) *UserUpsert {
+	u.Set(user.FieldAllowBalanceSubscriptionPurchase, v)
+	return u
+}
+
+// UpdateAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field to the value that was provided on create.
+func (u *UserUpsert) UpdateAllowBalanceSubscriptionPurchase() *UserUpsert {
+	u.SetExcluded(user.FieldAllowBalanceSubscriptionPurchase)
+	return u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (u *UserUpsert) SetRpmLimit(v int) *UserUpsert {
 	u.Set(user.FieldRpmLimit, v)
@@ -1862,6 +1899,20 @@ func (u *UserUpsertOne) AddTotalRecharged(v float64) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateTotalRecharged() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateTotalRecharged()
+	})
+}
+
+// SetAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field.
+func (u *UserUpsertOne) SetAllowBalanceSubscriptionPurchase(v bool) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetAllowBalanceSubscriptionPurchase(v)
+	})
+}
+
+// UpdateAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateAllowBalanceSubscriptionPurchase() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateAllowBalanceSubscriptionPurchase()
 	})
 }
 
@@ -2472,6 +2523,20 @@ func (u *UserUpsertBulk) AddTotalRecharged(v float64) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateTotalRecharged() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateTotalRecharged()
+	})
+}
+
+// SetAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field.
+func (u *UserUpsertBulk) SetAllowBalanceSubscriptionPurchase(v bool) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetAllowBalanceSubscriptionPurchase(v)
+	})
+}
+
+// UpdateAllowBalanceSubscriptionPurchase sets the "allow_balance_subscription_purchase" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateAllowBalanceSubscriptionPurchase() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateAllowBalanceSubscriptionPurchase()
 	})
 }
 

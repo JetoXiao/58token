@@ -316,7 +316,7 @@
               </div>
 
               <div class="space-y-4 lg:sticky lg:top-24 lg:self-start">
-                <div v-if="enabledMethods.length >= 1" class="card p-6">
+                <div v-if="subscriptionMethods.length >= 1" class="card p-6">
                   <PaymentMethodSelector
                     :methods="subMethodOptions"
                     :selected="selectedSubscriptionMethod"
@@ -426,7 +426,7 @@
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.amountLabel') }}</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(subscriptionBaseAmount) }}</span>
                       </div>
-                      <div v-if="feeRate > 0 && selectedPlan.price > 0" class="flex justify-between gap-4">
+                      <div v-if="selectedSubscriptionMethod !== 'balance' && feeRate > 0 && selectedPlan.price > 0" class="flex justify-between gap-4">
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(subFeeAmount) }}</span>
                       </div>
@@ -445,7 +445,7 @@
                       <span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                       {{ t('common.processing') }}
                     </span>
-                    <span v-else-if="enabledMethods.length === 0">{{ t('payment.notAvailable') }}</span>
+                    <span v-else-if="subscriptionMethods.length === 0">{{ t('payment.notAvailable') }}</span>
                     <span v-else-if="!selectedPlan">{{ t('payment.selectPlan') }}</span>
                     <span v-else>{{ t('payment.createOrder') }} {{ formatSelectedPaymentAmount(subscriptionPayableAmount) }}</span>
                   </button>
@@ -744,7 +744,7 @@ function onPaymentSettled() {
 // All checkout data from single API call
 const checkout = ref<CheckoutInfoResponse>({
   methods: {}, global_min: 0, global_max: 0,
-  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, recharge_bonus_threshold: 100, recharge_bonus_amount: 10, usdt_cny_exchange_rate: 7, help_text: '', help_image_url: '', stripe_publishable_key: '',
+  plans: [], balance_disabled: false, balance_recharge_multiplier: 1, recharge_fee_rate: 0, recharge_bonus_threshold: 100, recharge_bonus_amount: 10, usdt_cny_exchange_rate: 7, help_text: '', help_image_url: '', stripe_publishable_key: '', allow_balance_subscription_purchase: false,
 })
 
 const tabs = computed(() => {
@@ -768,6 +768,12 @@ const rechargeMethods = computed(() => {
   return allowed.filter((method) => isVisibleMethodOpen(method))
 })
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
+const balanceSubscriptionAllowed = computed(() => checkout.value.allow_balance_subscription_purchase === true)
+const subscriptionMethods = computed(() => {
+  const methods = enabledMethods.value.filter((method) => method !== 'balance')
+  if (!balanceSubscriptionAllowed.value) return methods
+  return ['balance', ...methods]
+})
 
 function firstSortedMethod(methods: string[]): string {
   if (methods.length === 0) return ''
@@ -910,6 +916,7 @@ const planGridClass = computed(() => {
 // Check if an amount fits a method's [min, max]. 0 = no limit.
 function amountFitsMethod(amt: number, methodType: string): boolean {
   if (amt <= 0) return true
+  if (methodType === 'balance') return true
   const ml = visibleMethods.value[methodType]
   if (!ml) return false
   const paymentAmount = amountForMethodLimit(amt, ml)
@@ -953,8 +960,12 @@ const selectedSubscriptionLimit = computed(() => visibleMethods.value[selectedSu
 const selectedLimit = computed(() =>
   activeTab.value === 'subscription' ? selectedSubscriptionLimit.value : selectedRechargeLimit.value
 )
-const selectedCurrency = computed(() => normalizePaymentCurrency(selectedLimit.value?.currency))
-const selectedSubscriptionCurrency = computed(() => normalizePaymentCurrency(selectedSubscriptionLimit.value?.currency))
+const selectedSubscriptionCurrency = computed(() =>
+  selectedSubscriptionMethod.value === 'balance' ? 'USD' : normalizePaymentCurrency(selectedSubscriptionLimit.value?.currency)
+)
+const selectedCurrency = computed(() =>
+  activeTab.value === 'subscription' ? selectedSubscriptionCurrency.value : normalizePaymentCurrency(selectedLimit.value?.currency)
+)
 const localeCode = computed(() => {
   const raw = i18n.locale as unknown
   if (typeof raw === 'string') return raw
@@ -1017,8 +1028,15 @@ const canSubmit = computed(() =>
 // Subscription-specific: method options based on plan price
 const subMethodOptions = computed<PaymentMethodOption[]>(() => {
   const planPrice = selectedPlan.value?.price ?? 0
-  return enabledMethods.value.map((type) => {
+  return subscriptionMethods.value.map((type) => {
     const ml = visibleMethods.value[type]
+    if (type === 'balance') {
+      return {
+        type,
+        fee_rate: 0,
+        available: planPrice <= 0 || (user.value?.balance ?? 0) >= balanceSubscriptionCost(planPrice),
+      }
+    }
     return {
       type,
       fee_rate: ml?.fee_rate ?? 0,
@@ -1027,8 +1045,16 @@ const subMethodOptions = computed<PaymentMethodOption[]>(() => {
   })
 })
 
+function balanceSubscriptionCost(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  return Math.round((value * balanceRechargeMultiplier.value) * 100) / 100
+}
+
 const subscriptionBaseAmount = computed(() => {
   const price = selectedPlan.value?.price ?? 0
+  if (selectedSubscriptionMethod.value === 'balance') {
+    return balanceSubscriptionCost(price)
+  }
   if (selectedSubscriptionCurrency.value === 'USDT') {
     return usdtPaymentForAmount(price)
   }
@@ -1036,6 +1062,7 @@ const subscriptionBaseAmount = computed(() => {
 })
 
 const subFeeAmount = computed(() => {
+  if (selectedSubscriptionMethod.value === 'balance') return 0
   const amountValue = subscriptionBaseAmount.value
   if (feeRate.value <= 0 || amountValue <= 0) return 0
   const scale = selectedSubscriptionCurrency.value === 'USDT' ? 10000 : 100
@@ -1043,6 +1070,7 @@ const subFeeAmount = computed(() => {
 })
 
 const subTotalAmount = computed(() => {
+  if (selectedSubscriptionMethod.value === 'balance') return subscriptionBaseAmount.value
   const amountValue = subscriptionBaseAmount.value
   if (feeRate.value <= 0 || amountValue <= 0) return amountValue
   const scale = selectedSubscriptionCurrency.value === 'USDT' ? 10000 : 100
@@ -1055,9 +1083,13 @@ const subscriptionPayableAmount = computed(() =>
 
 const canSubmitSubscription = computed(() =>
   selectedPlan.value !== null
-    && enabledMethods.value.includes(selectedSubscriptionMethod.value)
+    && subscriptionMethods.value.includes(selectedSubscriptionMethod.value)
     && amountFitsMethod(selectedPlan.value.price, selectedSubscriptionMethod.value)
-    && selectedSubscriptionLimit.value?.available !== false
+    && (
+      selectedSubscriptionMethod.value === 'balance'
+        ? (user.value?.balance ?? 0) >= balanceSubscriptionCost(selectedPlan.value.price)
+        : selectedSubscriptionLimit.value?.available !== false
+    )
 )
 
 // Auto-switch to first available method when current selection can't handle the amount
@@ -1067,9 +1099,9 @@ watch(() => [validAmount.value, selectedRechargeMethod.value, selectedRechargeRa
   if (available) selectedRechargeMethod.value = available
 })
 
-watch(() => [selectedPlan.value?.price ?? 0, selectedSubscriptionMethod.value, enabledMethods.value.join(',')] as const, ([price, method]) => {
-  if (method && enabledMethods.value.includes(method) && amountFitsMethod(price, method)) return
-  const available = enabledMethods.value.find((m) => amountFitsMethod(price, m))
+watch(() => [selectedPlan.value?.price ?? 0, selectedSubscriptionMethod.value, subscriptionMethods.value.join(',')] as const, ([price, method]) => {
+  if (method && subscriptionMethods.value.includes(method) && amountFitsMethod(price, method)) return
+  const available = subscriptionMethods.value.find((m) => amountFitsMethod(price, m))
   if (available) selectedSubscriptionMethod.value = available
 })
 
@@ -1087,6 +1119,7 @@ const paymentButtonClass = computed(() => {
   if (!m) return 'btn-primary'
   if (m.includes('alipay')) return 'btn-alipay'
   if (m.includes('wxpay')) return 'btn-wxpay'
+  if (m === 'balance') return 'btn-usdt'
   if (m === 'usdt') return 'btn-usdt'
   if (m === 'stripe') return 'btn-stripe'
   if (m === 'airwallex') return 'btn-airwallex'
@@ -1299,6 +1332,17 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       stripeRouteUrl,
       airwallexRouteUrl,
     })
+
+    if (visibleMethod === 'balance' && String(result.status || '').toUpperCase() === 'COMPLETED') {
+      removeRecoverySnapshot()
+      authStore.refreshUser()
+      if (orderType === 'subscription') {
+        selectedPlan.value = null
+        subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
+      }
+      appStore.showSuccess(t('payment.balanceSubscriptionSuccess'))
+      return
+    }
 
     if (decision.kind === 'wechat_oauth' && decision.oauth?.authorize_url) {
       window.location.href = buildWechatOAuthAuthorizeUrl(decision.oauth.authorize_url, {
@@ -1580,7 +1624,7 @@ onMounted(async () => {
     const res = await paymentAPI.getCheckoutInfo()
     checkout.value = res.data
     selectedRechargeMethod.value = firstSortedMethod(rechargeMethods.value) || firstSortedMethod(enabledMethods.value)
-    selectedSubscriptionMethod.value = firstSortedMethod(enabledMethods.value)
+    selectedSubscriptionMethod.value = firstSortedMethod(subscriptionMethods.value)
     if (typeof window !== 'undefined') {
       if (hasWechatResumeQuery(route.query)) {
         removeRecoverySnapshot()

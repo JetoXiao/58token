@@ -61,6 +61,8 @@ const (
 	FieldBalanceNotifyExtraEmails = "balance_notify_extra_emails"
 	// FieldTotalRecharged holds the string denoting the total_recharged field in the database.
 	FieldTotalRecharged = "total_recharged"
+	// FieldAllowBalanceSubscriptionPurchase holds the string denoting the allow_balance_subscription_purchase field in the database.
+	FieldAllowBalanceSubscriptionPurchase = "allow_balance_subscription_purchase"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -208,6 +210,7 @@ var Columns = []string{
 	FieldBalanceNotifyThreshold,
 	FieldBalanceNotifyExtraEmails,
 	FieldTotalRecharged,
+	FieldAllowBalanceSubscriptionPurchase,
 	FieldRpmLimit,
 }
 
@@ -279,6 +282,8 @@ var (
 	DefaultBalanceNotifyExtraEmails string
 	// DefaultTotalRecharged holds the default value on creation for the "total_recharged" field.
 	DefaultTotalRecharged float64
+	// DefaultAllowBalanceSubscriptionPurchase holds the default value on creation for the "allow_balance_subscription_purchase" field.
+	DefaultAllowBalanceSubscriptionPurchase bool
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
@@ -404,6 +409,11 @@ func ByBalanceNotifyExtraEmails(opts ...sql.OrderTermOption) OrderOption {
 // ByTotalRecharged orders the results by the total_recharged field.
 func ByTotalRecharged(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTotalRecharged, opts...).ToFunc()
+}
+
+// ByAllowBalanceSubscriptionPurchase orders the results by the allow_balance_subscription_purchase field.
+func ByAllowBalanceSubscriptionPurchase(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowBalanceSubscriptionPurchase, opts...).ToFunc()
 }
 
 // ByRpmLimit orders the results by the rpm_limit field.

@@ -71,6 +71,15 @@
         />
         <p class="input-hint">{{ t('admin.users.form.rpmLimitHint') }}</p>
       </div>
+      <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+        <label class="flex items-start gap-3">
+          <input v-model="form.allow_balance_subscription_purchase" type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          <span>
+            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.users.form.balanceSubscriptionPurchase') }}</span>
+            <span class="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.users.form.balanceSubscriptionPurchaseHint') }}</span>
+          </span>
+        </label>
+      </div>
       <UserAttributeForm v-model="form.customAttributes" :user-id="user?.id" />
     </form>
     <template #footer>
@@ -112,6 +121,7 @@ const form = reactive({
   partner_level: 'none' as AffiliatePartnerLevel,
   concurrency: 1,
   rpm_limit: 0,
+  allow_balance_subscription_purchase: false,
   customAttributes: {} as UserAttributeValuesMap
 })
 
@@ -127,6 +137,7 @@ watch(() => props.user, (u) => {
       partner_level: u.affiliate?.partner_level || 'none',
       concurrency: u.concurrency,
       rpm_limit: u.rpm_limit ?? 0,
+      allow_balance_subscription_purchase: !!u.allow_balance_subscription_purchase,
       customAttributes: {}
     })
     passwordCopied.value = false
@@ -162,7 +173,8 @@ const handleUpdateUser = async () => {
       role: form.role,
       admin_menu_permissions: form.role === 'sub_admin' ? form.admin_menu_permissions : [],
       concurrency: form.concurrency,
-      rpm_limit: form.rpm_limit
+      rpm_limit: form.rpm_limit,
+      allow_balance_subscription_purchase: form.allow_balance_subscription_purchase
     }
     if (form.password.trim()) data.password = form.password.trim()
     await adminAPI.users.update(props.user.id, data)

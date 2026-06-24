@@ -210,6 +210,17 @@ func (s *PaymentService) SetFreeQuotaService(freeQuotaService *FreeQuotaService)
 	s.freeQuotaService = freeQuotaService
 }
 
+func (s *PaymentService) CanUseBalanceSubscriptionPurchase(ctx context.Context, userID int64) bool {
+	if userID <= 0 || s.userRepo == nil {
+		return false
+	}
+	user, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil || user == nil {
+		return false
+	}
+	return user.Status == payment.EntityStatusActive && user.AllowBalanceSubscriptionPurchase
+}
+
 // --- Provider Registry ---
 
 // EnsureProviders lazily initializes the provider registry on first call.

@@ -13,6 +13,7 @@ LOCAL_HOST = os.environ.get("CLOUD_DB_LOCAL_HOST", "127.0.0.1")
 LOCAL_PORT = int(os.environ.get("CLOUD_DB_LOCAL_PORT", "5433"))
 REMOTE_HOST = os.environ.get("CLOUD_DB_REMOTE_HOST", "127.0.0.1")
 REMOTE_PORT = int(os.environ.get("CLOUD_DB_REMOTE_PORT", "5432"))
+READY_FILE = os.environ.get("CLOUD_DB_READY_FILE")
 
 
 def pipe(src, dst):
@@ -67,6 +68,9 @@ def run_once():
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind((LOCAL_HOST, LOCAL_PORT))
     server.listen(100)
+    if READY_FILE:
+        with open(READY_FILE, "w", encoding="utf-8") as fp:
+            fp.write(f"{LOCAL_HOST}:{LOCAL_PORT}->{REMOTE_HOST}:{REMOTE_PORT}\n")
 
     try:
         while transport and transport.is_active():

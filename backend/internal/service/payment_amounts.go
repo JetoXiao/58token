@@ -65,6 +65,16 @@ func calculateCreditedBalance(paymentAmount, multiplier, bonusThreshold, bonusAm
 		InexactFloat64()
 }
 
+func calculateBalanceSubscriptionCost(planPriceCNY, multiplier float64) float64 {
+	if planPriceCNY <= 0 {
+		return 0
+	}
+	return decimal.NewFromFloat(planPriceCNY).
+		Mul(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
+		Round(2).
+		InexactFloat64()
+}
+
 func calculateUSDTAmountFromCNY(cnyAmount, exchangeRate float64) float64 {
 	if cnyAmount <= 0 {
 		return 0

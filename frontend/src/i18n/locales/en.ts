@@ -2706,7 +2706,9 @@ export default {
         partnerLevel: 'Partner Level',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
-        rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
+        rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.',
+        balanceSubscriptionPurchase: 'Allow balance subscription purchase',
+        balanceSubscriptionPurchaseHint: 'When enabled, this user can pay for subscription plans with account balance.'
       },
       columns: {
         user: 'User',
@@ -7627,6 +7629,7 @@ export default {
       stripe: 'Stripe',
       airwallex: 'Airwallex',
       usdt: 'USDT',
+      balance: 'Balance',
       infini: 'Infini',
       card: 'Card',
       link: 'Link',
@@ -7750,6 +7753,7 @@ export default {
     subscriptionRuleValidity: 'After purchase, the plan is valid for 30 days from the payment date.',
     subscriptionRuleAutoActivate: 'After payment, the subscription activates automatically and limits refresh.',
     subscriptionRuleOfferVolatile: 'If underlying costs fluctuate significantly, discounts may be cancelled at any time without separate notice.',
+    balanceSubscriptionSuccess: 'Balance deducted and subscription activated.',
     rechargeRuleRate: 'Recharge is credited at 1 RMB = 1 USD balance.',
     rechargeRuleNoExpiry: 'Balance does not expire and can be used across supported API models.',
     rechargeRuleAllModels: 'After payment, the order is confirmed automatically and the balance refreshes.',

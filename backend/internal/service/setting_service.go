@@ -656,7 +656,6 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeySiteSubtitle,
 		SettingKeyAPIBaseURL,
 		SettingKeyContactInfo,
-		SettingKeySupportContactConfig,
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
 		SettingKeyHideCcsImportButton,
@@ -783,7 +782,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "让AI为我所用"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
 		ContactInfo:                      settings[SettingKeyContactInfo],
-		SupportContactConfig:             settings[SettingKeySupportContactConfig],
+		// Keep the global public settings payload small. The full support contact
+		// config may contain base64 QR images and is loaded by its dedicated API.
+		SupportContactConfig:             "",
 		DocURL:                           settings[SettingKeyDocURL],
 		HomeContent:                      settings[SettingKeyHomeContent],
 		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
@@ -821,6 +822,20 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 	}, nil
+}
+
+func (s *SettingService) GetSupportContactConfig(ctx context.Context) (string, error) {
+	if s == nil || s.settingRepo == nil {
+		return NormalizeSupportContactConfigJSON(""), nil
+	}
+	raw, err := s.settingRepo.GetValue(ctx, SettingKeySupportContactConfig)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return NormalizeSupportContactConfigJSON(""), nil
+		}
+		return "", err
+	}
+	return NormalizeSupportContactConfigJSON(raw), nil
 }
 
 // channelMonitorIntervalMin / channelMonitorIntervalMax bound the default interval

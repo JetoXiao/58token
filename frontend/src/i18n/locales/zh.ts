@@ -2811,7 +2811,9 @@ export default {
         partnerLevel: '合伙人等级',
         rpmLimit: '每分钟请求数 (RPM)',
         rpmLimitPlaceholder: '0 表示不限制',
-        rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效'
+        rpmLimitHint: '该用户每分钟最大请求数，0 = 不限制；仅在所用分组未设置 rpm_limit 时作为兜底生效',
+        balanceSubscriptionPurchase: '允许余额购买订阅',
+        balanceSubscriptionPurchaseHint: '开启后，该用户可以在订阅套餐页使用账户余额支付订阅费用。'
       },
       adjustBalance: '调整余额',
       adjustConcurrency: '调整并发数',
@@ -7808,6 +7810,7 @@ export default {
       stripe: 'Stripe',
       airwallex: 'Airwallex',
       usdt: 'USDT',
+      balance: '余额',
       infini: 'Infini',
       card: '银行卡',
       link: 'Link',
@@ -7931,6 +7934,7 @@ export default {
     subscriptionRuleValidity: '购买成功后从付款日起计算 30 天有效期。',
     subscriptionRuleAutoActivate: '支付完成后系统会自动开通订阅并刷新额度。',
     subscriptionRuleOfferVolatile: '如成本价格波动过大，平台可能随时取消优惠，不再另做说明。',
+    balanceSubscriptionSuccess: '余额已扣款，订阅已开通。',
     rechargeRuleRate: '充值按 1 RMB = 1 USD 余额计入账户。',
     rechargeRuleNoExpiry: '余额长期有效，可用于所有支持的 API 模型调用。',
     rechargeRuleAllModels: '支付完成后系统会自动确认订单并刷新余额。',

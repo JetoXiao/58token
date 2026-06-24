@@ -336,6 +336,11 @@ export async function getPublicSettings(): Promise<PublicSettings> {
   return data
 }
 
+export async function getSupportContactConfig(): Promise<PublicSettings['support_contact_config']> {
+  const { data } = await apiClient.get<PublicSettings['support_contact_config']>('/settings/support-contact')
+  return data
+}
+
 export type WeChatOAuthMode = 'open' | 'mp'
 export type WeChatOAuthUnavailableReason =
   | 'not_configured'
@@ -673,6 +678,7 @@ export const authAPI = {
   getTokenExpiresAt,
   clearAuthToken,
   getPublicSettings,
+  getSupportContactConfig,
   sendVerifyCode,
   sendPendingOAuthVerifyCode,
   validatePromoCode,

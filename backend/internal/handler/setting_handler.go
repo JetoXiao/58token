@@ -104,6 +104,17 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 	})
 }
 
+// GetSupportContactConfig returns the full support contact payload, including QR images.
+// GET /api/v1/settings/support-contact
+func (h *SettingHandler) GetSupportContactConfig(c *gin.Context) {
+	raw, err := h.settingService.GetSupportContactConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, dto.ParseSupportContactConfig(raw))
+}
+
 // UnsubscribeNotificationEmail handles optional notification email opt-outs.
 // GET /api/v1/settings/email-unsubscribe?token=...
 func (h *SettingHandler) UnsubscribeNotificationEmail(c *gin.Context) {

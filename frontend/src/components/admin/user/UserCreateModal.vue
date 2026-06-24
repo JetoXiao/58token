@@ -60,6 +60,15 @@
         />
         <p class="input-hint">{{ t('admin.users.form.rpmLimitHint') }}</p>
       </div>
+      <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-dark-700 dark:bg-dark-800/60">
+        <label class="flex items-start gap-3">
+          <input v-model="form.allow_balance_subscription_purchase" type="checkbox" class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          <span>
+            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.users.form.balanceSubscriptionPurchase') }}</span>
+            <span class="mt-1 block text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('admin.users.form.balanceSubscriptionPurchaseHint') }}</span>
+          </span>
+        </label>
+      </div>
     </form>
     <template #footer>
       <div class="flex justify-end gap-3">
@@ -92,7 +101,8 @@ const form = reactive({
   admin_menu_permissions: [] as string[],
   balance: 0,
   concurrency: 1,
-  rpm_limit: 0
+  rpm_limit: 0,
+  allow_balance_subscription_purchase: false
 })
 
 const { loading, submit } = useForm({
@@ -115,7 +125,8 @@ watch(() => props.show, (v) => {
       admin_menu_permissions: [],
       balance: 0,
       concurrency: 1,
-      rpm_limit: 0
+      rpm_limit: 0,
+      allow_balance_subscription_purchase: false
     })
   }
 })

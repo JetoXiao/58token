@@ -96,12 +96,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import { getSupportContactConfig } from '@/api/auth'
 import { useAppStore } from '@/stores'
 import type { SupportContactConfig, SupportContactItem } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const loading = ref(false)
+const fullConfig = ref<SupportContactConfig | null>(null)
 
 const defaultConfig: SupportContactConfig = {
   enabled: true,
@@ -110,13 +112,14 @@ const defaultConfig: SupportContactConfig = {
   contacts: [],
 }
 
-const config = computed<SupportContactConfig>(() => ({
-  ...defaultConfig,
-  ...(appStore.cachedPublicSettings?.support_contact_config ?? {}),
-  contacts: Array.isArray(appStore.cachedPublicSettings?.support_contact_config?.contacts)
-    ? appStore.cachedPublicSettings.support_contact_config.contacts
-    : [],
-}))
+const config = computed<SupportContactConfig>(() => {
+  const source = fullConfig.value ?? appStore.cachedPublicSettings?.support_contact_config
+  return {
+    ...defaultConfig,
+    ...(source ?? {}),
+    contacts: Array.isArray(source?.contacts) ? source.contacts : [],
+  }
+})
 
 const visibleContacts = computed<SupportContactItem[]>(() =>
   config.value.contacts
@@ -125,10 +128,12 @@ const visibleContacts = computed<SupportContactItem[]>(() =>
 )
 
 onMounted(async () => {
-  if (appStore.publicSettingsLoaded) return
   loading.value = true
   try {
-    await appStore.fetchPublicSettings()
+    if (!appStore.publicSettingsLoaded) {
+      await appStore.fetchPublicSettings()
+    }
+    fullConfig.value = await getSupportContactConfig()
   } finally {
     loading.value = false
   }

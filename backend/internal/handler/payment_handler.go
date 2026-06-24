@@ -104,6 +104,10 @@ func (h *PaymentHandler) GetChannels(c *gin.Context) {
 // GET /api/v1/payment/checkout-info
 func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	ctx := c.Request.Context()
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
 
 	// Fetch limits (methods + global range)
 	limitsResp, err := h.configService.GetAvailableMethodLimits(ctx)
@@ -141,38 +145,40 @@ func (h *PaymentHandler) GetCheckoutInfo(c *gin.Context) {
 	}
 
 	response.Success(c, checkoutInfoResponse{
-		Methods:                   limitsResp.Methods,
-		GlobalMin:                 limitsResp.GlobalMin,
-		GlobalMax:                 limitsResp.GlobalMax,
-		Plans:                     planList,
-		BalanceDisabled:           cfg.BalanceDisabled,
-		BalanceRechargeMultiplier: cfg.BalanceRechargeMultiplier,
-		RechargeFeeRate:           cfg.RechargeFeeRate,
-		RechargeBonusThreshold:    cfg.RechargeBonusThreshold,
-		RechargeBonusAmount:       cfg.RechargeBonusAmount,
-		UsdtCnyExchangeRate:       cfg.UsdtCnyExchangeRate,
-		HelpText:                  cfg.HelpText,
-		HelpImageURL:              cfg.HelpImageURL,
-		StripePublishableKey:      cfg.StripePublishableKey,
-		AlipayForceQRCode:         cfg.AlipayForceQRCode,
+		Methods:                          limitsResp.Methods,
+		GlobalMin:                        limitsResp.GlobalMin,
+		GlobalMax:                        limitsResp.GlobalMax,
+		Plans:                            planList,
+		BalanceDisabled:                  cfg.BalanceDisabled,
+		BalanceRechargeMultiplier:        cfg.BalanceRechargeMultiplier,
+		RechargeFeeRate:                  cfg.RechargeFeeRate,
+		RechargeBonusThreshold:           cfg.RechargeBonusThreshold,
+		RechargeBonusAmount:              cfg.RechargeBonusAmount,
+		UsdtCnyExchangeRate:              cfg.UsdtCnyExchangeRate,
+		HelpText:                         cfg.HelpText,
+		HelpImageURL:                     cfg.HelpImageURL,
+		StripePublishableKey:             cfg.StripePublishableKey,
+		AlipayForceQRCode:                cfg.AlipayForceQRCode,
+		AllowBalanceSubscriptionPurchase: h.paymentService.CanUseBalanceSubscriptionPurchase(ctx, subject.UserID),
 	})
 }
 
 type checkoutInfoResponse struct {
-	Methods                   map[string]service.MethodLimits `json:"methods"`
-	GlobalMin                 float64                         `json:"global_min"`
-	GlobalMax                 float64                         `json:"global_max"`
-	Plans                     []checkoutPlan                  `json:"plans"`
-	BalanceDisabled           bool                            `json:"balance_disabled"`
-	BalanceRechargeMultiplier float64                         `json:"balance_recharge_multiplier"`
-	RechargeFeeRate           float64                         `json:"recharge_fee_rate"`
-	RechargeBonusThreshold    float64                         `json:"recharge_bonus_threshold"`
-	RechargeBonusAmount       float64                         `json:"recharge_bonus_amount"`
-	UsdtCnyExchangeRate       float64                         `json:"usdt_cny_exchange_rate"`
-	HelpText                  string                          `json:"help_text"`
-	HelpImageURL              string                          `json:"help_image_url"`
-	StripePublishableKey      string                          `json:"stripe_publishable_key"`
-	AlipayForceQRCode         bool                            `json:"alipay_force_qrcode"`
+	Methods                          map[string]service.MethodLimits `json:"methods"`
+	GlobalMin                        float64                         `json:"global_min"`
+	GlobalMax                        float64                         `json:"global_max"`
+	Plans                            []checkoutPlan                  `json:"plans"`
+	BalanceDisabled                  bool                            `json:"balance_disabled"`
+	BalanceRechargeMultiplier        float64                         `json:"balance_recharge_multiplier"`
+	RechargeFeeRate                  float64                         `json:"recharge_fee_rate"`
+	RechargeBonusThreshold           float64                         `json:"recharge_bonus_threshold"`
+	RechargeBonusAmount              float64                         `json:"recharge_bonus_amount"`
+	UsdtCnyExchangeRate              float64                         `json:"usdt_cny_exchange_rate"`
+	HelpText                         string                          `json:"help_text"`
+	HelpImageURL                     string                          `json:"help_image_url"`
+	StripePublishableKey             string                          `json:"stripe_publishable_key"`
+	AlipayForceQRCode                bool                            `json:"alipay_force_qrcode"`
+	AllowBalanceSubscriptionPurchase bool                            `json:"allow_balance_subscription_purchase"`
 }
 
 type checkoutPlan struct {
@@ -268,12 +274,13 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 			return
 		}
 	}
+	req.PaymentType = strings.ToLower(strings.TrimSpace(req.PaymentType))
 
 	mobile := isMobile(c)
 	if req.IsMobile != nil {
 		mobile = *req.IsMobile
 	}
-	result, err := h.paymentService.CreateOrder(c.Request.Context(), service.CreateOrderRequest{
+	serviceReq := service.CreateOrderRequest{
 		UserID:          subject.UserID,
 		Amount:          req.Amount,
 		PaymentAmount:   req.PaymentAmount,
@@ -289,7 +296,14 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		OrderType:       req.OrderType,
 		PlanID:          req.PlanID,
 		Locale:          c.GetHeader("Accept-Language"),
-	})
+	}
+	var result *service.CreateOrderResponse
+	var err error
+	if req.OrderType == payment.OrderTypeSubscription && strings.TrimSpace(req.PaymentType) == payment.TypeBalance {
+		result, err = h.paymentService.CreateBalanceSubscriptionOrder(c.Request.Context(), serviceReq)
+	} else {
+		result, err = h.paymentService.CreateOrder(c.Request.Context(), serviceReq)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
