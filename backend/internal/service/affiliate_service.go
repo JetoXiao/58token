@@ -299,6 +299,8 @@ type AffiliateRepository interface {
 	ListAffiliateUsageDailyRecords(ctx context.Context, filter AffiliateUsageFilter) ([]AffiliateUsageDailyRecord, *AffiliateUsageSummary, int64, error)
 	ListAffiliateRebateRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateRebateRecord, int64, error)
 	ListAffiliateTransferRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateTransferRecord, int64, error)
+	CreateAffiliateSettlement(ctx context.Context, input AffiliateSettlementInput) (*AffiliateSettlementRecord, error)
+	ListAffiliateSettlementRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateSettlementRecord, int64, error)
 	GetAffiliateUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error)
 }
 
@@ -381,8 +383,17 @@ type AffiliateRecordFilter struct {
 	PageSize int
 	StartAt  *time.Time
 	EndAt    *time.Time
+	UserID   int64
 	SortBy   string
 	SortDesc bool
+}
+
+type AffiliateSettlementInput struct {
+	UserID    int64     `json:"user_id"`
+	Amount    float64   `json:"amount"`
+	SettledOn time.Time `json:"settled_on"`
+	Note      string    `json:"note"`
+	CreatedBy int64     `json:"created_by"`
 }
 
 type AffiliateUsageFilter struct {
@@ -399,6 +410,7 @@ type AffiliateUsageFilter struct {
 	DefaultRebateRatePercent float64
 	SortBy                   string
 	SortDesc                 bool
+	InviterOnly              bool
 }
 
 type AffiliateInviteAssignment struct {
@@ -436,6 +448,8 @@ type AffiliateUsageDailyRecord struct {
 	RechargeAmount    float64                      `json:"recharge_amount"`
 	RebateRatePercent float64                      `json:"rebate_rate_percent"`
 	RebateAmount      float64                      `json:"rebate_amount"`
+	SettledAmount     float64                      `json:"settled_amount"`
+	PendingAmount     float64                      `json:"pending_amount"`
 	Unassigned        bool                         `json:"unassigned"`
 	ProfitDetails     []AffiliateUsageProfitDetail `json:"profit_details,omitempty"`
 	Members           []AffiliateUsageDailyRecord  `json:"members,omitempty"`
@@ -445,6 +459,7 @@ type AffiliateUsageProfitDetail struct {
 	GroupID           int64   `json:"group_id"`
 	GroupName         string  `json:"group_name"`
 	Model             string  `json:"model"`
+	Source            string  `json:"source,omitempty"`
 	Requests          int64   `json:"requests"`
 	TotalTokens       int64   `json:"total_tokens"`
 	ActualCost        float64 `json:"actual_cost"`
@@ -454,12 +469,15 @@ type AffiliateUsageProfitDetail struct {
 }
 
 type AffiliateUsageSummary struct {
-	TotalRequests     int64   `json:"total_requests"`
-	TotalTokens       int64   `json:"total_tokens"`
-	TotalActualCost   float64 `json:"total_actual_cost"`
-	TotalAccountCost  float64 `json:"total_account_cost"`
-	TotalNetProfit    float64 `json:"total_net_profit"`
-	TotalRebateAmount float64 `json:"total_rebate_amount"`
+	TotalRequests      int64   `json:"total_requests"`
+	TotalTokens        int64   `json:"total_tokens"`
+	TotalActualCost    float64 `json:"total_actual_cost"`
+	TotalAccountCost   float64 `json:"total_account_cost"`
+	TotalNetProfit     float64 `json:"total_net_profit"`
+	TotalRecharge      float64 `json:"total_recharge_amount"`
+	TotalRebateAmount  float64 `json:"total_rebate_amount"`
+	TotalSettledAmount float64 `json:"total_settled_amount"`
+	TotalPendingAmount float64 `json:"total_pending_amount"`
 }
 
 type AffiliateRebateRecord struct {
@@ -495,6 +513,21 @@ type AffiliateTransferRecord struct {
 	FrozenQuota         float64   `json:"-"`
 	HistoryQuota        float64   `json:"-"`
 	CreatedAt           time.Time `json:"created_at"`
+}
+
+type AffiliateSettlementRecord struct {
+	ID                int64     `json:"id"`
+	UserID            int64     `json:"user_id"`
+	UserEmail         string    `json:"user_email"`
+	Username          string    `json:"username"`
+	Amount            float64   `json:"amount"`
+	SettledOn         time.Time `json:"settled_on"`
+	Note              string    `json:"note"`
+	CreatedBy         *int64    `json:"created_by,omitempty"`
+	CreatedByEmail    string    `json:"created_by_email,omitempty"`
+	CreatedByUsername string    `json:"created_by_username,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 type AffiliateUserOverview struct {
@@ -1116,6 +1149,18 @@ func (s *AffiliateService) AdminListUsageDailyRecords(ctx context.Context, filte
 	return s.repo.ListAffiliateUsageDailyRecords(ctx, filter)
 }
 
+func (s *AffiliateService) ListMyUsageDailyRecords(ctx context.Context, inviterID int64, filter AffiliateUsageFilter) ([]AffiliateUsageDailyRecord, *AffiliateUsageSummary, int64, error) {
+	if inviterID <= 0 {
+		return nil, nil, 0, infraerrors.Unauthorized("UNAUTHORIZED", "user not authenticated")
+	}
+	filter.InviterID = inviterID
+	filter.InviterOnly = true
+	if filter.View == "" {
+		filter.View = "users"
+	}
+	return s.AdminListUsageDailyRecords(ctx, filter)
+}
+
 func affiliateGroupProfitRatesByID(input map[string]float64) map[int64]float64 {
 	if len(input) == 0 {
 		return nil
@@ -1149,6 +1194,42 @@ func (s *AffiliateService) AdminListTransferRecords(ctx context.Context, filter 
 		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
 	}
 	return s.repo.ListAffiliateTransferRecords(ctx, normalizeAffiliateRecordFilter(filter))
+}
+
+func (s *AffiliateService) AdminCreateSettlement(ctx context.Context, input AffiliateSettlementInput) (*AffiliateSettlementRecord, error) {
+	if s == nil || s.repo == nil {
+		return nil, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	if input.UserID <= 0 {
+		return nil, infraerrors.BadRequest("INVALID_USER", "invalid user")
+	}
+	if math.IsNaN(input.Amount) || math.IsInf(input.Amount, 0) || input.Amount <= 0 {
+		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "settlement amount must be greater than 0")
+	}
+	if input.SettledOn.IsZero() {
+		return nil, infraerrors.BadRequest("INVALID_SETTLED_ON", "settlement date is required")
+	}
+	input.Amount = roundTo(input.Amount, 8)
+	input.Note = strings.TrimSpace(input.Note)
+	if len(input.Note) > 1000 {
+		input.Note = input.Note[:1000]
+	}
+	return s.repo.CreateAffiliateSettlement(ctx, input)
+}
+
+func (s *AffiliateService) AdminListSettlementRecords(ctx context.Context, filter AffiliateRecordFilter) ([]AffiliateSettlementRecord, int64, error) {
+	if s == nil || s.repo == nil {
+		return nil, 0, infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "affiliate service unavailable")
+	}
+	return s.repo.ListAffiliateSettlementRecords(ctx, normalizeAffiliateRecordFilter(filter))
+}
+
+func (s *AffiliateService) ListMySettlementRecords(ctx context.Context, userID int64, filter AffiliateRecordFilter) ([]AffiliateSettlementRecord, int64, error) {
+	if userID <= 0 {
+		return nil, 0, infraerrors.Unauthorized("UNAUTHORIZED", "user not authenticated")
+	}
+	filter.UserID = userID
+	return s.AdminListSettlementRecords(ctx, filter)
 }
 
 func (s *AffiliateService) AdminGetUserOverview(ctx context.Context, userID int64) (*AffiliateUserOverview, error) {

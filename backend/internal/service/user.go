@@ -123,6 +123,60 @@ func NormalizeAdminMenuPermissions(items []string) []string {
 	return out
 }
 
+func NormalizeUserMenuPermissions(items []string) []string {
+	normalized := NormalizeAdminMenuPermissions(items)
+	if len(normalized) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(normalized))
+	for _, item := range normalized {
+		if isUserMenuPermissionKey(item) || isCustomUserMenuPermissionKey(item) {
+			out = append(out, item)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+func NormalizeMenuPermissionsForRole(role string, items []string) []string {
+	switch NormalizeUserRole(role) {
+	case RoleSubAdmin:
+		return NormalizeAdminMenuPermissions(items)
+	case RoleUser:
+		return NormalizeUserMenuPermissions(items)
+	default:
+		return nil
+	}
+}
+
+func isUserMenuPermissionKey(item string) bool {
+	switch item {
+	case "dashboard",
+		"api_keys",
+		"image_generation",
+		"usage",
+		"channel_status",
+		"subscriptions",
+		"purchase",
+		"orders",
+		"redeem",
+		"affiliate",
+		"affiliate_usage",
+		"support_contact",
+		"profile":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCustomUserMenuPermissionKey(item string) bool {
+	const prefix = "custom:user:"
+	return strings.HasPrefix(item, prefix) && strings.TrimSpace(strings.TrimPrefix(item, prefix)) != ""
+}
+
 // CanBindGroup checks whether a user can bind to a given group.
 // For standard groups:
 // - Public groups (non-exclusive): all users can bind

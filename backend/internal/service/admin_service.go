@@ -662,10 +662,7 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	if err != nil {
 		return nil, err
 	}
-	permissions := NormalizeAdminMenuPermissions(input.AdminMenuPermissions)
-	if role != RoleSubAdmin {
-		permissions = nil
-	}
+	permissions := NormalizeMenuPermissionsForRole(role, input.AdminMenuPermissions)
 	user := &User{
 		Email:                            input.Email,
 		Username:                         input.Username,
@@ -780,9 +777,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if input.AdminMenuPermissions != nil {
 		user.AdminMenuPermissions = NormalizeAdminMenuPermissions(*input.AdminMenuPermissions)
 	}
-	if user.Role != RoleSubAdmin {
-		user.AdminMenuPermissions = nil
-	}
+	user.AdminMenuPermissions = NormalizeMenuPermissionsForRole(user.Role, user.AdminMenuPermissions)
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err

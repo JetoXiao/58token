@@ -358,11 +358,65 @@ func (h *AffiliateHandler) ListTransferRecords(c *gin.Context) {
 	response.Paginated(c, items, total, filter.Page, filter.PageSize)
 }
 
+type CreateAffiliateSettlementRequest struct {
+	UserID    int64   `json:"user_id" binding:"required"`
+	Amount    float64 `json:"amount" binding:"required"`
+	SettledOn string  `json:"settled_on" binding:"required"`
+	Note      string  `json:"note"`
+}
+
+// ListSettlementRecords returns manually recorded affiliate cashback settlements.
+// GET /api/v1/admin/affiliates/settlements
+func (h *AffiliateHandler) ListSettlementRecords(c *gin.Context) {
+	page, pageSize := response.ParsePagination(c)
+	filter := parseAffiliateRecordFilter(c, page, pageSize)
+	items, total, err := h.affiliateService.AdminListSettlementRecords(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Paginated(c, items, total, filter.Page, filter.PageSize)
+}
+
+// CreateSettlement records a manual cashback settlement for reconciliation.
+// POST /api/v1/admin/affiliates/settlements
+func (h *AffiliateHandler) CreateSettlement(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok || subject.UserID <= 0 {
+		response.Unauthorized(c, "Admin not authenticated")
+		return
+	}
+
+	var req CreateAffiliateSettlementRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	settledOn, err := parseAffiliateSettlementDate(req.SettledOn)
+	if err != nil {
+		response.BadRequest(c, "Invalid settled_on")
+		return
+	}
+	record, err := h.affiliateService.AdminCreateSettlement(c.Request.Context(), service.AffiliateSettlementInput{
+		UserID:    req.UserID,
+		Amount:    req.Amount,
+		SettledOn: settledOn,
+		Note:      req.Note,
+		CreatedBy: subject.UserID,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, record)
+}
+
 func parseAffiliateRecordFilter(c *gin.Context, page, pageSize int) service.AffiliateRecordFilter {
 	filter := service.AffiliateRecordFilter{
 		Search:   c.Query("search"),
 		Page:     page,
 		PageSize: pageSize,
+		UserID:   parseAffiliateInt64Query(c, "user_id"),
 		SortBy:   c.Query("sort_by"),
 		SortDesc: c.Query("sort_order") != "asc",
 	}
@@ -436,6 +490,20 @@ func parseAffiliateUsageEndTime(raw string, userTZ string) *time.Time {
 		return &end
 	}
 	return nil
+}
+
+func parseAffiliateSettlementDate(raw string) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, strconv.ErrSyntax
+	}
+	if parsed, err := time.Parse("2006-01-02", raw); err == nil {
+		return parsed, nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed, nil
+	}
+	return time.Time{}, strconv.ErrSyntax
 }
 
 func defaultAffiliateUsageRange(userTZ string) (time.Time, time.Time) {

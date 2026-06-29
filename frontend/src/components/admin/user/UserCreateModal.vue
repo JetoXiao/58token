@@ -35,7 +35,7 @@
         <p v-if="form.role === 'sub_admin'" class="input-hint">{{ t('admin.users.form.readonlyAdminHint') }}</p>
       </div>
       <AdminMenuPermissionPicker
-        v-if="form.role === 'sub_admin'"
+        v-if="form.role !== 'admin'"
         v-model="form.admin_menu_permissions"
       />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

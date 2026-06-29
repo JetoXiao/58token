@@ -436,6 +436,14 @@ func (r *oauthEmailAffiliateRepoStub) ListAffiliateTransferRecords(context.Conte
 	panic("unexpected ListAffiliateTransferRecords call")
 }
 
+func (r *oauthEmailAffiliateRepoStub) CreateAffiliateSettlement(context.Context, service.AffiliateSettlementInput) (*service.AffiliateSettlementRecord, error) {
+	panic("unexpected CreateAffiliateSettlement call")
+}
+
+func (r *oauthEmailAffiliateRepoStub) ListAffiliateSettlementRecords(context.Context, service.AffiliateRecordFilter) ([]service.AffiliateSettlementRecord, int64, error) {
+	panic("unexpected ListAffiliateSettlementRecords call")
+}
+
 func (r *oauthEmailAffiliateRepoStub) GetAffiliateUserOverview(context.Context, int64) (*service.AffiliateUserOverview, error) {
 	panic("unexpected GetAffiliateUserOverview call")
 }

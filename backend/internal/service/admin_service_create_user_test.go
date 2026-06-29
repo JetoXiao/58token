@@ -42,6 +42,38 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	require.Equal(t, user, repo.created[0])
 }
 
+func TestAdminService_CreateUser_KeepsUserMenuPermissionsForRegularUser(t *testing.T) {
+	repo := &userRepoStub{nextID: 11}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	user, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:                "partner@test.com",
+		Password:             "strong-pass",
+		Role:                 RoleUser,
+		AdminMenuPermissions: []string{"affiliate_usage", "admin_users", "custom:user:42", "custom:admin:7"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"affiliate_usage", "custom:user:42"}, user.AdminMenuPermissions)
+	require.Len(t, repo.created, 1)
+	require.Equal(t, []string{"affiliate_usage", "custom:user:42"}, repo.created[0].AdminMenuPermissions)
+}
+
+func TestAdminService_CreateUser_KeepsAllMenuPermissionsForSubAdmin(t *testing.T) {
+	repo := &userRepoStub{nextID: 12}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	user, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:                "readonly-admin@test.com",
+		Password:             "strong-pass",
+		Role:                 RoleSubAdmin,
+		AdminMenuPermissions: []string{"admin_users", "affiliate_usage", "custom:user:42"},
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []string{"admin_users", "affiliate_usage", "custom:user:42"}, user.AdminMenuPermissions)
+}
+
 func TestAdminService_CreateUser_EmailExists(t *testing.T) {
 	repo := &userRepoStub{createErr: ErrEmailExists}
 	svc := &adminServiceImpl{userRepo: repo}

@@ -284,16 +284,16 @@
     <BaseDialog
       :show="posterPreviewVisible"
       :title="t('affiliate.posterPreviewTitle')"
-      width="normal"
+      width="wide"
       @close="closePosterPreview"
     >
       <div class="space-y-4">
-        <div class="rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900">
+        <div class="flex justify-center overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 p-3 dark:border-dark-700 dark:bg-dark-900">
           <img
             v-if="posterPreviewUrl"
             :src="posterPreviewUrl"
             :alt="t('affiliate.posterAlt')"
-            class="mx-auto max-h-[70vh] w-auto max-w-full rounded-xl shadow-sm"
+            class="max-h-[58vh] w-auto max-w-full rounded-xl object-contain shadow-sm"
           />
         </div>
         <p class="text-sm leading-6 text-gray-500 dark:text-dark-400">

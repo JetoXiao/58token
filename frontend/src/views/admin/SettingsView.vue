@@ -7055,7 +7055,7 @@ import {
 import {
   DEFAULT_USER_MENU_ITEMS,
   normalizeUserMenuItems,
-  type UserMenuItem,
+  type DefaultUserMenuItem,
 } from "@/utils/userMenuItems";
 
 const { t, locale } = useI18n();
@@ -7093,7 +7093,7 @@ const marketingNavSelection = reactive<Record<MarketingNavItem, boolean>>({
 });
 
 const userMenuOptions = computed<
-  Array<{ value: UserMenuItem; label: string; description: string }>
+  Array<{ value: DefaultUserMenuItem; label: string; description: string }>
 >(() => [
   {
     value: "dashboard",
@@ -7156,7 +7156,7 @@ const userMenuOptions = computed<
     description: localText("个人资料、安全和偏好设置。", "Profile, security, and preferences."),
   },
 ]);
-const userMenuSelection = reactive<Record<UserMenuItem, boolean>>({
+const userMenuSelection = reactive<Record<DefaultUserMenuItem, boolean>>({
   dashboard: true,
   api_keys: true,
   image_generation: true,
@@ -8382,11 +8382,11 @@ function marketingNavItemsFromSelection(): MarketingNavItem[] {
   return DEFAULT_MARKETING_NAV_ITEMS.filter((item) => marketingNavSelection[item]);
 }
 
-function isUserMenuItemSelected(item: UserMenuItem): boolean {
+function isUserMenuItemSelected(item: DefaultUserMenuItem): boolean {
   return userMenuSelection[item];
 }
 
-function toggleUserMenuItem(item: UserMenuItem) {
+function toggleUserMenuItem(item: DefaultUserMenuItem) {
   userMenuSelection[item] = !userMenuSelection[item];
   form.user_menu_items = userMenuItemsFromSelection();
 }
@@ -8399,7 +8399,7 @@ function setUserMenuItems(value: unknown) {
   form.user_menu_items = userMenuItemsFromSelection();
 }
 
-function userMenuItemsFromSelection(): UserMenuItem[] {
+function userMenuItemsFromSelection(): DefaultUserMenuItem[] {
   return DEFAULT_USER_MENU_ITEMS.filter((item) => userMenuSelection[item]);
 }
 

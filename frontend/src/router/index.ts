@@ -10,7 +10,7 @@ import { useAdminSettingsStore } from '@/stores/adminSettings'
 import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
-import { isUserMenuItemEnabled, resolveUserMenuFallbackPath } from '@/utils/userMenuItems'
+import { isOptionalUserMenuItem, isUserMenuItemEnabled, resolveUserMenuFallbackPath } from '@/utils/userMenuItems'
 import { hasAdminMenuPermission, resolveReadonlyAdminFallbackPath } from '@/utils/adminMenuPermissions'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveDocumentTitle } from './title'
@@ -278,6 +278,19 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'affiliate.title',
       descriptionKey: 'affiliate.description',
       userMenuKey: 'affiliate'
+    }
+  },
+  {
+    path: '/affiliate/usage',
+    name: 'AffiliateUsage',
+    component: () => import('@/views/user/AffiliateUsageView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Affiliate Usage',
+      titleKey: 'affiliate.usage.pageTitle',
+      descriptionKey: 'affiliate.usage.pageDescription',
+      userMenuKey: 'affiliate_usage'
     }
   },
   {
@@ -975,7 +988,9 @@ router.beforeEach(async (to, _from, next) => {
       ? appStore.cachedPublicSettings
       : await appStore.fetchPublicSettings()
     const userMenuItems = settings?.user_menu_items ?? appStore.cachedPublicSettings?.user_menu_items
-    if (!isUserMenuItemEnabled(userMenuItems, to.meta.userMenuKey)) {
+    const hasPersonalPermission = isOptionalUserMenuItem(to.meta.userMenuKey)
+      && hasAdminMenuPermission(authStore.user?.admin_menu_permissions, to.meta.userMenuKey)
+    if (!isUserMenuItemEnabled(userMenuItems, to.meta.userMenuKey) && !hasPersonalPermission) {
       next(resolveUserMenuFallbackPath(userMenuItems))
       return
     }

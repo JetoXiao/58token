@@ -13,7 +13,13 @@ export const DEFAULT_USER_MENU_ITEMS = [
   'profile',
 ] as const
 
-export type UserMenuItem = typeof DEFAULT_USER_MENU_ITEMS[number]
+export type DefaultUserMenuItem = typeof DEFAULT_USER_MENU_ITEMS[number]
+export const OPTIONAL_USER_MENU_ITEMS = [
+  'affiliate_usage',
+] as const
+
+export type UserMenuItem = DefaultUserMenuItem | typeof OPTIONAL_USER_MENU_ITEMS[number]
+const USER_MENU_ITEMS = [...DEFAULT_USER_MENU_ITEMS, ...OPTIONAL_USER_MENU_ITEMS] as const
 
 export const USER_MENU_PATHS: Record<UserMenuItem, string> = {
   dashboard: '/dashboard',
@@ -26,11 +32,12 @@ export const USER_MENU_PATHS: Record<UserMenuItem, string> = {
   orders: '/orders',
   redeem: '/redeem',
   affiliate: '/affiliate',
+  affiliate_usage: '/affiliate/usage',
   support_contact: '/support-contact',
   profile: '/profile',
 }
 
-const USER_MENU_ITEM_SET = new Set<UserMenuItem>(DEFAULT_USER_MENU_ITEMS)
+const USER_MENU_ITEM_SET = new Set<UserMenuItem>(USER_MENU_ITEMS)
 
 export function normalizeUserMenuItems(value: unknown): UserMenuItem[] {
   const parsed = parseUserMenuItemsValue(value)
@@ -48,8 +55,32 @@ export function normalizeUserMenuItems(value: unknown): UserMenuItem[] {
   return DEFAULT_USER_MENU_ITEMS.filter((item) => enabled.has(item))
 }
 
+export function normalizeUserPermissionMenuItems(value: unknown): UserMenuItem[] {
+  const parsed = parseUserMenuItemsValue(value)
+  if (!Array.isArray(parsed)) {
+    return []
+  }
+
+  const enabled = new Set<UserMenuItem>()
+  for (const item of parsed) {
+    const normalized = normalizeUserMenuItemKey(item)
+    if (normalized && USER_MENU_ITEM_SET.has(normalized)) {
+      enabled.add(normalized)
+    }
+  }
+  return USER_MENU_ITEMS.filter((item) => enabled.has(item))
+}
+
 export function isUserMenuItemEnabled(value: unknown, item: UserMenuItem): boolean {
   return normalizeUserMenuItems(value).includes(item)
+}
+
+export function isOptionalUserMenuItem(item: string | undefined): item is typeof OPTIONAL_USER_MENU_ITEMS[number] {
+  return !!item && (OPTIONAL_USER_MENU_ITEMS as readonly string[]).includes(item)
+}
+
+export function isUserMenuPermissionKey(item: string | undefined): item is UserMenuItem {
+  return !!item && USER_MENU_ITEM_SET.has(item as UserMenuItem)
 }
 
 export function resolveUserMenuFallbackPath(value: unknown): string {
@@ -97,6 +128,9 @@ function normalizeUserMenuItemKey(value: unknown): UserMenuItem | undefined {
       return 'redeem'
     case 'affiliate':
       return 'affiliate'
+    case 'affiliate_usage':
+    case 'affiliate-usage':
+      return 'affiliate_usage'
     case 'support_contact':
     case 'support':
     case 'after_sales':

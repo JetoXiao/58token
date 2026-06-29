@@ -61,7 +61,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ADMIN_MENU_ITEMS, normalizeAdminMenuPermissions, type AdminPermissionKey } from '@/utils/adminMenuPermissions'
-import { DEFAULT_USER_MENU_ITEMS, type UserMenuItem } from '@/utils/userMenuItems'
+import { DEFAULT_USER_MENU_ITEMS, OPTIONAL_USER_MENU_ITEMS, type UserMenuItem } from '@/utils/userMenuItems'
 
 const props = defineProps<{ modelValue: string[] }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
@@ -107,14 +107,16 @@ const userLabelKeys: Record<UserMenuItem, string> = {
   orders: 'nav.myOrders',
   redeem: 'nav.redeem',
   affiliate: 'nav.affiliate',
+  affiliate_usage: 'nav.affiliateUsage',
   support_contact: 'nav.supportContact',
   profile: 'nav.profile',
 }
 
 const selectedSet = computed(() => new Set(normalizeAdminMenuPermissions(props.modelValue)))
 const adminOptions = computed(() => ADMIN_MENU_ITEMS.map((key) => ({ key, label: t(adminLabelKeys[key]) })))
-const userOptions = computed(() => DEFAULT_USER_MENU_ITEMS.map((key) => ({ key, label: t(userLabelKeys[key]) })))
-const allKeys = computed(() => [...ADMIN_MENU_ITEMS, ...DEFAULT_USER_MENU_ITEMS])
+const userPermissionItems = computed(() => [...DEFAULT_USER_MENU_ITEMS, ...OPTIONAL_USER_MENU_ITEMS] as UserMenuItem[])
+const userOptions = computed(() => userPermissionItems.value.map((key) => ({ key, label: t(userLabelKeys[key]) })))
+const allKeys = computed(() => [...ADMIN_MENU_ITEMS, ...userPermissionItems.value])
 
 function toggle(key: AdminPermissionKey) {
   const next = new Set(selectedSet.value)

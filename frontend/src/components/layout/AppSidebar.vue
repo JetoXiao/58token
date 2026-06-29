@@ -192,7 +192,7 @@ import { useI18n } from 'vue-i18n'
 import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
-import { normalizeUserMenuItems, type UserMenuItem } from '@/utils/userMenuItems'
+import { isUserMenuPermissionKey, normalizeUserMenuItems, type UserMenuItem } from '@/utils/userMenuItems'
 import { hasAdminMenuPermission, type AdminPermissionKey } from '@/utils/adminMenuPermissions'
 import { BRAND_LOGO_URL } from '@/constants/brand'
 
@@ -238,7 +238,8 @@ function applyUserMenuItems(items: NavItem[]): NavItem[] {
   const enabled = new Set(normalizeUserMenuItems(appStore.cachedPublicSettings?.user_menu_items))
   const out: NavItem[] = []
   for (const item of items) {
-    if (item.menuKey && !enabled.has(item.menuKey)) continue
+    const hasPersonalPermission = hasPersonalUserMenuPermission(item)
+    if (item.menuKey && !enabled.has(item.menuKey) && !hasPersonalPermission) continue
     if (item.children) {
       out.push({ ...item, children: applyUserMenuItems(item.children) })
     } else {
@@ -246,6 +247,15 @@ function applyUserMenuItems(items: NavItem[]): NavItem[] {
     }
   }
   return out
+}
+
+function hasPersonalUserMenuPermission(item: NavItem): boolean {
+  return Boolean(
+    item.menuKey
+      && item.permissionKey
+      && isUserMenuPermissionKey(item.menuKey)
+      && hasAdminMenuPermission(authStore.user?.admin_menu_permissions, item.permissionKey),
+  )
 }
 
 function applyReadonlyAdminPermissions(items: NavItem[]): NavItem[] {
@@ -740,6 +750,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment, menuKey: 'orders', permissionKey: 'orders' },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, menuKey: 'redeem', permissionKey: 'redeem' },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate, menuKey: 'affiliate', permissionKey: 'affiliate' },
+    { path: '/affiliate/usage', label: t('nav.affiliateUsage'), icon: ChartIcon, hideInSimpleMode: true, menuKey: 'affiliate_usage', permissionKey: 'affiliate_usage' },
     { path: '/support-contact', label: t('nav.supportContact'), icon: SupportContactIcon, menuKey: 'support_contact', permissionKey: 'support_contact' },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon, menuKey: 'profile', permissionKey: 'profile' },
     ...customMenuItemsForUser.value.map((item): NavItem => ({

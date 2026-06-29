@@ -44,7 +44,7 @@
         <p v-else-if="form.role === 'sub_admin'" class="input-hint">{{ t('admin.users.form.readonlyAdminHint') }}</p>
       </div>
       <AdminMenuPermissionPicker
-        v-if="form.role === 'sub_admin'"
+        v-if="form.role !== 'admin'"
         v-model="form.admin_menu_permissions"
       />
       <div>
@@ -171,7 +171,7 @@ const handleUpdateUser = async () => {
       username: form.username,
       notes: form.notes,
       role: form.role,
-      admin_menu_permissions: form.role === 'sub_admin' ? form.admin_menu_permissions : [],
+      admin_menu_permissions: form.role !== 'admin' ? form.admin_menu_permissions : [],
       concurrency: form.concurrency,
       rpm_limit: form.rpm_limit,
       allow_balance_subscription_purchase: form.allow_balance_subscription_purchase

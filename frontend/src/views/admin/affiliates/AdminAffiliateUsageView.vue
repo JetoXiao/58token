@@ -4,7 +4,7 @@
       <template #actions>
         <div
           class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          :class="viewMode === 'groups' ? 'xl:grid-cols-5' : 'xl:grid-cols-4'"
+          :class="viewMode === 'groups' ? 'xl:grid-cols-5 2xl:grid-cols-7' : 'xl:grid-cols-4'"
         >
           <SummaryStat
             :label="t('admin.affiliates.usage.summaryRequests')"
@@ -31,6 +31,18 @@
             :label="t('admin.affiliates.usage.summaryRebate')"
             :value="formatRebateAmount(summary.total_rebate_amount)"
             icon="creditCard"
+          />
+          <SummaryStat
+            v-if="viewMode === 'groups'"
+            :label="t('admin.affiliates.usage.summarySettled')"
+            :value="formatRebateAmount(summary.total_settled_amount)"
+            icon="checkCircle"
+          />
+          <SummaryStat
+            v-if="viewMode === 'groups'"
+            :label="t('admin.affiliates.usage.summaryPending')"
+            :value="formatRebateAmount(summary.total_pending_amount)"
+            icon="clock"
           />
         </div>
       </template>
@@ -145,6 +157,15 @@
             <Icon name="userPlus" size="md" />
             <span>{{ t('admin.affiliates.usage.assignButton') }}</span>
           </button>
+          <button
+            v-if="viewMode === 'groups'"
+            class="btn btn-secondary"
+            type="button"
+            @click="openSettlementRecordsDialog()"
+          >
+            <Icon name="clipboard" size="md" />
+            <span>{{ t('admin.affiliates.usage.settlementRecordsButton') }}</span>
+          </button>
         </div>
       </template>
 
@@ -209,6 +230,33 @@
           </template>
           <template #cell-rebate_amount="{ row }">
             <span class="text-sm font-semibold text-primary-600 dark:text-primary-400">{{ formatRebateAmount(row.rebate_amount) }}</span>
+          </template>
+          <template #cell-settled_amount="{ row }">
+            <span class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ row.unassigned ? '-' : formatRebateAmount(row.settled_amount) }}</span>
+          </template>
+          <template #cell-pending_amount="{ row }">
+            <span class="text-sm font-semibold text-amber-600 dark:text-amber-400">{{ row.unassigned ? '-' : formatRebateAmount(row.pending_amount) }}</span>
+          </template>
+          <template #cell-settlement_actions="{ row }">
+            <div v-if="!row.unassigned" class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:border-emerald-700 dark:hover:bg-emerald-900/30 dark:focus:ring-offset-dark-900"
+                @click.stop="openSettlementDialog(row)"
+              >
+                <Icon name="dollar" size="sm" />
+                <span>{{ t('admin.affiliates.usage.settleButton') }}</span>
+              </button>
+              <button
+                type="button"
+                class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-dark-700 dark:bg-dark-800 dark:text-dark-200 dark:hover:border-primary-700 dark:hover:bg-primary-900/20 dark:hover:text-primary-300 dark:focus:ring-offset-dark-900"
+                @click.stop="openSettlementRecordsDialog(row)"
+              >
+                <Icon name="clipboard" size="sm" />
+                <span>{{ t('admin.affiliates.usage.settlementRecordsShort') }}</span>
+              </button>
+            </div>
+            <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
           </template>
         </DataTable>
       </template>
@@ -461,7 +509,7 @@
                     {{ t('admin.affiliates.usage.totalTokens') }}
                   </th>
                   <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
-                    {{ t('admin.affiliates.usage.actualCost') }}
+                    {{ t('admin.affiliates.usage.profitDetailAmount') }}
                   </th>
                   <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
                     {{ t('admin.affiliates.usage.profitDetailRate') }}
@@ -477,12 +525,12 @@
               <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
                 <tr v-for="detail in selectedProfitDetails" :key="profitDetailKey(detail)" class="hover:bg-gray-50 dark:hover:bg-dark-800">
                   <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ profitDetailGroupLabel(detail) }}</td>
-                  <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-dark-200">{{ detail.model || '-' }}</td>
+                  <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-dark-200">{{ profitDetailModelLabel(detail) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm text-gray-700 dark:text-dark-200">{{ formatInteger(detail.requests) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm font-medium text-gray-900 dark:text-white">{{ formatTokens(detail.total_tokens) }}</td>
-                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatCost(detail.actual_cost) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatProfitDetailActualCost(detail) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm text-gray-700 dark:text-dark-200">{{ formatPercent(detail.profit_rate_percent) }}</td>
-                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCost(detail.net_profit) }}</td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatProfitDetailNetProfit(detail) }}</td>
                   <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-primary-600 dark:text-primary-400">{{ formatRebateAmount(detail.rebate_amount) }}</td>
                 </tr>
                 <tr v-if="selectedProfitDetails.length === 0">
@@ -504,10 +552,10 @@
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ profitDetailGroupLabel(detail) }}</div>
-                <div class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-dark-400">{{ detail.model || '-' }}</div>
+                <div class="mt-1 truncate font-mono text-xs text-gray-500 dark:text-dark-400">{{ profitDetailModelLabel(detail) }}</div>
               </div>
               <div class="shrink-0 text-right">
-                <div class="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCost(detail.net_profit) }}</div>
+                <div class="font-mono text-sm font-semibold text-indigo-600 dark:text-indigo-400">{{ formatProfitDetailNetProfit(detail) }}</div>
                 <div class="mt-1 font-mono text-xs text-primary-600 dark:text-primary-400">{{ formatRebateAmount(detail.rebate_amount) }}</div>
               </div>
             </div>
@@ -521,8 +569,8 @@
                 <div class="mt-0.5 font-mono text-gray-900 dark:text-white">{{ formatTokens(detail.total_tokens) }}</div>
               </div>
               <div>
-                <div>{{ t('admin.affiliates.usage.actualCost') }}</div>
-                <div class="mt-0.5 font-mono text-emerald-600 dark:text-emerald-400">{{ formatCost(detail.actual_cost) }}</div>
+                <div>{{ t('admin.affiliates.usage.profitDetailAmount') }}</div>
+                <div class="mt-0.5 font-mono text-emerald-600 dark:text-emerald-400">{{ formatProfitDetailActualCost(detail) }}</div>
               </div>
               <div>
                 <div>{{ t('admin.affiliates.usage.profitDetailRate') }}</div>
@@ -616,6 +664,231 @@
         </button>
       </template>
     </BaseDialog>
+
+    <BaseDialog
+      :show="settlementDialog"
+      :title="t('admin.affiliates.usage.settlementTitle')"
+      width="wide"
+      @close="closeSettlementDialog"
+    >
+      <div class="space-y-5">
+        <div v-if="settlementForm.user" class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-dark-700 dark:bg-dark-800">
+          <div class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+            {{ t('admin.affiliates.usage.settlementUser') }}
+          </div>
+          <div class="mt-2">
+            <UserCell
+              :id="settlementForm.user.id"
+              :email="settlementForm.user.email"
+              :username="settlementForm.user.username"
+            />
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-dark-300">
+              {{ t('admin.affiliates.usage.settlementAmount') }}
+            </label>
+            <input
+              v-model="settlementForm.amount"
+              type="text"
+              inputmode="decimal"
+              class="input"
+              placeholder="0.00"
+              @input="onSettlementAmountInput"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700 dark:text-dark-300">
+              {{ t('admin.affiliates.usage.settlementDate') }}
+            </label>
+            <input v-model="settlementForm.settled_on" type="date" class="input" />
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700 dark:text-dark-300">
+            {{ t('admin.affiliates.usage.settlementNote') }}
+          </label>
+          <textarea
+            v-model="settlementForm.note"
+            class="input min-h-28 resize-y"
+            :placeholder="t('admin.affiliates.usage.settlementNotePlaceholder')"
+            maxlength="1000"
+          ></textarea>
+        </div>
+      </div>
+
+      <template #footer>
+        <button class="btn btn-secondary" type="button" @click="closeSettlementDialog">
+          {{ t('common.cancel') }}
+        </button>
+        <button
+          class="btn btn-primary"
+          type="button"
+          :disabled="settlementForm.submitting || !settlementForm.user"
+          @click="submitSettlement"
+        >
+          <Icon name="sync" size="md" :class="settlementForm.submitting ? 'animate-spin' : ''" />
+          <span>{{ t('admin.affiliates.usage.settlementSubmit') }}</span>
+        </button>
+      </template>
+    </BaseDialog>
+
+    <BaseDialog
+      :show="settlementRecordsDialog"
+      :title="settlementRecordsTitle"
+      width="extra-wide"
+      @close="closeSettlementRecordsDialog"
+    >
+      <div class="space-y-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <input
+            v-model="settlementRecordFilters.search"
+            type="text"
+            class="input w-full sm:w-72"
+            :placeholder="t('admin.affiliates.usage.settlementRecordSearch')"
+            @input="debounceSettlementRecordsLoad"
+          />
+          <input
+            v-model="settlementRecordFilters.start_at"
+            type="date"
+            class="input w-full sm:w-44"
+            :title="t('admin.affiliates.records.startAt')"
+            @change="loadSettlementRecordsFromFirstPage"
+          />
+          <input
+            v-model="settlementRecordFilters.end_at"
+            type="date"
+            class="input w-full sm:w-44"
+            :title="t('admin.affiliates.records.endAt')"
+            @change="loadSettlementRecordsFromFirstPage"
+          />
+          <button class="btn btn-secondary px-2 md:px-3" :disabled="settlementRecordsLoading" :title="t('common.refresh')" @click="loadSettlementRecords">
+            <Icon name="refresh" size="md" :class="settlementRecordsLoading ? 'animate-spin' : ''" />
+          </button>
+        </div>
+
+        <div class="hidden overflow-hidden rounded-lg border border-gray-200 dark:border-dark-700 md:block">
+          <div class="max-h-[60vh] overflow-auto">
+            <table class="w-full min-w-[64rem] divide-y divide-gray-200 dark:divide-dark-700">
+              <thead class="sticky top-0 z-10 bg-gray-50 dark:bg-dark-800">
+                <tr>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.records.user') }}
+                  </th>
+                  <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.settlementAmount') }}
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.settlementDate') }}
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.settlementCreatedBy') }}
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.settlementCreatedAt') }}
+                  </th>
+                  <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-dark-400">
+                    {{ t('admin.affiliates.usage.settlementNote') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-700 dark:bg-dark-900">
+                <tr v-for="record in settlementRecords" :key="record.id" class="hover:bg-gray-50 dark:hover:bg-dark-800">
+                  <td class="px-4 py-3">
+                    <UserCell :id="record.user_id" :email="record.user_email" :username="record.username" />
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    {{ formatRebateAmount(record.amount) }}
+                  </td>
+                  <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-dark-200">
+                    {{ formatDateOnly(record.settled_on) }}
+                  </td>
+                  <td class="px-4 py-3">
+                    <UserCell
+                      v-if="record.created_by"
+                      :id="record.created_by"
+                      :email="record.created_by_email || ''"
+                      :username="record.created_by_username || ''"
+                    />
+                    <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
+                  </td>
+                  <td class="px-4 py-3 font-mono text-sm text-gray-700 dark:text-dark-200">
+                    {{ formatDateTime(record.created_at) }}
+                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-700 dark:text-dark-200">
+                    <div class="max-w-md whitespace-pre-wrap break-words">{{ record.note || '-' }}</div>
+                  </td>
+                </tr>
+                <tr v-if="!settlementRecordsLoading && settlementRecords.length === 0">
+                  <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+                    {{ t('empty.noData') }}
+                  </td>
+                </tr>
+                <tr v-if="settlementRecordsLoading">
+                  <td colspan="6" class="px-4 py-10 text-center text-sm text-gray-500 dark:text-dark-400">
+                    {{ t('common.loading') }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="space-y-3 md:hidden">
+          <div
+            v-for="record in settlementRecords"
+            :key="record.id"
+            class="rounded-lg border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <UserCell :id="record.user_id" :email="record.user_email" :username="record.username" />
+              <div class="shrink-0 text-right">
+                <div class="font-mono text-sm font-semibold text-emerald-600 dark:text-emerald-400">{{ formatRebateAmount(record.amount) }}</div>
+                <div class="mt-1 font-mono text-xs text-gray-500 dark:text-dark-400">{{ formatDateOnly(record.settled_on) }}</div>
+              </div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-500 dark:text-dark-400">
+              <div>
+                <div>{{ t('admin.affiliates.usage.settlementCreatedBy') }}</div>
+                <div class="mt-0.5 text-gray-900 dark:text-white">{{ record.created_by_email || record.created_by_username || '-' }}</div>
+              </div>
+              <div>
+                <div>{{ t('admin.affiliates.usage.settlementCreatedAt') }}</div>
+                <div class="mt-0.5 font-mono text-gray-900 dark:text-white">{{ formatDateTime(record.created_at) }}</div>
+              </div>
+            </div>
+            <div class="mt-3 text-sm text-gray-700 dark:text-dark-200">
+              <div class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.affiliates.usage.settlementNote') }}</div>
+              <div class="mt-1 whitespace-pre-wrap break-words">{{ record.note || '-' }}</div>
+            </div>
+          </div>
+          <div v-if="!settlementRecordsLoading && settlementRecords.length === 0" class="rounded-lg border border-gray-200 bg-white py-10 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400">
+            {{ t('empty.noData') }}
+          </div>
+          <div v-if="settlementRecordsLoading" class="rounded-lg border border-gray-200 bg-white py-10 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400">
+            {{ t('common.loading') }}
+          </div>
+        </div>
+
+        <Pagination
+          v-if="settlementRecordPagination.total > 0"
+          :page="settlementRecordPagination.page"
+          :total="settlementRecordPagination.total"
+          :page-size="settlementRecordPagination.page_size"
+          @update:page="handleSettlementRecordPageChange"
+          @update:pageSize="handleSettlementRecordPageSizeChange"
+        />
+      </div>
+
+      <template #footer>
+        <button class="btn btn-secondary" type="button" @click="closeSettlementRecordsDialog">
+          {{ t('common.close') }}
+        </button>
+      </template>
+    </BaseDialog>
   </AppLayout>
 </template>
 
@@ -632,13 +905,16 @@ import type { Column } from '@/components/common/types'
 import { useAppStore } from '@/stores/app'
 import {
   affiliatesAPI,
+  type AffiliateSettlementRecord,
   type AffiliateUsageDailyRecord,
   type AffiliateUsageProfitDetail,
   type AffiliateUsageSummary,
+  type ListAffiliateRecordsParams,
   type ListAffiliateUsageParams,
   type SimpleUser,
 } from '@/api/admin/affiliates'
 import { extractI18nErrorMessage } from '@/utils/apiError'
+import { formatDateTime as formatDisplayDateTime } from '@/utils/format'
 
 type UserRole = 'inviter' | 'invitee'
 type UsageView = 'users' | 'groups'
@@ -668,7 +944,7 @@ function usageLabel(key: UsageLabelKey): string {
 }
 
 const loading = ref(false)
-const viewMode = ref<UsageView>('users')
+const viewMode = ref<UsageView>('groups')
 const records = ref<AffiliateUsageDailyRecord[]>([])
 const membersDialog = ref(false)
 const selectedMemberGroup = ref<AffiliateUsageDailyRecord | null>(null)
@@ -687,6 +963,8 @@ const summary = reactive<AffiliateUsageSummary>({
   total_account_cost: 0,
   total_net_profit: 0,
   total_rebate_amount: 0,
+  total_settled_amount: 0,
+  total_pending_amount: 0,
 })
 const filters = reactive({
   search: '',
@@ -722,11 +1000,33 @@ const assignForm = reactive({
 const showAssignInviterResults = ref(false)
 const showAssignInviteeResults = ref(false)
 
+const settlementDialog = ref(false)
+const settlementForm = reactive({
+  user: null as SimpleUser | null,
+  amount: '',
+  settled_on: defaultDateInput(0),
+  note: '',
+  submitting: false,
+})
+
+const settlementRecordsDialog = ref(false)
+const settlementRecordsLoading = ref(false)
+const settlementRecords = ref<AffiliateSettlementRecord[]>([])
+const settlementRecordUser = ref<SimpleUser | null>(null)
+const settlementRecordFilters = reactive({
+  search: '',
+  start_at: defaultDateInput(-29),
+  end_at: defaultDateInput(0),
+})
+const settlementRecordPagination = reactive({ page: 1, page_size: 20, total: 0 })
+const settlementRecordSort = reactive({ sort_by: 'settled_on', sort_order: 'desc' as 'asc' | 'desc' })
+
 let reloadTimer: ReturnType<typeof setTimeout> | null = null
 let filterInviterTimer: ReturnType<typeof setTimeout> | null = null
 let filterInviteeTimer: ReturnType<typeof setTimeout> | null = null
 let assignInviterTimer: ReturnType<typeof setTimeout> | null = null
 let assignInviteeTimer: ReturnType<typeof setTimeout> | null = null
+let settlementRecordsTimer: ReturnType<typeof setTimeout> | null = null
 
 const columns = computed<Column[]>(() => [
   ...(viewMode.value === 'users'
@@ -747,9 +1047,18 @@ const columns = computed<Column[]>(() => [
     ? [
         { key: 'rebate_rate', label: t('admin.affiliates.usage.rebateRate'), sortable: true },
         { key: 'rebate_amount', label: t('admin.affiliates.usage.rebateAmount'), sortable: true },
+        { key: 'settled_amount', label: t('admin.affiliates.usage.settledAmount'), sortable: true },
+        { key: 'pending_amount', label: t('admin.affiliates.usage.pendingAmount'), sortable: true },
+        { key: 'settlement_actions', label: t('admin.affiliates.usage.settlementActions') },
       ]
     : []),
 ])
+
+const settlementRecordsTitle = computed(() => {
+  const user = settlementRecordUser.value
+  if (!user) return t('admin.affiliates.usage.settlementRecordsTitle')
+  return t('admin.affiliates.usage.settlementRecordsForUser', { user: userLabel(user) })
+})
 
 function userTimezone(): string {
   try {
@@ -790,6 +1099,8 @@ async function loadRecords() {
     summary.total_account_cost = res.summary?.total_account_cost || 0
     summary.total_net_profit = res.summary?.total_net_profit || 0
     summary.total_rebate_amount = res.summary?.total_rebate_amount || 0
+    summary.total_settled_amount = res.summary?.total_settled_amount || 0
+    summary.total_pending_amount = res.summary?.total_pending_amount || 0
   } catch (error) {
     appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
   } finally {
@@ -830,6 +1141,7 @@ function setViewMode(mode: UsageView) {
   viewMode.value = mode
   closeMembersDialog()
   closeProfitDetailsDialog()
+  closeSettlementDialog()
   sortState.sort_by = 'actual_cost'
   sortState.sort_order = 'desc'
   pagination.page = 1
@@ -893,8 +1205,23 @@ function profitDetailGroupLabel(detail: AffiliateUsageProfitDetail): string {
   return t('admin.affiliates.usage.unassignedGroup')
 }
 
+function profitDetailModelLabel(detail: AffiliateUsageProfitDetail): string {
+  if (detail.source === 'subscription') {
+    return `${t('admin.affiliates.usage.subscriptionSource')} · ${detail.model || '-'}`
+  }
+  return detail.model || '-'
+}
+
 function profitDetailKey(detail: AffiliateUsageProfitDetail): string {
-  return `${detail.group_id}:${detail.group_name}:${detail.model}:${detail.profit_rate_percent}`
+  return `${detail.source || 'usage'}:${detail.group_id}:${detail.group_name}:${detail.model}:${detail.profit_rate_percent}`
+}
+
+function formatProfitDetailActualCost(detail: AffiliateUsageProfitDetail): string {
+  return detail.source === 'subscription' ? formatCnyAmount(detail.actual_cost) : formatCost(detail.actual_cost)
+}
+
+function formatProfitDetailNetProfit(detail: AffiliateUsageProfitDetail): string {
+  return detail.source === 'subscription' ? formatCnyAmount(detail.net_profit) : formatCost(detail.net_profit)
 }
 
 function resolveProfitDetailsRecord(row: AffiliateUsageDailyRecord): AffiliateUsageDailyRecord {
@@ -951,6 +1278,7 @@ function aggregateProfitDetails(records: AffiliateUsageDailyRecord[]): Affiliate
           group_id: detail.group_id,
           group_name: detail.group_name,
           model: detail.model,
+          source: detail.source,
           requests: Number(detail.requests || 0),
           total_tokens: Number(detail.total_tokens || 0),
           actual_cost: Number(detail.actual_cost || 0),
@@ -1198,6 +1526,126 @@ async function submitAssignment() {
   }
 }
 
+function openSettlementDialog(row: AffiliateUsageDailyRecord) {
+  const user = usageRecordUser(row, 'inviter')
+  if (!user) return
+  settlementForm.user = user
+  settlementForm.amount = decimalAmountInput(row.pending_amount || row.rebate_amount || 0)
+  settlementForm.settled_on = defaultDateInput(0)
+  settlementForm.note = ''
+  settlementDialog.value = true
+}
+
+function closeSettlementDialog() {
+  settlementDialog.value = false
+  settlementForm.submitting = false
+}
+
+function onSettlementAmountInput(event: Event) {
+  const target = event.target as HTMLInputElement | null
+  const value = sanitizeDecimalInput(target?.value || settlementForm.amount)
+  settlementForm.amount = value
+  if (target && target.value !== value) {
+    target.value = value
+  }
+}
+
+async function submitSettlement() {
+  const user = settlementForm.user
+  if (!user) return
+  const amount = Number(settlementForm.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    appStore.showError(t('admin.affiliates.usage.settlementInvalidAmount'))
+    return
+  }
+  if (!settlementForm.settled_on) {
+    appStore.showError(t('admin.affiliates.usage.settlementInvalidDate'))
+    return
+  }
+  settlementForm.submitting = true
+  try {
+    await affiliatesAPI.createSettlement({
+      user_id: user.id,
+      amount,
+      settled_on: settlementForm.settled_on,
+      note: settlementForm.note.trim(),
+    })
+    appStore.showSuccess(t('admin.affiliates.usage.settlementSuccess'))
+    settlementDialog.value = false
+    await loadRecords()
+    if (settlementRecordsDialog.value) {
+      await loadSettlementRecords()
+    }
+  } catch (error) {
+    appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
+  } finally {
+    settlementForm.submitting = false
+  }
+}
+
+function openSettlementRecordsDialog(row?: AffiliateUsageDailyRecord) {
+  settlementRecordUser.value = row ? usageRecordUser(row, 'inviter') : null
+  settlementRecordFilters.search = ''
+  settlementRecordFilters.start_at = filters.start_at
+  settlementRecordFilters.end_at = filters.end_at
+  settlementRecordPagination.page = 1
+  settlementRecordsDialog.value = true
+  void loadSettlementRecords()
+}
+
+function closeSettlementRecordsDialog() {
+  settlementRecordsDialog.value = false
+  settlementRecordUser.value = null
+}
+
+function buildSettlementRecordParams(): ListAffiliateRecordsParams {
+  return {
+    page: settlementRecordPagination.page,
+    page_size: settlementRecordPagination.page_size,
+    search: settlementRecordFilters.search.trim() || undefined,
+    start_at: settlementRecordFilters.start_at || undefined,
+    end_at: settlementRecordFilters.end_at || undefined,
+    user_id: settlementRecordUser.value?.id || undefined,
+    sort_by: settlementRecordSort.sort_by,
+    sort_order: settlementRecordSort.sort_order,
+    timezone: userTimezone(),
+  }
+}
+
+async function loadSettlementRecords() {
+  settlementRecordsLoading.value = true
+  try {
+    const res = await affiliatesAPI.listSettlementRecords(buildSettlementRecordParams())
+    settlementRecords.value = res.items || []
+    settlementRecordPagination.total = res.total || 0
+  } catch (error) {
+    appStore.showError(extractI18nErrorMessage(error, t, 'admin.affiliates.errors', t('common.error')))
+  } finally {
+    settlementRecordsLoading.value = false
+  }
+}
+
+function debounceSettlementRecordsLoad() {
+  if (settlementRecordsTimer) clearTimeout(settlementRecordsTimer)
+  settlementRecordsTimer = setTimeout(() => loadSettlementRecordsFromFirstPage(), 300)
+}
+
+function loadSettlementRecordsFromFirstPage() {
+  settlementRecordPagination.page = 1
+  void loadSettlementRecords()
+}
+
+function handleSettlementRecordPageChange(page: number) {
+  settlementRecordPagination.page = page
+  void loadSettlementRecords()
+}
+
+function handleSettlementRecordPageSizeChange(size: number) {
+  settlementRecordPagination.page_size = size
+  settlementRecordPagination.page = 1
+  void loadSettlementRecords()
+}
+
 function userLabel(user: SimpleUser): string {
   return `#${user.id} ${user.email || user.username || '-'}`
 }
@@ -1236,6 +1684,21 @@ function defaultDateInput(offsetDays: number): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function sanitizeDecimalInput(value: string): string {
+  let output = String(value || '').replace(/[^\d.]/g, '')
+  const dotIndex = output.indexOf('.')
+  if (dotIndex >= 0) {
+    output = output.slice(0, dotIndex + 1) + output.slice(dotIndex + 1).replace(/\./g, '')
+  }
+  return output
+}
+
+function decimalAmountInput(value: number | null | undefined): string {
+  const n = Number(value || 0)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  return trimNumber(Math.round(n * 10000) / 10000)
 }
 
 function formatInteger(value: number | null | undefined): string {
@@ -1289,6 +1752,22 @@ function formatPercent(value: number | null | undefined): string {
   return `${trimNumber(n)}%`
 }
 
+function formatDateOnly(value: string | null | undefined): string {
+  if (!value) return '-'
+  const raw = String(value)
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10)
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) return '-'
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  return value ? formatDisplayDateTime(value) : '-'
+}
+
 const UserCell = defineComponent({
   props: {
     id: { type: Number, required: true },
@@ -1325,7 +1804,7 @@ const SummaryStat = defineComponent({
   props: {
     label: { type: String, required: true },
     value: { type: String, required: true },
-    icon: { type: String as PropType<'chart' | 'creditCard' | 'database' | 'dollar'>, required: true },
+    icon: { type: String as PropType<'chart' | 'creditCard' | 'database' | 'dollar' | 'checkCircle' | 'clock'>, required: true },
   },
   setup(statProps) {
     return () => h('div', { class: 'min-h-[6.25rem] rounded-lg border border-gray-200 bg-white p-3 shadow-sm dark:border-dark-700 dark:bg-dark-800 sm:p-4' }, [

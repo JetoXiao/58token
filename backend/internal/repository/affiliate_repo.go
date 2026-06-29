@@ -645,19 +645,30 @@ SELECT COUNT(*)::bigint,
        COALESCE(SUM(actual_cost), 0)::double precision,
        COALESCE(SUM(account_cost), 0)::double precision,
        COALESCE(SUM(net_profit), 0)::double precision,
-       COALESCE(SUM(rebate_amount), 0)::double precision
+       COALESCE(SUM(recharge_amount), 0)::double precision,
+       COALESCE(SUM(rebate_amount), 0)::double precision,
+       COALESCE(SUM(settled_amount), 0)::double precision,
+       COALESCE(SUM(pending_amount), 0)::double precision
 FROM records`, args...)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 	if rows.Next() {
-		if err := rows.Scan(&total, &summary.TotalRequests, &summary.TotalTokens, &summary.TotalActualCost, &summary.TotalAccountCost, &summary.TotalNetProfit, &summary.TotalRebateAmount); err != nil {
+		if err := rows.Scan(&total, &summary.TotalRequests, &summary.TotalTokens, &summary.TotalActualCost, &summary.TotalAccountCost, &summary.TotalNetProfit, &summary.TotalRecharge, &summary.TotalRebateAmount, &summary.TotalSettledAmount, &summary.TotalPendingAmount); err != nil {
 			_ = rows.Close()
 			return nil, nil, 0, err
 		}
 	}
 	if err := rows.Close(); err != nil {
 		return nil, nil, 0, err
+	}
+	if filter.InviterOnly && filter.View == "users" && filter.InviterID > 0 {
+		settledAmount, err := queryAffiliateUsageSettledAmount(ctx, client, filter)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		summary.TotalSettledAmount = settledAmount
+		summary.TotalPendingAmount = math.Max(summary.TotalRebateAmount-settledAmount, 0)
 	}
 
 	orderBy := buildAffiliateUsageOrderBy(filter)
@@ -690,6 +701,8 @@ SELECT usage_date,
        recharge_amount,
        rebate_rate_percent,
        rebate_amount,
+       settled_amount,
+       pending_amount,
        unassigned,
        profit_details,
        members
@@ -723,6 +736,8 @@ LIMIT `+limitPlaceholder+` OFFSET `+offsetPlaceholder, args...)
 			&item.RechargeAmount,
 			&item.RebateRatePercent,
 			&item.RebateAmount,
+			&item.SettledAmount,
+			&item.PendingAmount,
 			&item.Unassigned,
 			&profitDetailsRaw,
 			&membersRaw,
@@ -745,6 +760,37 @@ LIMIT `+limitPlaceholder+` OFFSET `+offsetPlaceholder, args...)
 		return nil, nil, 0, err
 	}
 	return items, summary, total, nil
+}
+
+func queryAffiliateUsageSettledAmount(ctx context.Context, client affiliateQueryExecer, filter service.AffiliateUsageFilter) (float64, error) {
+	args := []any{filter.InviterID}
+	clauses := []string{"uas.user_id = $1", "uas.amount > 0"}
+	tz := strings.ReplaceAll(affiliateUsageTimezone(filter.Timezone), "'", "''")
+	if filter.StartAt != nil {
+		args = append(args, *filter.StartAt)
+		clauses = append(clauses, fmt.Sprintf("uas.settled_on >= ($%d AT TIME ZONE '%s')::date", len(args), tz))
+	}
+	if filter.EndAt != nil {
+		args = append(args, *filter.EndAt)
+		clauses = append(clauses, fmt.Sprintf("uas.settled_on < ($%d AT TIME ZONE '%s')::date", len(args), tz))
+	}
+
+	rows, err := client.QueryContext(ctx, `
+SELECT COALESCE(SUM(uas.amount), 0)::double precision
+FROM user_affiliate_settlements uas
+WHERE `+strings.Join(clauses, " AND "), args...)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var settledAmount float64
+	if rows.Next() {
+		if err := rows.Scan(&settledAmount); err != nil {
+			return 0, err
+		}
+	}
+	return settledAmount, rows.Err()
 }
 
 func (r *affiliateRepository) ListAffiliateRebateRecords(ctx context.Context, filter service.AffiliateRecordFilter) ([]service.AffiliateRebateRecord, int64, error) {
@@ -917,6 +963,118 @@ LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	return items, total, nil
 }
 
+func (r *affiliateRepository) CreateAffiliateSettlement(ctx context.Context, input service.AffiliateSettlementInput) (*service.AffiliateSettlementRecord, error) {
+	client := clientFromContext(ctx, r.client)
+	createdBy := sql.NullInt64{Int64: input.CreatedBy, Valid: input.CreatedBy > 0}
+	rows, err := client.QueryContext(ctx, `
+WITH inserted AS (
+    INSERT INTO user_affiliate_settlements (user_id, amount, settled_on, note, created_by)
+    SELECT u.id, $2, $3::date, $4, $5::bigint
+    FROM users u
+    WHERE u.id = $1 AND u.deleted_at IS NULL
+    RETURNING id, user_id, amount::double precision, settled_on, note, created_by, created_at, updated_at
+)
+SELECT i.id,
+       i.user_id,
+       COALESCE(u.email, ''),
+       COALESCE(u.username, ''),
+       i.amount,
+       i.settled_on,
+       i.note,
+       i.created_by,
+       COALESCE(admin.email, ''),
+       COALESCE(admin.username, ''),
+       i.created_at,
+       i.updated_at
+FROM inserted i
+JOIN users u ON u.id = i.user_id
+LEFT JOIN users admin ON admin.id = i.created_by`, input.UserID, input.Amount, input.SettledOn, input.Note, createdBy)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, service.ErrUserNotFound
+	}
+	item, err := scanAffiliateSettlementRecord(rows)
+	if err != nil {
+		return nil, err
+	}
+	return &item, rows.Err()
+}
+
+func (r *affiliateRepository) ListAffiliateSettlementRecords(ctx context.Context, filter service.AffiliateRecordFilter) ([]service.AffiliateSettlementRecord, int64, error) {
+	client := clientFromContext(ctx, r.client)
+	where, args := buildAffiliateRecordWhere(filter, "uas.settled_on::timestamptz", []string{
+		"u.email", "u.username", "u.id::text", "uas.note", "admin.email", "admin.username",
+	})
+	if filter.UserID > 0 {
+		args = append(args, filter.UserID)
+		condition := fmt.Sprintf("uas.user_id = $%d", len(args))
+		if where == "" {
+			where = "WHERE " + condition
+		} else {
+			where += " AND " + condition
+		}
+	}
+	baseJoin := `
+FROM user_affiliate_settlements uas
+JOIN users u ON u.id = uas.user_id
+LEFT JOIN users admin ON admin.id = uas.created_by`
+
+	total, err := queryAffiliateRecordCount(ctx, client, "SELECT COUNT(*) "+baseJoin+" "+where, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	orderBy := buildAffiliateRecordOrderBy(filter, map[string]string{
+		"user":       "u.email",
+		"amount":     "uas.amount",
+		"settled_on": "uas.settled_on",
+		"note":       "uas.note",
+		"created_by": "admin.email",
+		"created_at": "uas.created_at",
+	}, "uas.settled_on")
+	args = append(args, filter.PageSize, (filter.Page-1)*filter.PageSize)
+	rows, err := client.QueryContext(ctx, `
+SELECT uas.id,
+       uas.user_id,
+       COALESCE(u.email, ''),
+       COALESCE(u.username, ''),
+       uas.amount::double precision,
+       uas.settled_on,
+       uas.note,
+       uas.created_by,
+       COALESCE(admin.email, ''),
+       COALESCE(admin.username, ''),
+       uas.created_at,
+       uas.updated_at
+`+baseJoin+`
+`+where+`
+`+orderBy+`
+LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]service.AffiliateSettlementRecord, 0)
+	for rows.Next() {
+		item, err := scanAffiliateSettlementRecord(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
+}
+
 func (r *affiliateRepository) GetAffiliateUserOverview(ctx context.Context, userID int64) (*service.AffiliateUserOverview, error) {
 	if userID <= 0 {
 		return nil, service.ErrUserNotFound
@@ -1031,6 +1189,8 @@ func buildAffiliateUsageCTE(filter service.AffiliateUsageFilter) (string, []any)
 		paymentClauses = append(paymentClauses, fmt.Sprintf("po.paid_at < $%d", endAtArg))
 	}
 	paymentWhere := strings.Join(paymentClauses, " AND ")
+	subscriptionOrderWhere := buildAffiliateSubscriptionOrderWhere(endAtArg, filter.Timezone)
+	subscriptionEffectiveWhere := buildAffiliateSubscriptionEffectiveWhere(startAtArg, endAtArg, filter.Timezone)
 	groupProfitRatesCTE := buildAffiliateGroupProfitRatesCTE(&args, filter.GroupProfitRates)
 
 	if filter.View == "groups" {
@@ -1070,7 +1230,7 @@ CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
 		}
 		userWhere := "WHERE " + strings.Join(userClauses, " AND ")
 		return fmt.Sprintf(`
-WITH %[7]s,
+WITH RECURSIVE %[7]s,
 %[3]s,
 usage_by_user_detail AS (
     SELECT ul.user_id,
@@ -1081,8 +1241,8 @@ usage_by_user_detail AS (
            COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
            COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost,
            COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0)::double precision AS account_cost,
-           COALESCE(agpr.profit_rate_percent, 0)::double precision AS profit_rate_percent,
-           COALESCE(SUM(GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit
+           CASE WHEN ul.subscription_id IS NULL THEN COALESCE(agpr.profit_rate_percent, 0) ELSE 0 END::double precision AS profit_rate_percent,
+           COALESCE(SUM(CASE WHEN ul.subscription_id IS NULL THEN GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100 ELSE 0 END), 0)::double precision AS net_profit
     FROM usage_logs ul
     LEFT JOIN groups g ON g.id = ul.group_id
     LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = ul.group_id
@@ -1091,7 +1251,7 @@ usage_by_user_detail AS (
              COALESCE(ul.group_id, 0),
              COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END),
              COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-'),
-             COALESCE(agpr.profit_rate_percent, 0)
+             CASE WHEN ul.subscription_id IS NULL THEN COALESCE(agpr.profit_rate_percent, 0) ELSE 0 END
 ),
 usage_by_user AS (
     SELECT user_id,
@@ -1147,6 +1307,29 @@ usage_user_records AS (
     LEFT JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
     %[4]s
 ),
+subscription_order_rows AS (
+    SELECT po.*,
+           ROW_NUMBER() OVER (PARTITION BY po.user_id, po.subscription_group_id ORDER BY po.paid_at ASC, po.id ASC) AS subscription_order_number,
+           GREATEST(COALESCE(po.subscription_days, 30), 1)::integer AS subscription_days_for_rebate
+    FROM payment_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    WHERE %[8]s
+),
+subscription_effective_orders AS (
+    SELECT sor.*,
+           sor.paid_at AS effective_start_at,
+           sor.paid_at + (sor.subscription_days_for_rebate * INTERVAL '1 day') AS effective_end_at
+    FROM subscription_order_rows sor
+    WHERE sor.subscription_order_number = 1
+    UNION ALL
+    SELECT sor.*,
+           GREATEST(sor.paid_at, seo.effective_end_at) AS effective_start_at,
+           GREATEST(sor.paid_at, seo.effective_end_at) + (sor.subscription_days_for_rebate * INTERVAL '1 day') AS effective_end_at
+    FROM subscription_order_rows sor
+    JOIN subscription_effective_orders seo ON seo.user_id = sor.user_id
+        AND seo.subscription_group_id = sor.subscription_group_id
+        AND seo.subscription_order_number + 1 = sor.subscription_order_number
+),
 recharge_by_user AS (
     SELECT po.user_id,
            COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount
@@ -1154,6 +1337,40 @@ recharge_by_user AS (
     JOIN usage_user_records uur ON uur.invitee_id = po.user_id
     CROSS JOIN exchange_rate er
     WHERE %[6]s
+    GROUP BY po.user_id
+),
+settlement_by_user AS (
+    SELECT uas.user_id,
+           COALESCE(SUM(uas.amount), 0)::double precision AS settled_amount
+    FROM user_affiliate_settlements uas
+    JOIN (SELECT DISTINCT inviter_id FROM usage_user_records WHERE inviter_id > 0) inviter_scope ON inviter_scope.inviter_id = uas.user_id
+    WHERE (%[9]s)
+    GROUP BY uas.user_id
+),
+subscription_profit_by_user AS (
+    SELECT po.user_id,
+           COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount,
+           COALESCE(SUM(%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit,
+           COALESCE(SUM(CASE WHEN uur.unassigned THEN 0::double precision ELSE (%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100) * uur.rebate_rate_percent / 100 END), 0)::double precision AS rebate_amount,
+           COALESCE(jsonb_agg(jsonb_build_object(
+               'group_id', COALESCE(po.subscription_group_id, 0),
+               'group_name', COALESCE(NULLIF(g.name, ''), CASE WHEN po.subscription_group_id IS NULL THEN '' ELSE '#' || po.subscription_group_id::text END),
+               'model', COALESCE(NULLIF(sp.name, ''), 'Subscription'),
+               'source', 'subscription',
+               'requests', 1,
+               'total_tokens', 0,
+               'actual_cost', %[5]s,
+               'profit_rate_percent', COALESCE(agpr.profit_rate_percent, 0),
+               'net_profit', %[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100,
+               'rebate_amount', CASE WHEN uur.unassigned THEN 0::double precision ELSE (%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100) * uur.rebate_rate_percent / 100 END
+           ) ORDER BY po.effective_start_at DESC, po.paid_at DESC, po.id DESC), '[]'::jsonb) AS profit_details
+    FROM subscription_effective_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    CROSS JOIN exchange_rate er
+    LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = po.subscription_group_id
+    LEFT JOIN groups g ON g.id = po.subscription_group_id
+    LEFT JOIN subscription_plans sp ON sp.id = po.plan_id
+    WHERE %[10]s
     GROUP BY po.user_id
 ),
 group_profit_detail_rows AS (
@@ -1199,6 +1416,16 @@ group_profit_details AS (
     FROM group_profit_detail_rows
     GROUP BY inviter_id, rebate_rate_percent, unassigned
 ),
+group_subscription_profit_details AS (
+    SELECT uur.inviter_id,
+           uur.rebate_rate_percent,
+           uur.unassigned,
+           COALESCE(jsonb_agg(sp_detail.detail ORDER BY (sp_detail.detail->>'net_profit')::double precision DESC), '[]'::jsonb) AS profit_details
+    FROM usage_user_records uur
+    JOIN subscription_profit_by_user spbu ON spbu.user_id = uur.invitee_id
+    JOIN LATERAL jsonb_array_elements(COALESCE(spbu.profit_details, '[]'::jsonb)) AS sp_detail(detail) ON TRUE
+    GROUP BY uur.inviter_id, uur.rebate_rate_percent, uur.unassigned
+),
 records AS (
     SELECT '' AS usage_date,
            uur.inviter_id,
@@ -1212,12 +1439,14 @@ records AS (
            COALESCE(SUM(uur.total_tokens), 0)::bigint AS total_tokens,
            COALESCE(SUM(uur.actual_cost), 0)::double precision AS actual_cost,
            COALESCE(SUM(uur.account_cost), 0)::double precision AS account_cost,
-           COALESCE(SUM(uur.net_profit), 0)::double precision AS net_profit,
-           COALESCE(SUM(COALESCE(rb.recharge_amount, 0)), 0)::double precision AS recharge_amount,
+           COALESCE(SUM(uur.net_profit + COALESCE(spbu.net_profit, 0)), 0)::double precision AS net_profit,
+           COALESCE(SUM(COALESCE(rb.recharge_amount, 0) + COALESCE(spbu.recharge_amount, 0)), 0)::double precision AS recharge_amount,
            uur.rebate_rate_percent,
-           COALESCE(SUM(uur.rebate_amount), 0)::double precision AS rebate_amount,
+           COALESCE(SUM(uur.rebate_amount + COALESCE(spbu.rebate_amount, 0)), 0)::double precision AS rebate_amount,
+           COALESCE(sbu.settled_amount, 0)::double precision AS settled_amount,
+           GREATEST(COALESCE(SUM(uur.rebate_amount + COALESCE(spbu.rebate_amount, 0)), 0) - COALESCE(sbu.settled_amount, 0), 0)::double precision AS pending_amount,
            uur.unassigned,
-           COALESCE(gpd.profit_details, '[]'::jsonb) AS profit_details,
+           COALESCE(gpd.profit_details, '[]'::jsonb) || COALESCE(gspd.profit_details, '[]'::jsonb) AS profit_details,
            COALESCE(jsonb_agg(jsonb_build_object(
                'date', uur.usage_date,
                'inviter_id', uur.inviter_id,
@@ -1231,21 +1460,28 @@ records AS (
                'total_tokens', uur.total_tokens,
                'actual_cost', uur.actual_cost,
                'account_cost', uur.account_cost,
-               'net_profit', uur.net_profit,
-               'recharge_amount', COALESCE(rb.recharge_amount, 0),
+               'net_profit', uur.net_profit + COALESCE(spbu.net_profit, 0),
+               'recharge_amount', COALESCE(rb.recharge_amount, 0) + COALESCE(spbu.recharge_amount, 0),
                'rebate_rate_percent', uur.rebate_rate_percent,
-               'rebate_amount', uur.rebate_amount,
+               'rebate_amount', uur.rebate_amount + COALESCE(spbu.rebate_amount, 0),
+               'settled_amount', 0,
+               'pending_amount', uur.rebate_amount + COALESCE(spbu.rebate_amount, 0),
                'unassigned', uur.unassigned,
-               'profit_details', uur.profit_details
-            ) ORDER BY uur.actual_cost DESC, COALESCE(rb.recharge_amount, 0) DESC, uur.invitee_id ASC), '[]'::jsonb) AS members
+               'profit_details', uur.profit_details || COALESCE(spbu.profit_details, '[]'::jsonb)
+            ) ORDER BY uur.actual_cost DESC, (COALESCE(rb.recharge_amount, 0) + COALESCE(spbu.recharge_amount, 0)) DESC, uur.invitee_id ASC), '[]'::jsonb) AS members
     FROM usage_user_records uur
     LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
+    LEFT JOIN subscription_profit_by_user spbu ON spbu.user_id = uur.invitee_id
+    LEFT JOIN settlement_by_user sbu ON sbu.user_id = uur.inviter_id
     LEFT JOIN group_profit_details gpd ON gpd.inviter_id = uur.inviter_id
         AND gpd.rebate_rate_percent = uur.rebate_rate_percent
         AND gpd.unassigned = uur.unassigned
-    GROUP BY uur.inviter_id, uur.inviter_email, uur.inviter_username, uur.rebate_rate_percent, uur.unassigned, gpd.profit_details
+    LEFT JOIN group_subscription_profit_details gspd ON gspd.inviter_id = uur.inviter_id
+        AND gspd.rebate_rate_percent = uur.rebate_rate_percent
+        AND gspd.unassigned = uur.unassigned
+    GROUP BY uur.inviter_id, uur.inviter_email, uur.inviter_username, uur.rebate_rate_percent, uur.unassigned, sbu.settled_amount, gpd.profit_details, gspd.profit_details
 )
-`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE), args
+`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE, subscriptionOrderWhere, buildAffiliateSettlementWhere(startAtArg, endAtArg, filter.Timezone), subscriptionEffectiveWhere), args
 	}
 
 	userClauses := []string{"u.deleted_at IS NULL"}
@@ -1285,7 +1521,7 @@ CASE WHEN ua.inviter_id IS NULL THEN 'unassigned' ELSE '' END ILIKE $%[1]d
 	userWhere := "WHERE " + strings.Join(userClauses, " AND ")
 
 	return fmt.Sprintf(`
-WITH %[7]s,
+WITH RECURSIVE %[7]s,
 %[3]s,
 usage_by_user_detail AS (
     SELECT ul.user_id,
@@ -1296,8 +1532,8 @@ usage_by_user_detail AS (
            COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0)::bigint AS total_tokens,
            COALESCE(SUM(ul.actual_cost), 0)::double precision AS actual_cost,
            COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0)::double precision AS account_cost,
-           COALESCE(agpr.profit_rate_percent, 0)::double precision AS profit_rate_percent,
-           COALESCE(SUM(GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit
+           CASE WHEN ul.subscription_id IS NULL THEN COALESCE(agpr.profit_rate_percent, 0) ELSE 0 END::double precision AS profit_rate_percent,
+           COALESCE(SUM(CASE WHEN ul.subscription_id IS NULL THEN GREATEST(ul.actual_cost, 0) * COALESCE(agpr.profit_rate_percent, 0) / 100 ELSE 0 END), 0)::double precision AS net_profit
     FROM usage_logs ul
     LEFT JOIN groups g ON g.id = ul.group_id
     LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = ul.group_id
@@ -1306,7 +1542,7 @@ usage_by_user_detail AS (
              COALESCE(ul.group_id, 0),
              COALESCE(NULLIF(g.name, ''), CASE WHEN ul.group_id IS NULL THEN '' ELSE '#' || ul.group_id::text END),
              COALESCE(NULLIF(BTRIM(ul.requested_model), ''), NULLIF(BTRIM(ul.model), ''), '-'),
-             COALESCE(agpr.profit_rate_percent, 0)
+             CASE WHEN ul.subscription_id IS NULL THEN COALESCE(agpr.profit_rate_percent, 0) ELSE 0 END
 ),
 usage_by_user AS (
     SELECT user_id,
@@ -1362,6 +1598,29 @@ usage_user_records AS (
     LEFT JOIN user_affiliates inviter_aff ON inviter_aff.user_id = ua.inviter_id
     %[4]s
 ),
+subscription_order_rows AS (
+    SELECT po.*,
+           ROW_NUMBER() OVER (PARTITION BY po.user_id, po.subscription_group_id ORDER BY po.paid_at ASC, po.id ASC) AS subscription_order_number,
+           GREATEST(COALESCE(po.subscription_days, 30), 1)::integer AS subscription_days_for_rebate
+    FROM payment_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    WHERE %[8]s
+),
+subscription_effective_orders AS (
+    SELECT sor.*,
+           sor.paid_at AS effective_start_at,
+           sor.paid_at + (sor.subscription_days_for_rebate * INTERVAL '1 day') AS effective_end_at
+    FROM subscription_order_rows sor
+    WHERE sor.subscription_order_number = 1
+    UNION ALL
+    SELECT sor.*,
+           GREATEST(sor.paid_at, seo.effective_end_at) AS effective_start_at,
+           GREATEST(sor.paid_at, seo.effective_end_at) + (sor.subscription_days_for_rebate * INTERVAL '1 day') AS effective_end_at
+    FROM subscription_order_rows sor
+    JOIN subscription_effective_orders seo ON seo.user_id = sor.user_id
+        AND seo.subscription_group_id = sor.subscription_group_id
+        AND seo.subscription_order_number + 1 = sor.subscription_order_number
+),
 recharge_by_user AS (
     SELECT po.user_id,
            COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount
@@ -1369,6 +1628,40 @@ recharge_by_user AS (
     JOIN usage_user_records uur ON uur.invitee_id = po.user_id
     CROSS JOIN exchange_rate er
     WHERE %[6]s
+    GROUP BY po.user_id
+),
+settlement_by_user AS (
+    SELECT uas.user_id,
+           COALESCE(SUM(uas.amount), 0)::double precision AS settled_amount
+    FROM user_affiliate_settlements uas
+    JOIN (SELECT DISTINCT inviter_id FROM usage_user_records WHERE inviter_id > 0) inviter_scope ON inviter_scope.inviter_id = uas.user_id
+    WHERE (%[9]s)
+    GROUP BY uas.user_id
+),
+subscription_profit_by_user AS (
+    SELECT po.user_id,
+           COALESCE(SUM(%[5]s), 0)::double precision AS recharge_amount,
+           COALESCE(SUM(%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100), 0)::double precision AS net_profit,
+           COALESCE(SUM(CASE WHEN uur.unassigned THEN 0::double precision ELSE (%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100) * uur.rebate_rate_percent / 100 END), 0)::double precision AS rebate_amount,
+           COALESCE(jsonb_agg(jsonb_build_object(
+               'group_id', COALESCE(po.subscription_group_id, 0),
+               'group_name', COALESCE(NULLIF(g.name, ''), CASE WHEN po.subscription_group_id IS NULL THEN '' ELSE '#' || po.subscription_group_id::text END),
+               'model', COALESCE(NULLIF(sp.name, ''), 'Subscription'),
+               'source', 'subscription',
+               'requests', 1,
+               'total_tokens', 0,
+               'actual_cost', %[5]s,
+               'profit_rate_percent', COALESCE(agpr.profit_rate_percent, 0),
+               'net_profit', %[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100,
+               'rebate_amount', CASE WHEN uur.unassigned THEN 0::double precision ELSE (%[5]s * COALESCE(agpr.profit_rate_percent, 0) / 100) * uur.rebate_rate_percent / 100 END
+           ) ORDER BY po.effective_start_at DESC, po.paid_at DESC, po.id DESC), '[]'::jsonb) AS profit_details
+    FROM subscription_effective_orders po
+    JOIN usage_user_records uur ON uur.invitee_id = po.user_id
+    CROSS JOIN exchange_rate er
+    LEFT JOIN affiliate_group_profit_rates agpr ON agpr.group_id = po.subscription_group_id
+    LEFT JOIN groups g ON g.id = po.subscription_group_id
+    LEFT JOIN subscription_plans sp ON sp.id = po.plan_id
+    WHERE %[10]s
     GROUP BY po.user_id
 ),
 records AS (
@@ -1384,17 +1677,20 @@ records AS (
            uur.total_tokens,
            uur.actual_cost,
            uur.account_cost,
-           uur.net_profit,
-           COALESCE(rb.recharge_amount, 0)::double precision AS recharge_amount,
+           uur.net_profit + COALESCE(spbu.net_profit, 0) AS net_profit,
+           (COALESCE(rb.recharge_amount, 0) + COALESCE(spbu.recharge_amount, 0))::double precision AS recharge_amount,
            uur.rebate_rate_percent,
-           uur.rebate_amount,
+           uur.rebate_amount + COALESCE(spbu.rebate_amount, 0) AS rebate_amount,
+           0::double precision AS settled_amount,
+           uur.rebate_amount + COALESCE(spbu.rebate_amount, 0) AS pending_amount,
            uur.unassigned,
-           uur.profit_details,
+           uur.profit_details || COALESCE(spbu.profit_details, '[]'::jsonb) AS profit_details,
            '[]'::jsonb AS members
     FROM usage_user_records uur
     LEFT JOIN recharge_by_user rb ON rb.user_id = uur.invitee_id
+    LEFT JOIN subscription_profit_by_user spbu ON spbu.user_id = uur.invitee_id
 )
-`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE), args
+`, rateExpr, usageWhere, affiliateUsageExchangeRateCTE, userWhere, affiliateUsageRechargeAmountCNYSQL, paymentWhere, groupProfitRatesCTE, subscriptionOrderWhere, buildAffiliateSettlementWhere(startAtArg, endAtArg, filter.Timezone), subscriptionEffectiveWhere), args
 }
 
 func buildAffiliateGroupProfitRatesCTE(args *[]any, rates map[int64]float64) string {
@@ -1425,6 +1721,48 @@ func buildAffiliateGroupProfitRatesCTE(args *[]any, rates map[int64]float64) str
 	return "affiliate_group_profit_rates(group_id, profit_rate_percent) AS (VALUES " + strings.Join(values, ", ") + ")"
 }
 
+func buildAffiliateSubscriptionOrderWhere(endAtArg int, userTZ string) string {
+	clauses := []string{
+		"po.status = 'COMPLETED'",
+		"po.order_type = 'subscription'",
+		"po.paid_at IS NOT NULL",
+		"po.subscription_group_id IS NOT NULL",
+	}
+	if endAtArg > 0 {
+		clauses = append(clauses, fmt.Sprintf("po.paid_at < %s", affiliateUsageMonthEndBoundarySQL(endAtArg, userTZ)))
+	}
+	return strings.Join(clauses, " AND ")
+}
+
+func buildAffiliateSubscriptionEffectiveWhere(startAtArg, endAtArg int, userTZ string) string {
+	clauses := []string{"po.effective_start_at IS NOT NULL"}
+	tz := strings.ReplaceAll(affiliateUsageTimezone(userTZ), "'", "''")
+	if startAtArg > 0 {
+		clauses = append(clauses, fmt.Sprintf("date_trunc('month', po.effective_start_at AT TIME ZONE '%s') >= date_trunc('month', $%d AT TIME ZONE '%s')", tz, startAtArg, tz))
+	}
+	if endAtArg > 0 {
+		clauses = append(clauses, fmt.Sprintf("date_trunc('month', po.effective_start_at AT TIME ZONE '%s') < date_trunc('month', (($%d - INTERVAL '1 microsecond') AT TIME ZONE '%s')) + INTERVAL '1 month'", tz, endAtArg, tz))
+	}
+	return strings.Join(clauses, " AND ")
+}
+
+func affiliateUsageMonthEndBoundarySQL(arg int, userTZ string) string {
+	tz := strings.ReplaceAll(affiliateUsageTimezone(userTZ), "'", "''")
+	return fmt.Sprintf("((date_trunc('month', (($%d - INTERVAL '1 microsecond') AT TIME ZONE '%s')) + INTERVAL '1 month') AT TIME ZONE '%s')", arg, tz, tz)
+}
+
+func buildAffiliateSettlementWhere(startAtArg, endAtArg int, userTZ string) string {
+	clauses := []string{"uas.amount > 0"}
+	tz := strings.ReplaceAll(affiliateUsageTimezone(userTZ), "'", "''")
+	if startAtArg > 0 {
+		clauses = append(clauses, fmt.Sprintf("uas.settled_on >= ($%d AT TIME ZONE '%s')::date", startAtArg, tz))
+	}
+	if endAtArg > 0 {
+		clauses = append(clauses, fmt.Sprintf("uas.settled_on < ($%d AT TIME ZONE '%s')::date", endAtArg, tz))
+	}
+	return strings.Join(clauses, " AND ")
+}
+
 func affiliateUsageTimezone(tz string) string {
 	tz = strings.TrimSpace(tz)
 	if tz == "" {
@@ -1448,6 +1786,8 @@ func buildAffiliateUsageOrderBy(filter service.AffiliateUsageFilter) string {
 		"recharge_amount": "recharge_amount",
 		"rebate_rate":     "rebate_rate_percent",
 		"rebate_amount":   "rebate_amount",
+		"settled_amount":  "settled_amount",
+		"pending_amount":  "pending_amount",
 	}
 	column := sortColumns[filter.SortBy]
 	if column == "" {
@@ -1474,6 +1814,33 @@ func queryAffiliateRecordCount(ctx context.Context, client affiliateQueryExecer,
 		return 0, err
 	}
 	return total, rows.Err()
+}
+
+type affiliateSettlementScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanAffiliateSettlementRecord(scanner affiliateSettlementScanner) (service.AffiliateSettlementRecord, error) {
+	var item service.AffiliateSettlementRecord
+	var createdBy sql.NullInt64
+	if err := scanner.Scan(
+		&item.ID,
+		&item.UserID,
+		&item.UserEmail,
+		&item.Username,
+		&item.Amount,
+		&item.SettledOn,
+		&item.Note,
+		&createdBy,
+		&item.CreatedByEmail,
+		&item.CreatedByUsername,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+	); err != nil {
+		return item, err
+	}
+	item.CreatedBy = nullableInt64Ptr(createdBy)
+	return item, nil
 }
 
 func (r *affiliateRepository) withTx(ctx context.Context, fn func(txCtx context.Context, txClient *dbent.Client) error) error {
@@ -1710,6 +2077,13 @@ func nullableFloat64Ptr(v sql.NullFloat64) *float64 {
 		return nil
 	}
 	return &v.Float64
+}
+
+func nullableInt64Ptr(v sql.NullInt64) *int64 {
+	if !v.Valid {
+		return nil
+	}
+	return &v.Int64
 }
 
 func generateAffiliateCode() (string, error) {

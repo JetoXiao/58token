@@ -137,6 +137,8 @@ func adminMenuKeyForAPIPath(path string) string {
 		return "admin_promo_codes"
 	case strings.HasPrefix(p, "/affiliates/usage"):
 		return "admin_affiliate_usage"
+	case strings.HasPrefix(p, "/affiliates/settlements"):
+		return "admin_affiliate_usage"
 	case strings.HasPrefix(p, "/affiliates/partner-applications"):
 		return "admin_affiliate_applications"
 	case strings.HasPrefix(p, "/affiliates/invites"):
@@ -184,6 +186,8 @@ func userMenuKeyForAPIPath(path string) string {
 		return "purchase"
 	case strings.HasPrefix(p, "/redeem"):
 		return "redeem"
+	case strings.HasPrefix(p, "/user/aff/usage") || strings.HasPrefix(p, "/user/aff/settlements"):
+		return "affiliate_usage"
 	case strings.HasPrefix(p, "/user/aff"):
 		return "affiliate"
 	case strings.HasPrefix(p, "/user"):

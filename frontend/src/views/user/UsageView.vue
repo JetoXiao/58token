@@ -298,6 +298,7 @@
                   />
                 </div>
               </div>
+              <BillingProcessIcon :row="row" />
             </div>
           </template>
 
@@ -550,6 +551,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Icon from '@/components/icons/Icon.vue'
+import BillingProcessIcon from '@/components/usage/BillingProcessIcon.vue'
 import type { UsageLog, ApiKey, UsageQueryParams, UsageStatsResponse } from '@/types'
 import type { Column } from '@/components/common/types'
 import { formatDateTime, formatReasoningEffort } from '@/utils/format'

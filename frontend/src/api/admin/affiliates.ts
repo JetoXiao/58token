@@ -37,6 +37,7 @@ export interface ListAffiliateRecordsParams {
   search?: string
   start_at?: string
   end_at?: string
+  user_id?: number
   sort_by?: string
   sort_order?: 'asc' | 'desc'
   timezone?: string
@@ -77,6 +78,8 @@ export interface AffiliateUsageDailyRecord {
   recharge_amount: number
   rebate_rate_percent: number
   rebate_amount: number
+  settled_amount: number
+  pending_amount: number
   unassigned: boolean
   profit_details?: AffiliateUsageProfitDetail[]
   members?: AffiliateUsageDailyRecord[]
@@ -86,6 +89,7 @@ export interface AffiliateUsageProfitDetail {
   group_id: number
   group_name: string
   model: string
+  source?: 'usage' | 'subscription' | string
   requests: number
   total_tokens: number
   actual_cost: number
@@ -100,7 +104,10 @@ export interface AffiliateUsageSummary {
   total_actual_cost: number
   total_account_cost: number
   total_net_profit: number
+  total_recharge_amount?: number
   total_rebate_amount: number
+  total_settled_amount?: number
+  total_pending_amount?: number
 }
 
 export interface AffiliateUsageResponse extends PaginatedResponse<AffiliateUsageDailyRecord> {
@@ -136,6 +143,28 @@ export interface AffiliateTransferRecord {
   history_quota_after?: number | null
   snapshot_available: boolean
   created_at: string
+}
+
+export interface AffiliateSettlementRecord {
+  id: number
+  user_id: number
+  user_email: string
+  username: string
+  amount: number
+  settled_on: string
+  note: string
+  created_by?: number | null
+  created_by_email?: string
+  created_by_username?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateAffiliateSettlementRequest {
+  user_id: number
+  amount: number
+  settled_on: string
+  note?: string
 }
 
 export interface AffiliateUserOverview {
@@ -293,6 +322,7 @@ function recordParams(params: ListAffiliateRecordsParams = {}) {
     search: params.search ?? '',
     start_at: params.start_at || undefined,
     end_at: params.end_at || undefined,
+    user_id: params.user_id || undefined,
     sort_by: params.sort_by || undefined,
     sort_order: params.sort_order || undefined,
     timezone: params.timezone || undefined,
@@ -356,6 +386,26 @@ export async function listTransferRecords(
   return data
 }
 
+export async function listSettlementRecords(
+  params: ListAffiliateRecordsParams = {},
+): Promise<PaginatedResponse<AffiliateSettlementRecord>> {
+  const { data } = await apiClient.get<PaginatedResponse<AffiliateSettlementRecord>>(
+    '/admin/affiliates/settlements',
+    { params: recordParams(params) },
+  )
+  return data
+}
+
+export async function createSettlement(
+  payload: CreateAffiliateSettlementRequest,
+): Promise<AffiliateSettlementRecord> {
+  const { data } = await apiClient.post<AffiliateSettlementRecord>(
+    '/admin/affiliates/settlements',
+    payload,
+  )
+  return data
+}
+
 export async function getUserOverview(
   userId: number,
 ): Promise<AffiliateUserOverview> {
@@ -379,6 +429,8 @@ export const affiliatesAPI = {
   listUsageDailyRecords,
   listRebateRecords,
   listTransferRecords,
+  listSettlementRecords,
+  createSettlement,
   getUserOverview,
 }
 

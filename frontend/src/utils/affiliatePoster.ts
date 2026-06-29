@@ -130,53 +130,53 @@ function drawHeader(ctx: CanvasRenderingContext2D, siteName: string, logoImage: 
   ctx.font = posterFont(500, 26)
   ctx.fillText('AI API 中转站 | 包月套餐 | 邀请返利', 220, 184)
 
-  drawChip(ctx, 784, 114, '注册送好友', '#ecfdf5', '#047857', 176)
+  drawChip(ctx, 770, 114, '邀请好友注册', '#ecfdf5', '#047857', 204)
 }
 
 function drawHero(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = '#0f172a'
-  ctx.font = posterFont(900, 70)
-  ctx.fillText('把 AI 能力分享给朋友', 72, 330)
+  ctx.font = posterFont(900, 66)
+  ctx.fillText('把 AI 能力分享给朋友', 72, 318)
 
   ctx.fillStyle = '#475569'
-  ctx.font = posterFont(600, 34)
+  ctx.font = posterFont(600, 32)
   drawWrappedText(
     ctx,
-    '通过你的专属邀请链接注册，好友可快速开通，你也能获得返利额度。',
+    '好友通过专属链接注册后，邀请码会自动绑定；你可获得对应返利。',
     76,
-    392,
+    378,
     900,
-    48,
+    46,
     2,
   )
 
-  drawChip(ctx, 76, 480, 'Codex / Claude / OpenAI', '#dcfce7', '#047857', 292)
-  drawChip(ctx, 390, 480, 'USDT / 支付宝', '#eef2ff', '#4338ca', 196)
-  drawChip(ctx, 608, 480, '自动绑定邀请码', '#fff1f2', '#be123c', 236)
+  drawChip(ctx, 76, 462, 'Codex / Claude / OpenAI', '#dcfce7', '#047857', 292)
+  drawChip(ctx, 390, 462, 'USDT / 支付宝', '#eef2ff', '#4338ca', 196)
+  drawChip(ctx, 608, 462, '注册自动绑定', '#fff1f2', '#be123c', 210)
 }
 
 function drawFeaturePanel(ctx: CanvasRenderingContext2D): void {
   withShadow(ctx, 'rgba(15, 23, 42, 0.13)', 38, 18, () => {
-    fillRoundedRect(ctx, 72, 568, 936, 462, 42, 'rgba(255, 255, 255, 0.92)')
+    fillRoundedRect(ctx, 72, 540, 936, 410, 42, 'rgba(255, 255, 255, 0.92)')
   })
-  strokeRoundedRect(ctx, 72, 568, 936, 462, 42, 'rgba(148, 163, 184, 0.18)', 1)
+  strokeRoundedRect(ctx, 72, 540, 936, 410, 42, 'rgba(148, 163, 184, 0.18)', 1)
 
   ctx.fillStyle = '#0f172a'
   ctx.font = posterFont(800, 38)
-  ctx.fillText('为什么选择 UseAiForMe', 118, 640)
+  ctx.fillText('为什么选择 UseAiForMe', 118, 608)
 
   const features: PosterFeature[] = [
     { title: '模型覆盖', description: 'Codex / Claude / OpenAI 常用模型' },
     { title: '灵活充值', description: '支持 USDT / 支付宝，按需使用' },
     { title: '包月套餐', description: '日 / 周 / 月额度，团队使用更稳' },
-    { title: '返利绑定', description: '扫码注册后自动绑定你的邀请码' },
+    { title: '邀请返利', description: '注册关系自动记录，返利清晰可查' },
   ]
 
   const positions = [
-    [118, 690],
-    [560, 690],
-    [118, 832],
-    [560, 832],
+    [118, 652],
+    [560, 652],
+    [118, 780],
+    [560, 780],
   ] as const
 
   features.forEach((feature, index) => {
@@ -192,28 +192,28 @@ function drawFeatureCard(
   feature: PosterFeature,
   index: number,
 ): void {
-  fillRoundedRect(ctx, x, y, 402, 112, 24, '#f8fafc')
-  strokeRoundedRect(ctx, x, y, 402, 112, 24, 'rgba(226, 232, 240, 0.96)', 1)
+  fillRoundedRect(ctx, x, y, 402, 104, 24, '#f8fafc')
+  strokeRoundedRect(ctx, x, y, 402, 104, 24, 'rgba(226, 232, 240, 0.96)', 1)
 
   const iconX = x + 28
-  const iconY = y + 32
+  const iconY = y + 30
   const colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f97316']
-  fillRoundedRect(ctx, iconX, iconY, 48, 48, 14, `${colors[index]}22`)
+  fillRoundedRect(ctx, iconX, iconY, 46, 46, 14, `${colors[index]}22`)
   ctx.strokeStyle = colors[index]
   ctx.lineWidth = 4
   ctx.lineCap = 'round'
   ctx.beginPath()
-  ctx.moveTo(iconX + 15, iconY + 25)
-  ctx.lineTo(iconX + 24, iconY + 34)
-  ctx.lineTo(iconX + 35, iconY + 16)
+  ctx.moveTo(iconX + 14, iconY + 24)
+  ctx.lineTo(iconX + 23, iconY + 33)
+  ctx.lineTo(iconX + 34, iconY + 15)
   ctx.stroke()
 
   ctx.fillStyle = '#0f172a'
-  ctx.font = posterFont(800, 28)
-  ctx.fillText(feature.title, x + 96, y + 46)
+  ctx.font = posterFont(800, 27)
+  ctx.fillText(feature.title, x + 94, y + 43)
   ctx.fillStyle = '#64748b'
-  ctx.font = posterFont(500, 21)
-  drawWrappedText(ctx, feature.description, x + 96, y + 80, 270, 30, 1)
+  ctx.font = posterFont(500, 20)
+  drawWrappedText(ctx, feature.description, x + 94, y + 75, 276, 28, 1)
 }
 
 function drawInvitePanel(
@@ -226,47 +226,47 @@ function drawInvitePanel(
   },
 ): void {
   const { inviteLink, affiliateCode, qrImage, siteName } = options
-  const highlightGradient = ctx.createLinearGradient(72, 1056, 1008, 1056)
+  const highlightGradient = ctx.createLinearGradient(72, 984, 1008, 984)
   highlightGradient.addColorStop(0, '#ecfdf5')
   highlightGradient.addColorStop(1, '#fff1f2')
-  fillRoundedRect(ctx, 72, 1056, 936, 104, 28, highlightGradient)
-  strokeRoundedRect(ctx, 72, 1056, 936, 104, 28, 'rgba(16, 185, 129, 0.28)', 1.5)
+  fillRoundedRect(ctx, 72, 984, 936, 100, 28, highlightGradient)
+  strokeRoundedRect(ctx, 72, 984, 936, 100, 28, 'rgba(16, 185, 129, 0.28)', 1.5)
 
   ctx.fillStyle = '#047857'
-  ctx.font = posterFont(850, 36)
-  ctx.fillText('扫码注册，邀请码自动绑定', 116, 1122)
+  ctx.font = posterFont(850, 34)
+  ctx.fillText('扫码注册，邀请关系自动绑定', 116, 1046)
 
   ctx.fillStyle = '#475569'
-  ctx.font = posterFont(500, 24)
-  ctx.fillText('邀请关系会通过专属链接自动记录，好友注册后无需手动填写。', 116, 1156)
+  ctx.font = posterFont(500, 23)
+  ctx.fillText('好友通过二维码进入注册页，无需手动填写邀请码。', 116, 1077)
 
   withShadow(ctx, 'rgba(15, 23, 42, 0.15)', 40, 18, () => {
-    fillRoundedRect(ctx, 72, 1190, 936, 218, 36, '#ffffff')
+    fillRoundedRect(ctx, 72, 1108, 936, 250, 36, '#ffffff')
   })
-  strokeRoundedRect(ctx, 72, 1190, 936, 218, 36, 'rgba(148, 163, 184, 0.20)', 1)
+  strokeRoundedRect(ctx, 72, 1108, 936, 250, 36, 'rgba(148, 163, 184, 0.20)', 1)
 
   const qrX = 104
-  const qrY = 1208
-  const qrSize = 184
+  const qrY = 1138
+  const qrSize = 180
   fillRoundedRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 24, '#f8fafc')
   ctx.drawImage(qrImage, qrX, qrY, qrSize, qrSize)
 
   ctx.fillStyle = '#0f172a'
   ctx.font = posterFont(850, 32)
-  ctx.fillText(`扫码加入 ${siteName}`, 336, 1256)
+  ctx.fillText(`扫码加入 ${siteName}`, 336, 1178)
 
   ctx.fillStyle = '#64748b'
   ctx.font = posterFont(500, 22)
-  drawWrappedText(ctx, getPosterLinkText(inviteLink, affiliateCode), 336, 1304, 570, 31, 2)
+  drawWrappedText(ctx, getPosterLinkText(inviteLink, affiliateCode), 336, 1228, 570, 31, 2)
 
-  fillRoundedRect(ctx, 336, 1352, 332, 40, 20, '#ecfdf5')
+  fillRoundedRect(ctx, 336, 1308, 360, 42, 21, '#ecfdf5')
   ctx.fillStyle = '#047857'
   ctx.font = posterFont(800, 22)
-  ctx.fillText(`邀请码：${affiliateCode}`, 358, 1379)
+  ctx.fillText(`邀请码：${affiliateCode}`, 358, 1336)
 
   ctx.fillStyle = '#94a3b8'
   ctx.font = posterFont(500, 18)
-  ctx.fillText('AI 能力稳定接入，适合个人与团队持续使用', 76, 1430)
+  ctx.fillText('AI 能力稳定接入，适合个人与团队持续使用', 76, 1402)
 }
 
 function getPosterLinkText(inviteLink: string, affiliateCode: string): string {
