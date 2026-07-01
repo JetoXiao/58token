@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"path/filepath"
+
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -41,6 +43,7 @@ func ProvideAdminHandlers(
 	paymentHandler *admin.PaymentHandler,
 	affiliateHandler *admin.AffiliateHandler,
 	trialCardHandler *admin.TrialCardHandler,
+	adminHelpCenterHandler *admin.HelpCenterHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
@@ -74,6 +77,7 @@ func ProvideAdminHandlers(
 		Payment:                paymentHandler,
 		Affiliate:              affiliateHandler,
 		TrialCard:              trialCardHandler,
+		HelpCenter:             adminHelpCenterHandler,
 	}
 }
 
@@ -102,6 +106,38 @@ func ProvideAdminOpsHandler(opsService *service.OpsService, cfg *config.Config) 
 	return h
 }
 
+func ProvideHelpCenterHandler(helpCenterService *service.HelpCenterService, userService *service.UserService, cfg *config.Config) *HelpCenterHandler {
+	h := NewHelpCenterHandler(helpCenterService, userService)
+	if cfg != nil {
+		h.SetAttachmentsDir(helpCenterAttachmentsDir(cfg.Pricing.DataDir))
+	}
+	h.SetBundledAttachmentsDir(helpCenterBundledAttachmentsDir())
+	return h
+}
+
+func ProvideAdminHelpCenterHandler(helpCenterService *service.HelpCenterService, cfg *config.Config) *admin.HelpCenterHandler {
+	h := admin.NewHelpCenterHandler(helpCenterService)
+	if cfg != nil {
+		h.SetAttachmentsDir(helpCenterAttachmentsDir(cfg.Pricing.DataDir))
+	}
+	return h
+}
+
+func helpCenterAttachmentsDir(dataDir string) string {
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+	return filepath.Join(dataDir, "help-center", "attachments")
+}
+
+func helpCenterBundledAttachmentsDir() string {
+	return filepath.Join("resources", "help-center", "attachments")
+}
+
+func ProvideAdminUserHandler(adminService service.AdminService, concurrencyService *service.ConcurrencyService, affiliateService *service.AffiliateService) *admin.UserHandler {
+	return admin.NewUserHandler(adminService, concurrencyService, affiliateService)
+}
+
 // ProvideHandlers creates the Handlers struct
 func ProvideHandlers(
 	authHandler *AuthHandler,
@@ -123,6 +159,7 @@ func ProvideHandlers(
 	availableChannelHandler *AvailableChannelHandler,
 	modelPricingHandler *ModelPricingHandler,
 	modelMarketplaceHandler *ModelMarketplaceHandler,
+	helpCenterHandler *HelpCenterHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -146,6 +183,7 @@ func ProvideHandlers(
 		AvailableChannel: availableChannelHandler,
 		ModelPricing:     modelPricingHandler,
 		ModelMarketplace: modelMarketplaceHandler,
+		HelpCenter:       helpCenterHandler,
 	}
 }
 
@@ -170,10 +208,11 @@ var ProviderSet = wire.NewSet(
 	NewAvailableChannelHandler,
 	NewModelPricingHandler,
 	NewModelMarketplaceHandler,
+	ProvideHelpCenterHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,
-	admin.NewUserHandler,
+	ProvideAdminUserHandler,
 	admin.NewGroupHandler,
 	admin.NewAccountHandler,
 	admin.NewAnnouncementHandler,
@@ -203,6 +242,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewPaymentHandler,
 	admin.NewAffiliateHandler,
 	admin.NewTrialCardHandler,
+	ProvideAdminHelpCenterHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

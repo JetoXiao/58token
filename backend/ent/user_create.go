@@ -353,6 +353,20 @@ func (_c *UserCreate) SetNillableAllowBalanceSubscriptionPurchase(v *bool) *User
 	return _c
 }
 
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (_c *UserCreate) SetHelpCenterKeyPromptDismissed(v bool) *UserCreate {
+	_c.mutation.SetHelpCenterKeyPromptDismissed(v)
+	return _c
+}
+
+// SetNillableHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field if the given value is not nil.
+func (_c *UserCreate) SetNillableHelpCenterKeyPromptDismissed(v *bool) *UserCreate {
+	if v != nil {
+		_c.SetHelpCenterKeyPromptDismissed(*v)
+	}
+	return _c
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_c *UserCreate) SetRpmLimit(v int) *UserCreate {
 	_c.mutation.SetRpmLimit(v)
@@ -654,6 +668,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultAllowBalanceSubscriptionPurchase
 		_c.mutation.SetAllowBalanceSubscriptionPurchase(v)
 	}
+	if _, ok := _c.mutation.HelpCenterKeyPromptDismissed(); !ok {
+		v := user.DefaultHelpCenterKeyPromptDismissed
+		_c.mutation.SetHelpCenterKeyPromptDismissed(v)
+	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		v := user.DefaultRpmLimit
 		_c.mutation.SetRpmLimit(v)
@@ -746,6 +764,9 @@ func (_c *UserCreate) check() error {
 	}
 	if _, ok := _c.mutation.AllowBalanceSubscriptionPurchase(); !ok {
 		return &ValidationError{Name: "allow_balance_subscription_purchase", err: errors.New(`ent: missing required field "User.allow_balance_subscription_purchase"`)}
+	}
+	if _, ok := _c.mutation.HelpCenterKeyPromptDismissed(); !ok {
+		return &ValidationError{Name: "help_center_key_prompt_dismissed", err: errors.New(`ent: missing required field "User.help_center_key_prompt_dismissed"`)}
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "User.rpm_limit"`)}
@@ -872,6 +893,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AllowBalanceSubscriptionPurchase(); ok {
 		_spec.SetField(user.FieldAllowBalanceSubscriptionPurchase, field.TypeBool, value)
 		_node.AllowBalanceSubscriptionPurchase = value
+	}
+	if value, ok := _c.mutation.HelpCenterKeyPromptDismissed(); ok {
+		_spec.SetField(user.FieldHelpCenterKeyPromptDismissed, field.TypeBool, value)
+		_node.HelpCenterKeyPromptDismissed = value
 	}
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)
@@ -1461,6 +1486,18 @@ func (u *UserUpsert) UpdateAllowBalanceSubscriptionPurchase() *UserUpsert {
 	return u
 }
 
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (u *UserUpsert) SetHelpCenterKeyPromptDismissed(v bool) *UserUpsert {
+	u.Set(user.FieldHelpCenterKeyPromptDismissed, v)
+	return u
+}
+
+// UpdateHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field to the value that was provided on create.
+func (u *UserUpsert) UpdateHelpCenterKeyPromptDismissed() *UserUpsert {
+	u.SetExcluded(user.FieldHelpCenterKeyPromptDismissed)
+	return u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (u *UserUpsert) SetRpmLimit(v int) *UserUpsert {
 	u.Set(user.FieldRpmLimit, v)
@@ -1913,6 +1950,20 @@ func (u *UserUpsertOne) SetAllowBalanceSubscriptionPurchase(v bool) *UserUpsertO
 func (u *UserUpsertOne) UpdateAllowBalanceSubscriptionPurchase() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateAllowBalanceSubscriptionPurchase()
+	})
+}
+
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (u *UserUpsertOne) SetHelpCenterKeyPromptDismissed(v bool) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetHelpCenterKeyPromptDismissed(v)
+	})
+}
+
+// UpdateHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateHelpCenterKeyPromptDismissed() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateHelpCenterKeyPromptDismissed()
 	})
 }
 
@@ -2537,6 +2588,20 @@ func (u *UserUpsertBulk) SetAllowBalanceSubscriptionPurchase(v bool) *UserUpsert
 func (u *UserUpsertBulk) UpdateAllowBalanceSubscriptionPurchase() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateAllowBalanceSubscriptionPurchase()
+	})
+}
+
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (u *UserUpsertBulk) SetHelpCenterKeyPromptDismissed(v bool) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetHelpCenterKeyPromptDismissed(v)
+	})
+}
+
+// UpdateHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateHelpCenterKeyPromptDismissed() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateHelpCenterKeyPromptDismissed()
 	})
 }
 

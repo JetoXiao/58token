@@ -229,6 +229,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/help-center',
+    name: 'HelpCenter',
+    component: () => import('@/views/user/HelpCenterView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Help Center',
+      titleKey: 'helpCenter.title',
+      descriptionKey: 'helpCenter.description',
+      userMenuKey: 'help_center'
+    }
+  },
+  {
     path: '/usage',
     name: 'Usage',
     component: () => import('@/views/user/UsageView.vue'),

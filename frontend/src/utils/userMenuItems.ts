@@ -1,6 +1,7 @@
 export const DEFAULT_USER_MENU_ITEMS = [
   'dashboard',
   'api_keys',
+  'help_center',
   'image_generation',
   'usage',
   'channel_status',
@@ -24,6 +25,7 @@ const USER_MENU_ITEMS = [...DEFAULT_USER_MENU_ITEMS, ...OPTIONAL_USER_MENU_ITEMS
 export const USER_MENU_PATHS: Record<UserMenuItem, string> = {
   dashboard: '/dashboard',
   api_keys: '/keys',
+  help_center: '/help-center',
   image_generation: '/image-generation',
   usage: '/usage',
   channel_status: '/monitor',
@@ -110,6 +112,10 @@ function normalizeUserMenuItemKey(value: unknown): UserMenuItem | undefined {
     case 'api_keys':
     case 'keys':
       return 'api_keys'
+    case 'help_center':
+    case 'help-center':
+    case 'help':
+      return 'help_center'
     case 'image_generation':
     case 'image-generation':
       return 'image_generation'

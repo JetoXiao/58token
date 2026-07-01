@@ -95,10 +95,80 @@ export interface User {
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
   balance_notify_extra_emails: NotifyEmailEntry[]
+  help_center_key_prompt_dismissed?: boolean
   subscriptions?: UserSubscription[] // User's active subscriptions
   last_active_at?: string | null
   created_at: string
   updated_at: string
+}
+
+export interface HelpCenterConfig {
+  enabled: boolean
+  base_url: string
+  title: string
+  description: string
+  key_created_prompt: HelpCenterKeyCreatedPrompt
+  tutorials: HelpCenterTutorial[]
+  faqs: HelpCenterFAQ[]
+}
+
+export interface HelpCenterKeyCreatedPrompt {
+  enabled: boolean
+  title: string
+  description: string
+  primary_action_label: string
+  primary_action_url: string
+  secondary_action_label: string
+  secondary_action_url: string
+  dismiss_label: string
+}
+
+export interface HelpCenterTutorial {
+  id: string
+  enabled: boolean
+  sort_order: number
+  title: string
+  badge: string
+  summary: string
+  content_md: string
+  steps: HelpCenterStep[]
+  code_blocks: HelpCenterCodeBlock[]
+  links: HelpCenterLink[]
+  attachments: HelpCenterAttachment[]
+}
+
+export interface HelpCenterStep {
+  title: string
+  description: string
+  code_blocks: HelpCenterCodeBlock[]
+  images: HelpCenterAttachment[]
+  attachments: HelpCenterAttachment[]
+}
+
+export interface HelpCenterCodeBlock {
+  title: string
+  language: string
+  content: string
+}
+
+export interface HelpCenterLink {
+  label: string
+  url: string
+}
+
+export interface HelpCenterAttachment {
+  label: string
+  url: string
+  file_name: string
+}
+
+export interface HelpCenterFAQ {
+  id: string
+  enabled: boolean
+  sort_order: number
+  question: string
+  answer_md: string
+  tags: string[]
 }
 
 export interface AdminUser extends User {

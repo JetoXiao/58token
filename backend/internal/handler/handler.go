@@ -37,6 +37,7 @@ type AdminHandlers struct {
 	Payment                *admin.PaymentHandler
 	Affiliate              *admin.AffiliateHandler
 	TrialCard              *admin.TrialCardHandler
+	HelpCenter             *admin.HelpCenterHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -60,6 +61,7 @@ type Handlers struct {
 	AvailableChannel *AvailableChannelHandler
 	ModelPricing     *ModelPricingHandler
 	ModelMarketplace *ModelMarketplaceHandler
+	HelpCenter       *HelpCenterHandler
 }
 
 // BuildInfo contains build-time information

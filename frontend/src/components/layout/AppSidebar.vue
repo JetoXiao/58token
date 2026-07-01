@@ -325,6 +325,21 @@ const KeyIcon = {
     )
 }
 
+const HelpCenterIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25'
+        })
+      ]
+    )
+}
+
 const ImageGenerationIcon = {
   render: () =>
     h(
@@ -742,6 +757,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   }
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon, menuKey: 'api_keys', permissionKey: 'api_keys' },
+    { path: '/help-center', label: t('nav.helpCenter'), icon: HelpCenterIcon, menuKey: 'help_center', permissionKey: 'help_center' },
     { path: '/image-generation', label: t('nav.imageGeneration'), icon: ImageGenerationIcon, menuKey: 'image_generation', permissionKey: 'image_generation' },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true, menuKey: 'usage', permissionKey: 'usage' },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor, menuKey: 'channel_status', permissionKey: 'channel_status' },

@@ -20,6 +20,7 @@ export { userGroupsAPI } from './groups'
 export { userChannelsAPI } from './channels'
 export { totpAPI } from './totp'
 export { imageGenerationAPI } from './imageGeneration'
+export { helpCenterAPI } from './helpCenter'
 export { default as announcementsAPI } from './announcements'
 export { channelMonitorUserAPI } from './channelMonitor'
 

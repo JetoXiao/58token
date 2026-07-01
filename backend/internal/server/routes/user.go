@@ -69,6 +69,15 @@ func RegisterUserRoutes(
 			keys.DELETE("/:id", h.APIKey.Delete)
 		}
 
+		// 帮助中心（用户侧只读）
+		helpCenter := authenticated.Group("/help-center")
+		{
+			helpCenter.GET("", h.HelpCenter.Get)
+			helpCenter.GET("/attachments/*filename", h.HelpCenter.DownloadAttachment)
+			helpCenter.POST("/key-created-prompt/dismiss", h.HelpCenter.DismissKeyCreatedPrompt)
+			helpCenter.POST("/key-prompt/dismiss", h.HelpCenter.DismissKeyCreatedPrompt)
+		}
+
 		// 用户可用分组（非管理员接口）
 		groups := authenticated.Group("/groups")
 		{

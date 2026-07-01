@@ -159,6 +159,8 @@ func adminMenuKeyForAPIPath(path string) string {
 		return "admin_order_dashboard"
 	case strings.HasPrefix(p, "/usage"):
 		return "admin_usage"
+	case strings.HasPrefix(p, "/help-center"):
+		return "admin_settings"
 	case strings.HasPrefix(p, "/settings") || strings.HasPrefix(p, "/system") || strings.HasPrefix(p, "/data-management") || strings.HasPrefix(p, "/backups") || strings.HasPrefix(p, "/scheduled-test-plans") || strings.HasPrefix(p, "/error-passthrough-rules") || strings.HasPrefix(p, "/tls-fingerprint-profiles"):
 		return "admin_settings"
 	default:
@@ -171,6 +173,8 @@ func userMenuKeyForAPIPath(path string) string {
 	switch {
 	case strings.HasPrefix(p, "/usage/dashboard"):
 		return "dashboard"
+	case strings.HasPrefix(p, "/help-center"):
+		return "help_center"
 	case strings.HasPrefix(p, "/keys") || strings.HasPrefix(p, "/groups"):
 		return "api_keys"
 	case strings.HasPrefix(p, "/usage"):

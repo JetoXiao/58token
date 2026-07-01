@@ -202,7 +202,7 @@ func (m *mockUserRepo) RemoveGroupFromAllowedGroups(context.Context, int64) (int
 
 func (m *mockUserRepo) BatchSetConcurrency(context.Context, []int64, int) (int, error) { return 0, nil }
 func (m *mockUserRepo) BatchAddConcurrency(context.Context, []int64, int) (int, error) { return 0, nil }
-func (m *mockUserRepo) AddGroupToAllowedGroups(context.Context, int64, int64) error { return nil }
+func (m *mockUserRepo) AddGroupToAllowedGroups(context.Context, int64, int64) error    { return nil }
 func (m *mockUserRepo) ListUserAuthIdentities(context.Context, int64) ([]UserAuthIdentityRecord, error) {
 	out := make([]UserAuthIdentityRecord, len(m.identities))
 	copy(out, m.identities)
@@ -607,6 +607,35 @@ func TestTouchLastActive_SkipsWhenRecent(t *testing.T) {
 
 	require.Empty(t, repo.updateLastActiveUserIDs)
 	require.Empty(t, repo.updateLastActiveAt)
+}
+
+func TestDismissHelpCenterKeyPrompt(t *testing.T) {
+	repo := &mockUserRepo{
+		getByIDUser: &User{
+			ID:                               42,
+			Email:                            "alice@example.com",
+			Username:                         "alice",
+			PasswordHash:                     "hash",
+			Role:                             RoleUser,
+			Status:                           StatusActive,
+			AllowBalanceSubscriptionPurchase: true,
+		},
+	}
+	var updated *User
+	repo.updateFn = func(_ context.Context, user *User) error {
+		cp := *user
+		updated = &cp
+		return nil
+	}
+	svc := NewUserService(repo, nil, nil, nil)
+
+	err := svc.DismissHelpCenterKeyPrompt(context.Background(), 42)
+
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	require.True(t, updated.HelpCenterKeyPromptDismissed)
+	require.True(t, updated.AllowBalanceSubscriptionPurchase, "unrelated user fields must be preserved")
+	require.Equal(t, 1, repo.updateCalls)
 }
 
 func TestUpdateBalance_RepoError_ReturnsError(t *testing.T) {

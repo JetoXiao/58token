@@ -63,6 +63,8 @@ const (
 	FieldTotalRecharged = "total_recharged"
 	// FieldAllowBalanceSubscriptionPurchase holds the string denoting the allow_balance_subscription_purchase field in the database.
 	FieldAllowBalanceSubscriptionPurchase = "allow_balance_subscription_purchase"
+	// FieldHelpCenterKeyPromptDismissed holds the string denoting the help_center_key_prompt_dismissed field in the database.
+	FieldHelpCenterKeyPromptDismissed = "help_center_key_prompt_dismissed"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -211,6 +213,7 @@ var Columns = []string{
 	FieldBalanceNotifyExtraEmails,
 	FieldTotalRecharged,
 	FieldAllowBalanceSubscriptionPurchase,
+	FieldHelpCenterKeyPromptDismissed,
 	FieldRpmLimit,
 }
 
@@ -284,6 +287,8 @@ var (
 	DefaultTotalRecharged float64
 	// DefaultAllowBalanceSubscriptionPurchase holds the default value on creation for the "allow_balance_subscription_purchase" field.
 	DefaultAllowBalanceSubscriptionPurchase bool
+	// DefaultHelpCenterKeyPromptDismissed holds the default value on creation for the "help_center_key_prompt_dismissed" field.
+	DefaultHelpCenterKeyPromptDismissed bool
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
@@ -414,6 +419,11 @@ func ByTotalRecharged(opts ...sql.OrderTermOption) OrderOption {
 // ByAllowBalanceSubscriptionPurchase orders the results by the allow_balance_subscription_purchase field.
 func ByAllowBalanceSubscriptionPurchase(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAllowBalanceSubscriptionPurchase, opts...).ToFunc()
+}
+
+// ByHelpCenterKeyPromptDismissed orders the results by the help_center_key_prompt_dismissed field.
+func ByHelpCenterKeyPromptDismissed(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHelpCenterKeyPromptDismissed, opts...).ToFunc()
 }
 
 // ByRpmLimit orders the results by the rpm_limit field.

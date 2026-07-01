@@ -99,6 +99,7 @@ const adminLabelKeys: Record<string, string> = {
 const userLabelKeys: Record<UserMenuItem, string> = {
   dashboard: 'nav.dashboard',
   api_keys: 'nav.apiKeys',
+  help_center: 'nav.helpCenter',
   image_generation: 'nav.imageGeneration',
   usage: 'nav.usage',
   channel_status: 'nav.channelStatus',

@@ -29,6 +29,7 @@ type User struct {
 	BalanceNotifyExtraEmails         []NotifyEmailEntry `json:"balance_notify_extra_emails"`
 	TotalRecharged                   float64            `json:"total_recharged"`
 	AllowBalanceSubscriptionPurchase bool               `json:"allow_balance_subscription_purchase"`
+	HelpCenterKeyPromptDismissed     bool               `json:"help_center_key_prompt_dismissed"`
 
 	// RPMLimit 用户级每分钟请求数上限（0 = 不限制），仅在所用分组未设置 rpm_limit 时作为兜底生效。
 	RPMLimit int `json:"rpm_limit"`

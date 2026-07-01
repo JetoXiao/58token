@@ -784,34 +784,34 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		ContactInfo:                      settings[SettingKeyContactInfo],
 		// Keep the global public settings payload small. The full support contact
 		// config may contain base64 QR images and is loaded by its dedicated API.
-		SupportContactConfig:             "",
-		DocURL:                           settings[SettingKeyDocURL],
-		HomeContent:                      settings[SettingKeyHomeContent],
-		HideCcsImportButton:              settings[SettingKeyHideCcsImportButton] == "true",
-		PurchaseSubscriptionEnabled:      settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
-		PurchaseSubscriptionURL:          strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
-		TableDefaultPageSize:             tableDefaultPageSize,
-		TablePageSizeOptions:             tablePageSizeOptions,
-		CustomMenuItems:                  settings[SettingKeyCustomMenuItems],
-		MarketingNavItems:                NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
-		UserMenuItems:                    NormalizeUserMenuItemsJSON(settings[SettingKeyUserMenuItems]),
-		CustomEndpoints:                  settings[SettingKeyCustomEndpoints],
-		LinuxDoOAuthEnabled:              linuxDoEnabled,
-		DingTalkOAuthEnabled:             dingTalkEnabled,
-		WeChatOAuthEnabled:               weChatEnabled,
-		WeChatOAuthOpenEnabled:           weChatOpenEnabled,
-		WeChatOAuthMPEnabled:             weChatMPEnabled,
-		WeChatOAuthMobileEnabled:         weChatMobileEnabled,
-		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
-		PaymentEnabled:                   settings[SettingPaymentEnabled] == "true",
-		OIDCOAuthEnabled:                 oidcEnabled,
-		OIDCOAuthProviderName:            oidcProviderName,
-		GitHubOAuthEnabled:               gitHubEnabled,
-		GoogleOAuthEnabled:               googleEnabled,
-		BalanceLowNotifyEnabled:          settings[SettingKeyBalanceLowNotifyEnabled] == "true",
-		AccountQuotaNotifyEnabled:        settings[SettingKeyAccountQuotaNotifyEnabled] == "true",
-		BalanceLowNotifyThreshold:        balanceLowNotifyThreshold,
-		BalanceLowNotifyRechargeURL:      settings[SettingKeyBalanceLowNotifyRechargeURL],
+		SupportContactConfig:        "",
+		DocURL:                      settings[SettingKeyDocURL],
+		HomeContent:                 settings[SettingKeyHomeContent],
+		HideCcsImportButton:         settings[SettingKeyHideCcsImportButton] == "true",
+		PurchaseSubscriptionEnabled: settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
+		PurchaseSubscriptionURL:     strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
+		TableDefaultPageSize:        tableDefaultPageSize,
+		TablePageSizeOptions:        tablePageSizeOptions,
+		CustomMenuItems:             settings[SettingKeyCustomMenuItems],
+		MarketingNavItems:           NormalizeMarketingNavItemsJSON(settings[SettingKeyMarketingNavItems]),
+		UserMenuItems:               NormalizeUserMenuItemsJSON(settings[SettingKeyUserMenuItems]),
+		CustomEndpoints:             settings[SettingKeyCustomEndpoints],
+		LinuxDoOAuthEnabled:         linuxDoEnabled,
+		DingTalkOAuthEnabled:        dingTalkEnabled,
+		WeChatOAuthEnabled:          weChatEnabled,
+		WeChatOAuthOpenEnabled:      weChatOpenEnabled,
+		WeChatOAuthMPEnabled:        weChatMPEnabled,
+		WeChatOAuthMobileEnabled:    weChatMobileEnabled,
+		BackendModeEnabled:          settings[SettingKeyBackendModeEnabled] == "true",
+		PaymentEnabled:              settings[SettingPaymentEnabled] == "true",
+		OIDCOAuthEnabled:            oidcEnabled,
+		OIDCOAuthProviderName:       oidcProviderName,
+		GitHubOAuthEnabled:          gitHubEnabled,
+		GoogleOAuthEnabled:          googleEnabled,
+		BalanceLowNotifyEnabled:     settings[SettingKeyBalanceLowNotifyEnabled] == "true",
+		AccountQuotaNotifyEnabled:   settings[SettingKeyAccountQuotaNotifyEnabled] == "true",
+		BalanceLowNotifyThreshold:   balanceLowNotifyThreshold,
+		BalanceLowNotifyRechargeURL: settings[SettingKeyBalanceLowNotifyRechargeURL],
 
 		ChannelMonitorEnabled:                !isFalseSettingValue(settings[SettingKeyChannelMonitorEnabled]),
 		ChannelMonitorDefaultIntervalSeconds: parseChannelMonitorInterval(settings[SettingKeyChannelMonitorDefaultIntervalSeconds]),
@@ -871,7 +871,7 @@ func clampChannelMonitorInterval(v int) int {
 }
 
 const defaultMarketingNavItemsJSON = `["models","docs","partner"]`
-const defaultUserMenuItemsJSON = `["dashboard","api_keys","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","support_contact","profile"]`
+const defaultUserMenuItemsJSON = `["dashboard","api_keys","help_center","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","support_contact","profile"]`
 const defaultSupportContactConfigJSON = `{"enabled":true,"title":"售后联系","description":"如需售后支持，请添加下方客服微信联系。","contacts":[]}`
 const maxSupportContactItems = 3
 
@@ -892,6 +892,7 @@ var marketingNavItemOrder = []string{"models", "docs", "partner"}
 var userMenuItemOrder = []string{
 	"dashboard",
 	"api_keys",
+	"help_center",
 	"image_generation",
 	"usage",
 	"channel_status",
@@ -1063,6 +1064,8 @@ func normalizeUserMenuItems(items []string) []string {
 			enabled["dashboard"] = struct{}{}
 		case "api_keys", "keys":
 			enabled["api_keys"] = struct{}{}
+		case "help_center", "help-center", "help":
+			enabled["help_center"] = struct{}{}
 		case "image_generation", "image-generation":
 			enabled["image_generation"] = struct{}{}
 		case "usage":
@@ -2783,6 +2786,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyCustomMenuItems:                           "[]",
 		SettingKeyMarketingNavItems:                         defaultMarketingNavItemsJSON,
 		SettingKeyUserMenuItems:                             defaultUserMenuItemsJSON,
+		SettingKeyHelpCenterDraftConfig:                     DefaultHelpCenterConfigJSON(),
+		SettingKeyHelpCenterPublishedConfig:                 DefaultHelpCenterConfigJSON(),
 		SettingKeyCustomEndpoints:                           "[]",
 		SettingKeyWeChatConnectEnabled:                      "false",
 		SettingKeyWeChatConnectAppID:                        "",

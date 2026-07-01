@@ -417,6 +417,20 @@ func (_u *UserUpdate) SetNillableAllowBalanceSubscriptionPurchase(v *bool) *User
 	return _u
 }
 
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (_u *UserUpdate) SetHelpCenterKeyPromptDismissed(v bool) *UserUpdate {
+	_u.mutation.SetHelpCenterKeyPromptDismissed(v)
+	return _u
+}
+
+// SetNillableHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableHelpCenterKeyPromptDismissed(v *bool) *UserUpdate {
+	if v != nil {
+		_u.SetHelpCenterKeyPromptDismissed(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *UserUpdate) SetRpmLimit(v int) *UserUpdate {
 	_u.mutation.ResetRpmLimit()
@@ -1062,6 +1076,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AllowBalanceSubscriptionPurchase(); ok {
 		_spec.SetField(user.FieldAllowBalanceSubscriptionPurchase, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.HelpCenterKeyPromptDismissed(); ok {
+		_spec.SetField(user.FieldHelpCenterKeyPromptDismissed, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)
@@ -2019,6 +2036,20 @@ func (_u *UserUpdateOne) SetNillableAllowBalanceSubscriptionPurchase(v *bool) *U
 	return _u
 }
 
+// SetHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field.
+func (_u *UserUpdateOne) SetHelpCenterKeyPromptDismissed(v bool) *UserUpdateOne {
+	_u.mutation.SetHelpCenterKeyPromptDismissed(v)
+	return _u
+}
+
+// SetNillableHelpCenterKeyPromptDismissed sets the "help_center_key_prompt_dismissed" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableHelpCenterKeyPromptDismissed(v *bool) *UserUpdateOne {
+	if v != nil {
+		_u.SetHelpCenterKeyPromptDismissed(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *UserUpdateOne) SetRpmLimit(v int) *UserUpdateOne {
 	_u.mutation.ResetRpmLimit()
@@ -2694,6 +2725,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.AllowBalanceSubscriptionPurchase(); ok {
 		_spec.SetField(user.FieldAllowBalanceSubscriptionPurchase, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.HelpCenterKeyPromptDismissed(); ok {
+		_spec.SetField(user.FieldHelpCenterKeyPromptDismissed, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)

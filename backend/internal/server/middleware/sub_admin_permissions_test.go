@@ -46,6 +46,22 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 			wantStatus:  http.StatusOK,
 		},
 		{
+			name:        "sub_admin_help_center_uses_settings_permission",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_settings"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/help-center",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "sub_admin_settings_help_center_alias_uses_settings_permission",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_settings"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/settings/help-center",
+			wantStatus:  http.StatusOK,
+		},
+		{
 			name:        "sub_admin_missing_menu_denied",
 			role:        service.RoleSubAdmin,
 			permissions: []string{"admin_groups"},

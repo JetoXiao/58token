@@ -93,6 +93,7 @@ func (r *userRepository) Create(ctx context.Context, userIn *service.User) error
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
 		SetAllowBalanceSubscriptionPurchase(userIn.AllowBalanceSubscriptionPurchase).
+		SetHelpCenterKeyPromptDismissed(userIn.HelpCenterKeyPromptDismissed).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
 		SetNillableLastLoginAt(userIn.LastLoginAt).
 		SetNillableLastActiveAt(userIn.LastActiveAt).
@@ -226,6 +227,7 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User) error
 		SetBalanceNotifyExtraEmails(marshalExtraEmails(userIn.BalanceNotifyExtraEmails)).
 		SetTotalRecharged(userIn.TotalRecharged).
 		SetAllowBalanceSubscriptionPurchase(userIn.AllowBalanceSubscriptionPurchase).
+		SetHelpCenterKeyPromptDismissed(userIn.HelpCenterKeyPromptDismissed).
 		SetRpmLimit(userIn.RPMLimit)
 	if userIn.SignupSource != "" {
 		updateOp = updateOp.SetSignupSource(userIn.SignupSource)
@@ -957,6 +959,7 @@ func applyUserEntityToService(dst *service.User, src *dbent.User) {
 	dst.CreatedAt = src.CreatedAt
 	dst.UpdatedAt = src.UpdatedAt
 	dst.AllowBalanceSubscriptionPurchase = src.AllowBalanceSubscriptionPurchase
+	dst.HelpCenterKeyPromptDismissed = src.HelpCenterKeyPromptDismissed
 }
 
 func userSignupSourceOrDefault(signupSource string) string {

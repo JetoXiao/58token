@@ -89,6 +89,7 @@ export function resolveReadonlyAdminFallbackPath(value: unknown): string {
     if (permissions.includes(item)) return ADMIN_MENU_PATHS[item]
   }
   if (permissions.includes('dashboard')) return '/dashboard'
+  if (permissions.includes('help_center')) return '/help-center'
   if (permissions.includes('support_contact')) return '/support-contact'
   if (permissions.includes('profile')) return '/profile'
   if (permissions.includes('api_keys')) return '/keys'

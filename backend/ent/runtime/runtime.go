@@ -1873,8 +1873,12 @@ func init() {
 	userDescAllowBalanceSubscriptionPurchase := userFields[20].Descriptor()
 	// user.DefaultAllowBalanceSubscriptionPurchase holds the default value on creation for the allow_balance_subscription_purchase field.
 	user.DefaultAllowBalanceSubscriptionPurchase = userDescAllowBalanceSubscriptionPurchase.Default.(bool)
+	// userDescHelpCenterKeyPromptDismissed is the schema descriptor for help_center_key_prompt_dismissed field.
+	userDescHelpCenterKeyPromptDismissed := userFields[21].Descriptor()
+	// user.DefaultHelpCenterKeyPromptDismissed holds the default value on creation for the help_center_key_prompt_dismissed field.
+	user.DefaultHelpCenterKeyPromptDismissed = userDescHelpCenterKeyPromptDismissed.Default.(bool)
 	// userDescRpmLimit is the schema descriptor for rpm_limit field.
-	userDescRpmLimit := userFields[21].Descriptor()
+	userDescRpmLimit := userFields[22].Descriptor()
 	// user.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	user.DefaultRpmLimit = userDescRpmLimit.Default.(int)
 	userallowedgroupFields := schema.UserAllowedGroup{}.Fields()

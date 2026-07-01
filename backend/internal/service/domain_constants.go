@@ -281,6 +281,8 @@ const (
 	SettingKeyForceEmailOnThirdPartySignup              = "force_email_on_third_party_signup"
 	SettingKeyMarketingNavItems                         = "marketing_nav_items" // Marketing navbar items (JSON array)
 	SettingKeyUserMenuItems                             = "user_menu_items"     // Built-in user menu items (JSON array)
+	SettingKeyHelpCenterDraftConfig                     = "help_center_draft_config"
+	SettingKeyHelpCenterPublishedConfig                 = "help_center_published_config"
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

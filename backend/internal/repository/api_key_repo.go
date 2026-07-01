@@ -677,6 +677,7 @@ func userEntityToService(u *dbent.User) *service.User {
 		BalanceNotifyThreshold:           u.BalanceNotifyThreshold,
 		TotalRecharged:                   u.TotalRecharged,
 		AllowBalanceSubscriptionPurchase: u.AllowBalanceSubscriptionPurchase,
+		HelpCenterKeyPromptDismissed:     u.HelpCenterKeyPromptDismissed,
 		RPMLimit:                         u.RpmLimit,
 		CreatedAt:                        u.CreatedAt,
 		UpdatedAt:                        u.UpdatedAt,

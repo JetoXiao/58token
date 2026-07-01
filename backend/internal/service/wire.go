@@ -467,6 +467,7 @@ var ProviderSet = wire.NewSet(
 	// Core services
 	ProvideAuthService,
 	NewUserService,
+	NewHelpCenterService,
 	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	NewGroupService,
@@ -547,6 +548,7 @@ var ProviderSet = wire.NewSet(
 	NewGroupCapacityService,
 	NewChannelService,
 	NewModelPricingResolver,
+	NewModelMarketplaceService,
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,

@@ -175,6 +175,11 @@ func AllowBalanceSubscriptionPurchase(v bool) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldAllowBalanceSubscriptionPurchase, v))
 }
 
+// HelpCenterKeyPromptDismissed applies equality check predicate on the "help_center_key_prompt_dismissed" field. It's identical to HelpCenterKeyPromptDismissedEQ.
+func HelpCenterKeyPromptDismissed(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldHelpCenterKeyPromptDismissed, v))
+}
+
 // RpmLimit applies equality check predicate on the "rpm_limit" field. It's identical to RpmLimitEQ.
 func RpmLimit(v int) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRpmLimit, v))
@@ -1383,6 +1388,16 @@ func AllowBalanceSubscriptionPurchaseEQ(v bool) predicate.User {
 // AllowBalanceSubscriptionPurchaseNEQ applies the NEQ predicate on the "allow_balance_subscription_purchase" field.
 func AllowBalanceSubscriptionPurchaseNEQ(v bool) predicate.User {
 	return predicate.User(sql.FieldNEQ(FieldAllowBalanceSubscriptionPurchase, v))
+}
+
+// HelpCenterKeyPromptDismissedEQ applies the EQ predicate on the "help_center_key_prompt_dismissed" field.
+func HelpCenterKeyPromptDismissedEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldHelpCenterKeyPromptDismissed, v))
+}
+
+// HelpCenterKeyPromptDismissedNEQ applies the NEQ predicate on the "help_center_key_prompt_dismissed" field.
+func HelpCenterKeyPromptDismissedNEQ(v bool) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldHelpCenterKeyPromptDismissed, v))
 }
 
 // RpmLimitEQ applies the EQ predicate on the "rpm_limit" field.

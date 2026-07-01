@@ -6916,8 +6916,13 @@
           <BackupSettings />
         </div>
 
+        <!-- Tab: Help Center -->
+        <div v-show="activeTab === 'help_center'">
+          <HelpCenterEditor />
+        </div>
+
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <div v-show="activeTab !== 'backup' && activeTab !== 'help_center'" class="flex justify-end">
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -6990,6 +6995,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { adminAPI } from "@/api";
 import {
   appendAuthSourceDefaultsToUpdateRequest,
@@ -7034,6 +7040,7 @@ import ProxySelector from "@/components/common/ProxySelector.vue";
 import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
+import HelpCenterEditor from "@/views/admin/settings/HelpCenterEditor.vue";
 import { useClipboard } from "@/composables/useClipboard";
 import { affiliatesAPI, type AffiliateAdminEntry, type SimpleUser as AffiliateSimpleUser } from "@/api/admin/affiliates";
 import { extractApiErrorMessage, extractI18nErrorMessage } from "@/utils/apiError";
@@ -7059,6 +7066,8 @@ import {
 } from "@/utils/userMenuItems";
 
 const { t, locale } = useI18n();
+const route = useRoute();
+const router = useRouter();
 const appStore = useAppStore();
 const adminSettingsStore = useAdminSettingsStore();
 const isZhLocale = computed(() => locale.value.startsWith("zh"));
@@ -7104,6 +7113,11 @@ const userMenuOptions = computed<
     value: "api_keys",
     label: t("nav.apiKeys"),
     description: localText("创建和管理用户自己的 API 密钥。", "Create and manage the user's own API keys."),
+  },
+  {
+    value: "help_center",
+    label: t("nav.helpCenter"),
+    description: localText("帮助文档和客户端接入教程入口。", "Help documents and client setup tutorial entry."),
   },
   {
     value: "image_generation",
@@ -7159,6 +7173,7 @@ const userMenuOptions = computed<
 const userMenuSelection = reactive<Record<DefaultUserMenuItem, boolean>>({
   dashboard: true,
   api_keys: true,
+  help_center: true,
   image_generation: true,
   usage: true,
   channel_status: true,
@@ -7223,8 +7238,8 @@ type SettingsTab =
   | "gateway"
   | "payment"
   | "email"
-  | "backup";
-const activeTab = ref<SettingsTab>("general");
+  | "backup"
+  | "help_center";
 const settingsTabs = [
   { key: "general" as SettingsTab, icon: "home" as const },
   { key: "agreement" as SettingsTab, icon: "document" as const },
@@ -7235,7 +7250,11 @@ const settingsTabs = [
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },
+  { key: "help_center" as SettingsTab, icon: "book" as const },
 ];
+const activeTab = ref<SettingsTab>(
+  normalizeSettingsTabFromQuery(route.query.tab) ?? "general",
+);
 
 const marketplaceGroupMultiplierKeys = [
   "Claude Lite",
@@ -7257,9 +7276,37 @@ const settingsTabKeyboardActions = {
   End: "last",
 } as const;
 
+function normalizeSettingsTabFromQuery(value: unknown): SettingsTab | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string") return null;
+  const normalized = raw.trim().replace(/-/g, "_");
+  return settingsTabs.some((tab) => tab.key === normalized)
+    ? (normalized as SettingsTab)
+    : null;
+}
+
 function selectSettingsTab(tab: SettingsTab): void {
   activeTab.value = tab;
+  if (normalizeSettingsTabFromQuery(route.query.tab) === tab) return;
+  void router
+    .replace({
+      query: {
+        ...route.query,
+        tab,
+      },
+    })
+    .catch(() => {});
 }
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    const nextTab = normalizeSettingsTabFromQuery(tab);
+    if (nextTab && nextTab !== activeTab.value) {
+      activeTab.value = nextTab;
+    }
+  },
+);
 
 function normalizeMarketplaceGroupMultipliers(
   raw: Record<string, number> | null | undefined,
