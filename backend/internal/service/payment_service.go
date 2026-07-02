@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 // --- Order Status Constants ---
@@ -71,6 +72,8 @@ func generateRandomString(n int) string {
 
 type CreateOrderRequest struct {
 	UserID          int64
+	TargetUserID    int64
+	TargetUserEmail string
 	Amount          float64
 	PaymentAmount   float64
 	PaymentType     string
@@ -87,28 +90,39 @@ type CreateOrderRequest struct {
 	Locale          string
 }
 
+type SubscriptionTargetUserOption struct {
+	ID       int64  `json:"id"`
+	Email    string `json:"email"`
+	Username string `json:"username"`
+}
+
+type balanceSubscriptionTargetSearcher interface {
+	SearchActiveUsersByKeyword(ctx context.Context, keyword string, limit int) ([]User, error)
+}
+
 type CreateOrderResponse struct {
-	OrderID      int64                           `json:"order_id"`
-	Amount       float64                         `json:"amount"`
-	PayAmount    float64                         `json:"pay_amount"`
-	FeeRate      float64                         `json:"fee_rate"`
-	Status       string                          `json:"status"`
-	ResultType   payment.CreatePaymentResultType `json:"result_type,omitempty"`
-	PaymentType  string                          `json:"payment_type"`
-	OutTradeNo   string                          `json:"out_trade_no,omitempty"`
-	PayURL       string                          `json:"pay_url,omitempty"`
-	QRCode       string                          `json:"qr_code,omitempty"`
-	ClientSecret string                          `json:"client_secret,omitempty"`
-	IntentID     string                          `json:"intent_id,omitempty"`
-	Currency     string                          `json:"currency,omitempty"`
-	CountryCode  string                          `json:"country_code,omitempty"`
-	PaymentEnv   string                          `json:"payment_env,omitempty"`
-	OAuth        *payment.WechatOAuthInfo        `json:"oauth,omitempty"`
-	JSAPI        *payment.WechatJSAPIPayload     `json:"jsapi,omitempty"`
-	JSAPIPayload *payment.WechatJSAPIPayload     `json:"jsapi_payload,omitempty"`
-	ExpiresAt    time.Time                       `json:"expires_at"`
-	PaymentMode  string                          `json:"payment_mode,omitempty"`
-	ResumeToken  string                          `json:"resume_token,omitempty"`
+	OrderID            int64                           `json:"order_id"`
+	Amount             float64                         `json:"amount"`
+	PayAmount          float64                         `json:"pay_amount"`
+	FeeRate            float64                         `json:"fee_rate"`
+	Status             string                          `json:"status"`
+	ResultType         payment.CreatePaymentResultType `json:"result_type,omitempty"`
+	PaymentType        string                          `json:"payment_type"`
+	OutTradeNo         string                          `json:"out_trade_no,omitempty"`
+	PayURL             string                          `json:"pay_url,omitempty"`
+	QRCode             string                          `json:"qr_code,omitempty"`
+	ClientSecret       string                          `json:"client_secret,omitempty"`
+	IntentID           string                          `json:"intent_id,omitempty"`
+	Currency           string                          `json:"currency,omitempty"`
+	CountryCode        string                          `json:"country_code,omitempty"`
+	PaymentEnv         string                          `json:"payment_env,omitempty"`
+	OAuth              *payment.WechatOAuthInfo        `json:"oauth,omitempty"`
+	JSAPI              *payment.WechatJSAPIPayload     `json:"jsapi,omitempty"`
+	JSAPIPayload       *payment.WechatJSAPIPayload     `json:"jsapi_payload,omitempty"`
+	ExpiresAt          time.Time                       `json:"expires_at"`
+	PaymentMode        string                          `json:"payment_mode,omitempty"`
+	ResumeToken        string                          `json:"resume_token,omitempty"`
+	SubscriptionTarget *PaymentOrderSubscriptionTarget `json:"subscription_target,omitempty"`
 }
 
 type OrderListParams struct {
@@ -219,6 +233,50 @@ func (s *PaymentService) CanUseBalanceSubscriptionPurchase(ctx context.Context, 
 		return false
 	}
 	return user.Status == payment.EntityStatusActive && user.AllowBalanceSubscriptionPurchase
+}
+
+func (s *PaymentService) SearchBalanceSubscriptionTargets(ctx context.Context, userID int64, keyword string, limit int) ([]SubscriptionTargetUserOption, error) {
+	if userID <= 0 || s.userRepo == nil {
+		return nil, infraerrors.Unauthorized("UNAUTHENTICATED", "user not authenticated")
+	}
+
+	requester, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil || requester == nil {
+		return nil, infraerrors.NotFound("USER_NOT_FOUND", "user not found")
+	}
+	if requester.Status != payment.EntityStatusActive || !requester.AllowBalanceSubscriptionPurchase {
+		return nil, infraerrors.Forbidden("BALANCE_SUBSCRIPTION_NOT_ALLOWED", "balance subscription purchase is not enabled for this user")
+	}
+
+	keyword = strings.TrimSpace(keyword)
+	if len([]rune(keyword)) < 2 {
+		return []SubscriptionTargetUserOption{}, nil
+	}
+	if limit <= 0 || limit > 10 {
+		limit = 8
+	}
+
+	searcher, ok := s.userRepo.(balanceSubscriptionTargetSearcher)
+	if !ok {
+		return nil, fmt.Errorf("user repository does not support subscription target search")
+	}
+	users, err := searcher.SearchActiveUsersByKeyword(ctx, keyword, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]SubscriptionTargetUserOption, 0, len(users))
+	for _, user := range users {
+		if user.ID <= 0 || strings.TrimSpace(user.Email) == "" {
+			continue
+		}
+		out = append(out, SubscriptionTargetUserOption{
+			ID:       user.ID,
+			Email:    user.Email,
+			Username: user.Username,
+		})
+	}
+	return out, nil
 }
 
 // --- Provider Registry ---

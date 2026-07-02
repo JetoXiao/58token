@@ -154,6 +154,10 @@ func (s *PaymentService) CreateBalanceSubscriptionOrder(ctx context.Context, req
 	if !user.AllowBalanceSubscriptionPurchase {
 		return nil, infraerrors.Forbidden("BALANCE_SUBSCRIPTION_NOT_ALLOWED", "balance subscription purchase is not enabled for this user")
 	}
+	targetUser, err := s.resolveBalanceSubscriptionTargetUser(ctx, req, user)
+	if err != nil {
+		return nil, err
+	}
 	if s.notificationEmailService != nil {
 		s.notificationEmailService.RememberRecipientLocale(ctx, req.UserID, user.Email, req.Locale)
 	}
@@ -163,7 +167,7 @@ func (s *PaymentService) CreateBalanceSubscriptionOrder(ctx context.Context, req
 	if balanceCost <= 0 {
 		return nil, infraerrors.BadRequest("INVALID_AMOUNT", "subscription balance cost must be positive")
 	}
-	order, err := s.createBalanceSubscriptionOrderInTx(ctx, req, user, plan, cfg, planPrice, balanceCost, now)
+	order, err := s.createBalanceSubscriptionOrderInTx(ctx, req, user, targetUser, plan, cfg, planPrice, balanceCost, now)
 	if err != nil {
 		return nil, err
 	}
@@ -174,6 +178,8 @@ func (s *PaymentService) CreateBalanceSubscriptionOrder(ctx context.Context, req
 		"orderType":         payment.OrderTypeSubscription,
 		"paymentSource":     NormalizePaymentSource(req.PaymentSource),
 		"balanceMultiplier": normalizeBalanceRechargeMultiplier(cfg.BalanceRechargeMultiplier),
+		"targetUserID":      targetUser.ID,
+		"targetUserEmail":   targetUser.Email,
 	})
 	if err := s.toPaid(ctx, order, order.OutTradeNo, balanceCost, payment.TypeBalance); err != nil {
 		return nil, err
@@ -182,20 +188,51 @@ func (s *PaymentService) CreateBalanceSubscriptionOrder(ctx context.Context, req
 		order = refreshed
 	}
 	return &CreateOrderResponse{
-		OrderID:     order.ID,
-		Amount:      order.Amount,
-		PayAmount:   order.PayAmount,
-		FeeRate:     order.FeeRate,
-		Status:      order.Status,
-		ResultType:  payment.CreatePaymentResultOrderCreated,
-		PaymentType: payment.TypeBalance,
-		OutTradeNo:  order.OutTradeNo,
-		Currency:    "USD",
-		ExpiresAt:   order.ExpiresAt,
+		OrderID:            order.ID,
+		Amount:             order.Amount,
+		PayAmount:          order.PayAmount,
+		FeeRate:            order.FeeRate,
+		Status:             order.Status,
+		ResultType:         payment.CreatePaymentResultOrderCreated,
+		PaymentType:        payment.TypeBalance,
+		OutTradeNo:         order.OutTradeNo,
+		Currency:           "USD",
+		ExpiresAt:          order.ExpiresAt,
+		SubscriptionTarget: subscriptionTargetFromUser(targetUser),
 	}, nil
 }
 
-func (s *PaymentService) createBalanceSubscriptionOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, planPrice, balanceCost float64, now time.Time) (*dbent.PaymentOrder, error) {
+func (s *PaymentService) resolveBalanceSubscriptionTargetUser(ctx context.Context, req CreateOrderRequest, payer *User) (*User, error) {
+	targetEmail := strings.TrimSpace(req.TargetUserEmail)
+	if req.TargetUserID <= 0 && targetEmail == "" {
+		return payer, nil
+	}
+	if req.TargetUserID == payer.ID || (targetEmail != "" && strings.EqualFold(targetEmail, payer.Email)) {
+		return payer, nil
+	}
+
+	var (
+		target *User
+		err    error
+	)
+	if req.TargetUserID > 0 {
+		target, err = s.userRepo.GetByID(ctx, req.TargetUserID)
+	} else {
+		target, err = s.userRepo.GetByEmail(ctx, targetEmail)
+	}
+	if err != nil || target == nil {
+		return nil, infraerrors.NotFound("TARGET_USER_NOT_FOUND", "target user not found")
+	}
+	if targetEmail != "" && !strings.EqualFold(target.Email, targetEmail) {
+		return nil, infraerrors.BadRequest("TARGET_USER_MISMATCH", "target user email does not match")
+	}
+	if target.Status != payment.EntityStatusActive {
+		return nil, infraerrors.Forbidden("TARGET_USER_INACTIVE", "target user account is disabled")
+	}
+	return target, nil
+}
+
+func (s *PaymentService) createBalanceSubscriptionOrderInTx(ctx context.Context, req CreateOrderRequest, user *User, targetUser *User, plan *dbent.SubscriptionPlan, cfg *PaymentConfig, planPrice, balanceCost float64, now time.Time) (*dbent.PaymentOrder, error) {
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -212,7 +249,7 @@ func (s *PaymentService) createBalanceSubscriptionOrderInTx(ctx context.Context,
 		return nil, err
 	}
 	exp := now.Add(time.Minute)
-	order, err := tx.PaymentOrder.Create().
+	builder := tx.PaymentOrder.Create().
 		SetUserID(req.UserID).
 		SetUserEmail(user.Email).
 		SetUserName(user.Username).
@@ -231,8 +268,11 @@ func (s *PaymentService) createBalanceSubscriptionOrderInTx(ctx context.Context,
 		SetStatus(OrderStatusPending).
 		SetExpiresAt(exp).
 		SetClientIP(req.ClientIP).
-		SetSrcHost(req.SrcHost).
-		Save(ctx)
+		SetSrcHost(req.SrcHost)
+	if snapshot := buildPaymentOrderSubscriptionTargetSnapshot(targetUser); snapshot != nil {
+		builder.SetProviderSnapshot(snapshot)
+	}
+	order, err := builder.Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("create balance subscription order: %w", err)
 	}

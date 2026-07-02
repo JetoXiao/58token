@@ -328,6 +328,80 @@
                   <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('payment.methodUnavailableHint') }}</p>
                 </div>
 
+                <div v-if="selectedSubscriptionMethod === 'balance' && balanceSubscriptionAllowed" class="card relative z-40 overflow-visible p-6">
+                  <h3 class="text-base font-bold text-gray-950 dark:text-white">{{ t('payment.subscriptionTargetTitle') }}</h3>
+                  <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">{{ t('payment.subscriptionTargetDesc') }}</p>
+                  <label class="mt-4 block text-sm font-semibold text-gray-700 dark:text-gray-200" for="subscription-target-email">
+                    {{ t('payment.subscriptionTargetEmail') }}
+                  </label>
+                  <div class="relative mt-2">
+                    <Icon name="search" size="sm" class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      id="subscription-target-email"
+                      v-model="subscriptionTargetKeyword"
+                      type="search"
+                      autocomplete="off"
+                      class="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-11 text-sm text-gray-900 outline-none transition focus:border-primary-400 focus:ring-4 focus:ring-primary-100 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:focus:border-primary-500 dark:focus:ring-primary-950"
+                      :placeholder="t('payment.subscriptionTargetPlaceholder')"
+                      @focus="openSubscriptionTargetDropdown"
+                      @input="handleSubscriptionTargetInput"
+                      @keydown.down.prevent="moveSubscriptionTargetHighlight(1)"
+                      @keydown.up.prevent="moveSubscriptionTargetHighlight(-1)"
+                      @keydown.enter.prevent="confirmHighlightedSubscriptionTarget"
+                      @keydown.esc="subscriptionTargetDropdownOpen = false"
+                    />
+                    <button
+                      v-if="subscriptionTargetKeyword"
+                      type="button"
+                      class="absolute right-3 top-1/2 rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700 dark:hover:text-gray-200"
+                      :title="t('common.clear')"
+                      @click="clearSubscriptionTarget"
+                    >
+                      <Icon name="x" size="xs" :stroke-width="2" />
+                    </button>
+
+                    <div
+                      v-if="subscriptionTargetDropdownVisible"
+                      class="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-xl border border-gray-200 bg-white p-1 shadow-xl dark:border-dark-700 dark:bg-dark-900"
+                    >
+                      <div v-if="subscriptionTargetSearching" class="flex items-center gap-2 px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        <span class="h-4 w-4 animate-spin rounded-full border-2 border-primary-400 border-t-transparent"></span>
+                        <span>{{ t('payment.subscriptionTargetSearching') }}</span>
+                      </div>
+                      <button
+                        v-for="(option, index) in subscriptionTargetOptions"
+                        :key="option.id"
+                        type="button"
+                        :class="[
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition',
+                          index === highlightedSubscriptionTargetIndex
+                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-200'
+                            : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-dark-800',
+                        ]"
+                        @mousedown.prevent="selectSubscriptionTarget(option)"
+                      >
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-900/40 dark:text-primary-200">
+                          {{ subscriptionTargetInitial(option) }}
+                        </span>
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate text-sm font-semibold">{{ option.username || option.email }}</span>
+                          <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ option.email }}</span>
+                        </span>
+                        <Icon v-if="option.email === subscriptionTargetEmailTrimmed" name="check" size="sm" class="shrink-0 text-primary-600 dark:text-primary-300" />
+                      </button>
+                      <div
+                        v-if="!subscriptionTargetSearching && subscriptionTargetKeywordReady && subscriptionTargetOptions.length === 0"
+                        class="px-3 py-3 text-sm text-gray-500 dark:text-gray-400"
+                      >
+                        {{ t('payment.subscriptionTargetNoResults') }}
+                      </div>
+                    </div>
+                  </div>
+                  <p class="mt-2 text-xs leading-5 text-gray-500 dark:text-gray-400">
+                    {{ subscriptionTargetStatusText }}
+                  </p>
+                </div>
+
                 <div class="card p-6">
                   <h3 class="text-base font-bold text-gray-950 dark:text-white">{{ t('payment.subscriptionSummaryTitle') }}</h3>
                   <div v-if="selectedPlan" class="mt-5 space-y-4">
@@ -430,6 +504,10 @@
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.fee') }} ({{ feeRate }}%)</span>
                         <span class="font-semibold text-gray-900 dark:text-white">{{ formatSelectedPaymentAmount(subFeeAmount) }}</span>
                       </div>
+                      <div v-if="selectedSubscriptionMethod === 'balance'" class="flex justify-between gap-4">
+                        <span class="text-gray-500 dark:text-gray-400">{{ t('payment.subscriptionTargetSummary') }}</span>
+                        <span class="max-w-[180px] truncate text-right font-semibold text-gray-900 dark:text-white">{{ subscriptionTargetDisplay }}</span>
+                      </div>
                       <div class="flex justify-between gap-4 border-t border-gray-200 pt-3 dark:border-dark-600">
                         <span class="font-medium text-gray-700 dark:text-gray-300">{{ t('payment.actualPay') }}</span>
                         <span class="text-lg font-black text-gray-950 dark:text-white">{{ formatSelectedPaymentAmount(subscriptionPayableAmount) }}</span>
@@ -511,7 +589,7 @@ import { useAppStore } from '@/stores'
 import { paymentAPI } from '@/api/payment'
 import { extractApiErrorMessage, extractI18nErrorMessage } from '@/utils/apiError'
 import { isMobileDevice } from '@/utils/device'
-import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType } from '@/types/payment'
+import type { SubscriptionPlan, CheckoutInfoResponse, CreateOrderResult, OrderType, PaymentSubscriptionTargetUser } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import AmountInput from '@/components/payment/AmountInput.vue'
 import PaymentMethodSelector from '@/components/payment/PaymentMethodSelector.vue'
@@ -570,7 +648,15 @@ const selectedRechargeMethod = ref('')
 const selectedSubscriptionMethod = ref('')
 const selectedRechargeRail = ref<'rmb' | 'usdt'>('rmb')
 const selectedPlan = ref<SubscriptionPlan | null>(null)
+const subscriptionTargetEmail = ref('')
+const subscriptionTargetKeyword = ref('')
+const subscriptionTargetOptions = ref<PaymentSubscriptionTargetUser[]>([])
+const subscriptionTargetSearching = ref(false)
+const subscriptionTargetDropdownOpen = ref(false)
+const highlightedSubscriptionTargetIndex = ref(0)
 const previewImage = ref('')
+let subscriptionTargetSearchTimer: ReturnType<typeof setTimeout> | null = null
+let subscriptionTargetSearchSeq = 0
 
 const paymentPhase = ref<'select' | 'paying'>('select')
 
@@ -579,6 +665,7 @@ interface CreateOrderOptions {
   wechatResumeToken?: string
   paymentType?: string
   paymentAmount?: number
+  targetUserEmail?: string
   isResume?: boolean
   mobileQrFallbackAttempted?: boolean
 }
@@ -769,11 +856,131 @@ const rechargeMethods = computed(() => {
 })
 const enabledMethods = computed(() => Object.keys(visibleMethods.value))
 const balanceSubscriptionAllowed = computed(() => checkout.value.allow_balance_subscription_purchase === true)
+const subscriptionTargetEmailTrimmed = computed(() => subscriptionTargetEmail.value.trim())
+const subscriptionTargetKeywordTrimmed = computed(() => subscriptionTargetKeyword.value.trim())
+const subscriptionTargetKeywordReady = computed(() => subscriptionTargetKeywordTrimmed.value.length >= 2)
+const subscriptionTargetNeedsSelection = computed(() =>
+  selectedSubscriptionMethod.value === 'balance'
+    && balanceSubscriptionAllowed.value
+    && subscriptionTargetKeywordTrimmed.value !== ''
+    && subscriptionTargetEmailTrimmed.value === ''
+)
+const subscriptionTargetDropdownVisible = computed(() =>
+  subscriptionTargetDropdownOpen.value
+    && subscriptionTargetKeywordTrimmed.value !== ''
+    && (
+      subscriptionTargetSearching.value
+      || subscriptionTargetKeywordReady.value
+      || subscriptionTargetOptions.value.length > 0
+    )
+)
+const subscriptionTargetDisplay = computed(() => {
+  if (subscriptionTargetEmailTrimmed.value) {
+    return subscriptionTargetEmailTrimmed.value
+  }
+  return user.value?.email || user.value?.username || t('payment.subscriptionTargetCurrentUser')
+})
+const subscriptionTargetStatusText = computed(() => {
+  if (subscriptionTargetNeedsSelection.value) {
+    return t('payment.subscriptionTargetSelectRequired')
+  }
+  if (subscriptionTargetEmailTrimmed.value) {
+    return t('payment.subscriptionTargetSelectedHint', { email: subscriptionTargetEmailTrimmed.value })
+  }
+  return t('payment.subscriptionTargetHint')
+})
 const subscriptionMethods = computed(() => {
   const methods = enabledMethods.value.filter((method) => method !== 'balance')
   if (!balanceSubscriptionAllowed.value) return methods
   return ['balance', ...methods]
 })
+
+function subscriptionTargetInitial(option: PaymentSubscriptionTargetUser): string {
+  const source = option.username || option.email || '?'
+  return source.trim().slice(0, 1).toUpperCase() || '?'
+}
+
+function openSubscriptionTargetDropdown() {
+  subscriptionTargetDropdownOpen.value = true
+  scheduleSubscriptionTargetSearch()
+}
+
+function handleSubscriptionTargetInput() {
+  subscriptionTargetEmail.value = ''
+  highlightedSubscriptionTargetIndex.value = 0
+  subscriptionTargetDropdownOpen.value = true
+  scheduleSubscriptionTargetSearch()
+}
+
+function clearSubscriptionTarget() {
+  subscriptionTargetKeyword.value = ''
+  subscriptionTargetEmail.value = ''
+  subscriptionTargetOptions.value = []
+  subscriptionTargetSearching.value = false
+  subscriptionTargetDropdownOpen.value = false
+  highlightedSubscriptionTargetIndex.value = 0
+  if (subscriptionTargetSearchTimer) {
+    clearTimeout(subscriptionTargetSearchTimer)
+    subscriptionTargetSearchTimer = null
+  }
+}
+
+function selectSubscriptionTarget(option: PaymentSubscriptionTargetUser) {
+  subscriptionTargetKeyword.value = option.username
+    ? `${option.username} <${option.email}>`
+    : option.email
+  subscriptionTargetEmail.value = option.email
+  subscriptionTargetDropdownOpen.value = false
+  highlightedSubscriptionTargetIndex.value = 0
+}
+
+function moveSubscriptionTargetHighlight(delta: number) {
+  if (!subscriptionTargetDropdownVisible.value || subscriptionTargetOptions.value.length === 0) {
+    openSubscriptionTargetDropdown()
+    return
+  }
+  const count = subscriptionTargetOptions.value.length
+  highlightedSubscriptionTargetIndex.value = (highlightedSubscriptionTargetIndex.value + delta + count) % count
+}
+
+function confirmHighlightedSubscriptionTarget() {
+  if (!subscriptionTargetDropdownVisible.value || subscriptionTargetOptions.value.length === 0) return
+  selectSubscriptionTarget(subscriptionTargetOptions.value[highlightedSubscriptionTargetIndex.value] || subscriptionTargetOptions.value[0])
+}
+
+function scheduleSubscriptionTargetSearch() {
+  if (subscriptionTargetSearchTimer) {
+    clearTimeout(subscriptionTargetSearchTimer)
+    subscriptionTargetSearchTimer = null
+  }
+  const keyword = subscriptionTargetKeywordTrimmed.value
+  if (keyword.length < 2) {
+    subscriptionTargetOptions.value = []
+    subscriptionTargetSearching.value = false
+    return
+  }
+  subscriptionTargetSearchTimer = setTimeout(() => {
+    searchSubscriptionTargets(keyword)
+  }, 250)
+}
+
+async function searchSubscriptionTargets(keyword: string) {
+  const requestSeq = ++subscriptionTargetSearchSeq
+  subscriptionTargetSearching.value = true
+  try {
+    const response = await paymentAPI.searchSubscriptionTargets(keyword, 8)
+    if (requestSeq !== subscriptionTargetSearchSeq) return
+    subscriptionTargetOptions.value = response.data || []
+    highlightedSubscriptionTargetIndex.value = 0
+  } catch {
+    if (requestSeq !== subscriptionTargetSearchSeq) return
+    subscriptionTargetOptions.value = []
+  } finally {
+    if (requestSeq === subscriptionTargetSearchSeq) {
+      subscriptionTargetSearching.value = false
+    }
+  }
+}
 
 function firstSortedMethod(methods: string[]): string {
   if (methods.length === 0) return ''
@@ -1087,7 +1294,7 @@ const canSubmitSubscription = computed(() =>
     && amountFitsMethod(selectedPlan.value.price, selectedSubscriptionMethod.value)
     && (
       selectedSubscriptionMethod.value === 'balance'
-        ? (user.value?.balance ?? 0) >= balanceSubscriptionCost(selectedPlan.value.price)
+        ? (user.value?.balance ?? 0) >= balanceSubscriptionCost(selectedPlan.value.price) && !subscriptionTargetNeedsSelection.value
         : selectedSubscriptionLimit.value?.available !== false
     )
 )
@@ -1260,6 +1467,7 @@ async function confirmSubscribe() {
   await createOrder(selectedPlan.value.price, 'subscription', selectedPlan.value.id, {
     paymentType: selectedSubscriptionMethod.value,
     paymentAmount: selectedPaymentCurrency === 'USDT' ? subscriptionBaseAmount.value : undefined,
+    targetUserEmail: selectedSubscriptionMethod.value === 'balance' ? subscriptionTargetEmailTrimmed.value : undefined,
   })
 }
 
@@ -1276,6 +1484,7 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
       paymentType: requestType,
       orderType,
       planId,
+      targetUserEmail: options.targetUserEmail,
       origin: typeof window !== 'undefined' ? window.location.origin : '',
       isMobile: isMobileDevice(),
       isWechatBrowser: typeof window !== 'undefined' && /MicroMessenger/i.test(window.navigator.userAgent),
@@ -1660,6 +1869,17 @@ onMounted(async () => {
     // Handle renewal navigation: ?tab=subscription&group=123
     if (route.query.tab === 'subscription') {
       activeTab.value = 'subscription'
+      if (typeof route.query.target_user === 'string') {
+        subscriptionTargetEmail.value = route.query.target_user
+      } else if (typeof route.query.target_email === 'string') {
+        subscriptionTargetEmail.value = route.query.target_email
+      }
+      if (subscriptionTargetEmail.value) {
+        subscriptionTargetKeyword.value = subscriptionTargetEmail.value
+      }
+      if (subscriptionTargetEmail.value && balanceSubscriptionAllowed.value) {
+        selectedSubscriptionMethod.value = 'balance'
+      }
       if (route.query.group) {
         const groupId = Number(route.query.group)
         const groupPlans = checkout.value.plans.filter(p => p.group_id === groupId)

@@ -780,6 +780,38 @@ func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 	return r.client.User.Query().Where(userEmailLookupPredicate(email)).Exist(ctx)
 }
 
+func (r *userRepository) SearchActiveUsersByKeyword(ctx context.Context, keyword string, limit int) ([]service.User, error) {
+	keyword = strings.TrimSpace(keyword)
+	if keyword == "" {
+		return []service.User{}, nil
+	}
+	if limit <= 0 || limit > 20 {
+		limit = 10
+	}
+
+	users, err := r.client.User.Query().
+		Where(
+			dbuser.StatusEQ(service.StatusActive),
+			dbuser.Or(
+				dbuser.EmailContainsFold(keyword),
+				dbuser.UsernameContainsFold(keyword),
+			),
+		).
+		Order(dbent.Asc(dbuser.FieldEmail), dbent.Asc(dbuser.FieldID)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]service.User, 0, len(users))
+	for _, item := range users {
+		user := userEntityToService(item)
+		out = append(out, *user)
+	}
+	return out, nil
+}
+
 func ensureNormalizedEmailAvailableWithClient(ctx context.Context, client *dbent.Client, userID int64, email string) error {
 	client = clientFromContext(ctx, client)
 	if client == nil {

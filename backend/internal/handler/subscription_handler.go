@@ -51,7 +51,7 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 		return
 	}
 
-	subscriptions, err := h.subscriptionService.ListUserSubscriptions(c.Request.Context(), subject.UserID)
+	subscriptions, err := h.subscriptionService.ListVisibleUserSubscriptions(c.Request.Context(), subject.UserID)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -59,7 +59,14 @@ func (h *SubscriptionHandler) List(c *gin.Context) {
 
 	out := make([]dto.UserSubscription, 0, len(subscriptions))
 	for i := range subscriptions {
-		out = append(out, *dto.UserSubscriptionFromService(&subscriptions[i]))
+		item := dto.UserSubscriptionFromService(&subscriptions[i])
+		if item == nil {
+			continue
+		}
+		if item.AssignedBy != nil && *item.AssignedBy != subject.UserID {
+			item.AssignedBy = nil
+		}
+		out = append(out, *item)
 	}
 	response.Success(c, out)
 }

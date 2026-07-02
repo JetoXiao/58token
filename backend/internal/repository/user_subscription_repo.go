@@ -151,6 +151,24 @@ func (r *userSubscriptionRepository) ListByUserID(ctx context.Context, userID in
 	return userSubscriptionEntitiesToService(subs), nil
 }
 
+func (r *userSubscriptionRepository) ListVisibleByUserID(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
+	client := clientFromContext(ctx, r.client)
+	subs, err := client.UserSubscription.Query().
+		Where(usersubscription.Or(
+			usersubscription.UserIDEQ(userID),
+			usersubscription.AssignedByEQ(userID),
+		)).
+		WithUser().
+		WithGroup().
+		WithAssignedByUser().
+		Order(dbent.Desc(usersubscription.FieldCreatedAt)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return userSubscriptionEntitiesToService(subs), nil
+}
+
 func (r *userSubscriptionRepository) ListActiveByUserID(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
 	client := clientFromContext(ctx, r.client)
 	subs, err := client.UserSubscription.Query().

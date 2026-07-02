@@ -49,6 +49,14 @@
                 <p v-if="subscription.group?.description" class="mt-0.5 text-xs text-gray-500 dark:text-dark-400">
                   {{ subscription.group.description }}
                 </p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <span
+                    v-if="isManagedByCurrentUser(subscription)"
+                    class="rounded-full border border-primary-200 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
+                  >
+                    {{ t('userSubscriptions.managedFor', { user: subscriptionUserLabel(subscription) }) }}
+                  </span>
+                </div>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -67,7 +75,7 @@
               <button
                 v-if="subscription.status === 'active'"
                 :class="['rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors', platformButtonClass(subscription.group?.platform || '')]"
-                @click="router.push({ path: '/purchase', query: { tab: 'subscription', group: String(subscription.group_id) } })"
+                @click="renewSubscription(subscription)"
               >
                 {{ t('payment.renewNow') }}
               </button>
@@ -242,9 +250,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import subscriptionsAPI from '@/api/subscriptions'
 import type { UserSubscription } from '@/types'
@@ -267,9 +276,11 @@ function platformAccentDotClass(p: string): string {
 const { t } = useI18n()
 const router = useRouter()
 const appStore = useAppStore()
+const authStore = useAuthStore()
 
 const subscriptions = ref<UserSubscription[]>([])
 const loading = ref(true)
+const currentUser = computed(() => authStore.user)
 
 async function loadSubscriptions() {
   try {
@@ -363,6 +374,28 @@ function formatResetTime(windowStart: string | null, windowHours: number): strin
   const parts = getRemainingDurationParts(end)
 
   return parts ? formatDurationParts(parts) : t('userSubscriptions.windowNotActive')
+}
+
+function isManagedByCurrentUser(subscription: UserSubscription): boolean {
+  const userID = currentUser.value?.id
+  return !!userID && subscription.assigned_by === userID && subscription.user_id !== userID
+}
+
+function subscriptionUserLabel(subscription: UserSubscription): string {
+  return subscription.user?.email || subscription.user?.username || `#${subscription.user_id}`
+}
+
+function renewSubscription(subscription: UserSubscription) {
+  const query: Record<string, string> = {
+    tab: 'subscription',
+    group: String(subscription.group_id),
+  }
+  if (isManagedByCurrentUser(subscription)) {
+    if (subscription.user?.email) {
+      query.target_user = subscription.user.email
+    }
+  }
+  router.push({ path: '/purchase', query })
 }
 
 onMounted(() => {

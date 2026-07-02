@@ -12,7 +12,8 @@ import type {
   CheckoutInfoResponse,
   CreateOrderRequest,
   CreateOrderResult,
-  PaymentOrder
+  PaymentOrder,
+  PaymentSubscriptionTargetUser
 } from '@/types/payment'
 import type { BasePaginationResponse } from '@/types'
 
@@ -40,6 +41,13 @@ export const paymentAPI = {
   /** Get payment method limits and fee rates */
   getLimits() {
     return apiClient.get<MethodLimitsResponse>('/payment/limits')
+  },
+
+  /** Search target users for balance subscription activation */
+  searchSubscriptionTargets(keyword: string, limit = 8) {
+    return apiClient.get<PaymentSubscriptionTargetUser[]>('/payment/subscription-targets', {
+      params: { keyword, limit }
+    })
   },
 
   /** Create a new payment order */

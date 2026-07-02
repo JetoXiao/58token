@@ -233,11 +233,40 @@ func (h *PaymentHandler) GetLimits(c *gin.Context) {
 	response.Success(c, resp)
 }
 
+// SearchSubscriptionTargets returns minimal user options for balance subscription purchase.
+// GET /api/v1/payment/subscription-targets?keyword=...
+func (h *PaymentHandler) SearchSubscriptionTargets(c *gin.Context) {
+	subject, ok := requireAuth(c)
+	if !ok {
+		return
+	}
+
+	limit := 8
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	targets, err := h.paymentService.SearchBalanceSubscriptionTargets(
+		c.Request.Context(),
+		subject.UserID,
+		c.Query("keyword"),
+		limit,
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, targets)
+}
+
 // CreateOrderRequest is the request body for creating a payment order.
 type CreateOrderRequest struct {
 	Amount            float64 `json:"amount"`
 	PaymentAmount     float64 `json:"payment_amount"`
 	PaymentType       string  `json:"payment_type" binding:"required"`
+	TargetUserID      int64   `json:"target_user_id,omitempty"`
+	TargetUserEmail   string  `json:"target_user_email,omitempty"`
 	OpenID            string  `json:"openid"`
 	WechatResumeToken string  `json:"wechat_resume_token"`
 	ReturnURL         string  `json:"return_url"`
@@ -282,6 +311,8 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 	serviceReq := service.CreateOrderRequest{
 		UserID:          subject.UserID,
+		TargetUserID:    req.TargetUserID,
+		TargetUserEmail: strings.TrimSpace(req.TargetUserEmail),
 		Amount:          req.Amount,
 		PaymentAmount:   req.PaymentAmount,
 		PaymentType:     req.PaymentType,
@@ -596,27 +627,28 @@ func isMobile(c *gin.Context) bool {
 }
 
 type PaymentOrderResult struct {
-	ID                  int64      `json:"id"`
-	UserID              int64      `json:"user_id"`
-	Amount              float64    `json:"amount"`
-	PayAmount           float64    `json:"pay_amount"`
-	FeeRate             float64    `json:"fee_rate"`
-	Currency            string     `json:"currency"`
-	PaymentType         string     `json:"payment_type"`
-	OutTradeNo          string     `json:"out_trade_no"`
-	Status              string     `json:"status"`
-	OrderType           string     `json:"order_type"`
-	CreatedAt           time.Time  `json:"created_at"`
-	ExpiresAt           time.Time  `json:"expires_at"`
-	PaidAt              *time.Time `json:"paid_at,omitempty"`
-	CompletedAt         *time.Time `json:"completed_at,omitempty"`
-	RefundAmount        float64    `json:"refund_amount"`
-	RefundReason        *string    `json:"refund_reason,omitempty"`
-	RefundRequestedAt   *time.Time `json:"refund_requested_at,omitempty"`
-	RefundRequestedBy   *string    `json:"refund_requested_by,omitempty"`
-	RefundRequestReason *string    `json:"refund_request_reason,omitempty"`
-	PlanID              *int64     `json:"plan_id,omitempty"`
-	ProviderInstanceID  *string    `json:"provider_instance_id,omitempty"`
+	ID                  int64                                   `json:"id"`
+	UserID              int64                                   `json:"user_id"`
+	Amount              float64                                 `json:"amount"`
+	PayAmount           float64                                 `json:"pay_amount"`
+	FeeRate             float64                                 `json:"fee_rate"`
+	Currency            string                                  `json:"currency"`
+	PaymentType         string                                  `json:"payment_type"`
+	OutTradeNo          string                                  `json:"out_trade_no"`
+	Status              string                                  `json:"status"`
+	OrderType           string                                  `json:"order_type"`
+	CreatedAt           time.Time                               `json:"created_at"`
+	ExpiresAt           time.Time                               `json:"expires_at"`
+	PaidAt              *time.Time                              `json:"paid_at,omitempty"`
+	CompletedAt         *time.Time                              `json:"completed_at,omitempty"`
+	RefundAmount        float64                                 `json:"refund_amount"`
+	RefundReason        *string                                 `json:"refund_reason,omitempty"`
+	RefundRequestedAt   *time.Time                              `json:"refund_requested_at,omitempty"`
+	RefundRequestedBy   *string                                 `json:"refund_requested_by,omitempty"`
+	RefundRequestReason *string                                 `json:"refund_request_reason,omitempty"`
+	PlanID              *int64                                  `json:"plan_id,omitempty"`
+	ProviderInstanceID  *string                                 `json:"provider_instance_id,omitempty"`
+	SubscriptionTarget  *service.PaymentOrderSubscriptionTarget `json:"subscription_target,omitempty"`
 }
 
 func sanitizePaymentOrdersForResponse(orders []*dbent.PaymentOrder) []PaymentOrderResult {
@@ -655,6 +687,7 @@ func sanitizePaymentOrderForResponse(order *dbent.PaymentOrder) *PaymentOrderRes
 		RefundRequestReason: order.RefundRequestReason,
 		PlanID:              order.PlanID,
 		ProviderInstanceID:  order.ProviderInstanceID,
+		SubscriptionTarget:  service.PaymentOrderSubscriptionTargetSnapshot(order),
 	}
 }
 

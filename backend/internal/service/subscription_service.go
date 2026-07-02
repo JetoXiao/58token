@@ -210,7 +210,7 @@ func (s *SubscriptionService) AssignOrExtendSubscription(ctx context.Context, in
 			newExpiresAt = MaxExpiresAt
 		}
 
-		if err := s.updateExistingSubscriptionTerm(ctx, existingSub, input.Notes, now, newExpiresAt, isExpired); err != nil {
+		if err := s.updateExistingSubscriptionTerm(ctx, existingSub, input.Notes, input.AssignedBy, now, newExpiresAt, isExpired); err != nil {
 			return nil, false, err
 		}
 
@@ -254,15 +254,29 @@ func (s *SubscriptionService) updateExistingSubscriptionTerm(
 	ctx context.Context,
 	existingSub *UserSubscription,
 	notes string,
+	assignedBy int64,
 	startsAt time.Time,
 	newExpiresAt time.Time,
 	isExpired bool,
 ) error {
 	return s.withSubscriptionUpdateTx(ctx, func(txCtx context.Context) error {
 		if isExpired {
-			renewed := renewedSubscriptionTerm(existingSub, notes, startsAt, newExpiresAt)
+			renewed := renewedSubscriptionTerm(existingSub, notes, assignedBy, startsAt, newExpiresAt)
 			if err := s.userSubRepo.Update(txCtx, renewed); err != nil {
 				return fmt.Errorf("renew expired subscription: %w", err)
+			}
+			return nil
+		}
+
+		if assignedBy > 0 {
+			updated := *existingSub
+			updated.ExpiresAt = newExpiresAt
+			updated.Status = SubscriptionStatusActive
+			updated.Notes = appendSubscriptionNotes(existingSub.Notes, notes)
+			updated.AssignedBy = &assignedBy
+			updated.AssignedAt = startsAt
+			if err := s.userSubRepo.Update(txCtx, &updated); err != nil {
+				return fmt.Errorf("extend assigned subscription: %w", err)
 			}
 			return nil
 		}
@@ -312,7 +326,7 @@ func (s *SubscriptionService) withSubscriptionUpdateTx(ctx context.Context, fn f
 	return nil
 }
 
-func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, startsAt, expiresAt time.Time) *UserSubscription {
+func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, assignedBy int64, startsAt, expiresAt time.Time) *UserSubscription {
 	renewed := *existingSub
 	windowStart := startOfDay(startsAt)
 	renewed.StartsAt = startsAt
@@ -325,6 +339,10 @@ func renewedSubscriptionTerm(existingSub *UserSubscription, notes string, starts
 	renewed.WeeklyUsageUSD = 0
 	renewed.MonthlyUsageUSD = 0
 	renewed.Notes = appendSubscriptionNotes(existingSub.Notes, notes)
+	if assignedBy > 0 {
+		renewed.AssignedBy = &assignedBy
+		renewed.AssignedAt = startsAt
+	}
 	return &renewed
 }
 
@@ -657,6 +675,16 @@ func (s *SubscriptionService) GetActiveSubscription(ctx context.Context, userID,
 // ListUserSubscriptions 获取用户的所有订阅
 func (s *SubscriptionService) ListUserSubscriptions(ctx context.Context, userID int64) ([]UserSubscription, error) {
 	subs, err := s.userSubRepo.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	normalizeExpiredWindows(subs)
+	normalizeSubscriptionStatus(subs)
+	return subs, nil
+}
+
+func (s *SubscriptionService) ListVisibleUserSubscriptions(ctx context.Context, userID int64) ([]UserSubscription, error) {
+	subs, err := s.userSubRepo.ListVisibleByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

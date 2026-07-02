@@ -314,6 +314,9 @@ func (r *freeQuotaPermissionUserSubRepo) Delete(context.Context, int64) error { 
 func (r *freeQuotaPermissionUserSubRepo) ListByUserID(context.Context, int64) ([]UserSubscription, error) {
 	panic("unexpected")
 }
+func (r *freeQuotaPermissionUserSubRepo) ListVisibleByUserID(context.Context, int64) ([]UserSubscription, error) {
+	panic("unexpected")
+}
 func (r *freeQuotaPermissionUserSubRepo) ListActiveByUserID(_ context.Context, userID int64) ([]UserSubscription, error) {
 	out := make([]UserSubscription, 0, len(r.activeSubscriptions))
 	for _, sub := range r.activeSubscriptions {

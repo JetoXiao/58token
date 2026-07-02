@@ -1722,6 +1722,7 @@ export interface UserSubscription {
   created_at: string
   updated_at: string
   expires_at: string | null
+  assigned_by?: number | null
   user?: User
   group?: Group
 }

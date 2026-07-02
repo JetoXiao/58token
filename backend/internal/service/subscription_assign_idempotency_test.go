@@ -86,6 +86,9 @@ func (userSubRepoNoop) Delete(context.Context, int64) error { panic("unexpected 
 func (userSubRepoNoop) ListByUserID(context.Context, int64) ([]UserSubscription, error) {
 	panic("unexpected ListByUserID call")
 }
+func (userSubRepoNoop) ListVisibleByUserID(context.Context, int64) ([]UserSubscription, error) {
+	panic("unexpected ListVisibleByUserID call")
+}
 func (userSubRepoNoop) ListActiveByUserID(context.Context, int64) ([]UserSubscription, error) {
 	panic("unexpected ListActiveByUserID call")
 }

@@ -588,12 +588,14 @@ type UserSubscription struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
+	AssignedBy *int64 `json:"assigned_by,omitempty"`
+
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
 }
 
 // AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。
-// 注意：普通用户接口不得返回 assigned_by/assigned_at/notes/assigned_by_user 等管理员字段。
+// 注意：普通用户接口不得返回 assigned_at/notes 等管理员内部字段。
 type AdminUserSubscription struct {
 	UserSubscription
 

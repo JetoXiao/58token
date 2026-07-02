@@ -145,6 +145,12 @@ export interface PaymentChannel {
   enabled: boolean
 }
 
+export interface PaymentSubscriptionTargetUser {
+  id: number
+  email: string
+  username: string
+}
+
 // ==================== Providers ====================
 
 export interface ProviderInstance {
@@ -169,6 +175,8 @@ export interface CreateOrderRequest {
   payment_type: string
   order_type: string
   plan_id?: number
+  target_user_id?: number
+  target_user_email?: string
   return_url?: string
   payment_source?: string
   openid?: string
@@ -215,6 +223,11 @@ export interface CreateOrderResult {
   out_trade_no?: string
   payment_mode?: string
   resume_token?: string
+  subscription_target?: {
+    user_id: number
+    email?: string
+    username?: string
+  }
   oauth?: WechatOAuthInfo
   jsapi?: WechatJSAPIPayload
   jsapi_payload?: WechatJSAPIPayload
