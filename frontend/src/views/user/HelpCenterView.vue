@@ -399,6 +399,7 @@ const previewImage = ref<(HelpCenterAttachment & { src: string }) | null>(null)
 const previewFitMode = ref<'fit' | 'actual'>('fit')
 const previewNaturalWidth = ref(0)
 let imageURLGeneration = 0
+let imageLoadAbortController: AbortController | null = null
 
 marked.setOptions({
   breaks: true,
@@ -475,6 +476,17 @@ function clearStepImageURLs(): void {
   stepImageURLs.value = {}
 }
 
+function setStepImageURL(key: string, url: string): void {
+  const previous = stepImageURLs.value[key]
+  if (previous && previous.startsWith('blob:') && previous !== url) {
+    URL.revokeObjectURL(previous)
+  }
+  stepImageURLs.value = {
+    ...stepImageURLs.value,
+    [key]: url,
+  }
+}
+
 async function copyCode(content: string): Promise<void> {
   await copyToClipboard(content, t('common.copiedToClipboard'))
 }
@@ -525,6 +537,9 @@ async function downloadAttachment(attachment: HelpCenterAttachment): Promise<voi
 
 async function loadStepImages(steps: Array<{ images?: HelpCenterAttachment[] }>): Promise<void> {
   const generation = ++imageURLGeneration
+  imageLoadAbortController?.abort()
+  const abortController = new AbortController()
+  imageLoadAbortController = abortController
   clearStepImageURLs()
   const uploadedImages = steps
     .flatMap((step) => step.images || [])
@@ -532,24 +547,34 @@ async function loadStepImages(steps: Array<{ images?: HelpCenterAttachment[] }>)
 
   if (!uploadedImages.length) return
 
-  const urls: Record<string, string> = {}
-  await Promise.all(uploadedImages.map(async (image) => {
+  const uniqueImages = Array.from(
+    new Map(uploadedImages.map((image) => [stepImageKey(image), image])).values(),
+  )
+
+  await Promise.all(uniqueImages.map(async (image) => {
+    const apiPath = getHelpCenterAttachmentAPIPath(image.url)
+    if (!apiPath) return
+    const key = stepImageKey(image)
     try {
-      const apiPath = getHelpCenterAttachmentAPIPath(image.url)
-      if (!apiPath) return
-      const response = await apiClient.get<Blob>(apiPath, { responseType: 'blob' })
-      urls[stepImageKey(image)] = URL.createObjectURL(response.data)
+      const response = await apiClient.get<Blob>(apiPath, {
+        responseType: 'blob',
+        signal: abortController.signal,
+      })
+      const objectURL = URL.createObjectURL(response.data)
+      if (generation !== imageURLGeneration || abortController.signal.aborted) {
+        URL.revokeObjectURL(objectURL)
+        return
+      }
+      setStepImageURL(key, objectURL)
     } catch (error) {
-      urls[stepImageKey(image)] = ''
+      if (generation !== imageURLGeneration || abortController.signal.aborted) return
+      setStepImageURL(key, '')
     }
   }))
-  if (generation !== imageURLGeneration) {
-    Object.values(urls).forEach((url) => {
-      if (url.startsWith('blob:')) URL.revokeObjectURL(url)
-    })
-    return
+
+  if (imageLoadAbortController === abortController) {
+    imageLoadAbortController = null
   }
-  stepImageURLs.value = urls
 }
 
 async function loadHelpCenter(): Promise<void> {
@@ -570,6 +595,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   imageURLGeneration += 1
+  imageLoadAbortController?.abort()
+  imageLoadAbortController = null
   clearStepImageURLs()
 })
 </script>

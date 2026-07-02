@@ -6917,7 +6917,7 @@
         </div>
 
         <!-- Tab: Help Center -->
-        <div v-show="activeTab === 'help_center'">
+        <div v-if="activeTab === 'help_center'">
           <HelpCenterEditor />
         </div>
 

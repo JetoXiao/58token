@@ -10,6 +10,16 @@ const { helpCenterGet, apiGet, showError } = vi.hoisted(() => ({
   showError: vi.fn(),
 }))
 
+class MockAbortController {
+  signal = { aborted: false }
+
+  abort() {
+    this.signal.aborted = true
+  }
+}
+
+vi.stubGlobal('AbortController', MockAbortController)
+
 vi.mock('@/api', () => ({
   helpCenterAPI: {
     get: helpCenterGet,
@@ -107,6 +117,23 @@ function helpCenterConfig(): HelpCenterConfig {
   }
 }
 
+function helpCenterConfigWithUploadedImages(): HelpCenterConfig {
+  const config = helpCenterConfig()
+  config.tutorials[0].steps[0].images = [
+    {
+      label: 'first',
+      url: '/api/v1/help-center/attachments/first.png',
+      file_name: 'first.png',
+    },
+    {
+      label: 'second',
+      url: '/api/v1/help-center/attachments/second.png',
+      file_name: 'second.png',
+    },
+  ]
+  return config
+}
+
 function mountHelpCenter() {
   return mount(HelpCenterView, {
     global: {
@@ -124,6 +151,18 @@ describe('HelpCenterView image preview', () => {
     helpCenterGet.mockReset()
     apiGet.mockReset()
     showError.mockReset()
+    Object.defineProperty(URL, 'createObjectURL', {
+      value: vi.fn(),
+      configurable: true,
+      writable: true,
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      value: vi.fn(),
+      configurable: true,
+      writable: true,
+    })
+    vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => `blob:${String((blob as Blob).size)}`)
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     helpCenterGet.mockResolvedValue({
       config: helpCenterConfig(),
       key_prompt_dismissed: false,
@@ -173,5 +212,47 @@ describe('HelpCenterView image preview', () => {
     await attachment.trigger('click')
 
     expect(apiGet).toHaveBeenCalledWith('/help-center/attachments/codex-config.zip', { responseType: 'blob' })
+  })
+
+  it('shows each uploaded image as soon as that image request finishes', async () => {
+    helpCenterGet.mockResolvedValue({
+      config: helpCenterConfigWithUploadedImages(),
+      key_prompt_dismissed: false,
+      help_center_key_prompt_dismissed: false,
+    })
+
+    let resolveFirst!: (value: { data: Blob }) => void
+    let resolveSecond!: (value: { data: Blob }) => void
+    apiGet.mockImplementation((url: string) => {
+      if (url.endsWith('first.png')) {
+        return new Promise((resolve) => {
+          resolveFirst = resolve
+        })
+      }
+      if (url.endsWith('second.png')) {
+        return new Promise((resolve) => {
+          resolveSecond = resolve
+        })
+      }
+      return Promise.resolve({ data: new Blob(['attachment']) })
+    })
+
+    const wrapper = mountHelpCenter()
+    await flushPromises()
+
+    expect(wrapper.findAll('img')).toHaveLength(0)
+
+    resolveFirst({ data: new Blob(['first']) })
+    await flushPromises()
+
+    expect(wrapper.findAll('img')).toHaveLength(1)
+    expect(wrapper.find('img').attributes('src')).toBe('blob:5')
+
+    resolveSecond({ data: new Blob(['second-image']) })
+    await flushPromises()
+
+    const images = wrapper.findAll('img')
+    expect(images).toHaveLength(2)
+    expect(images[1].attributes('src')).toBe('blob:12')
   })
 })
