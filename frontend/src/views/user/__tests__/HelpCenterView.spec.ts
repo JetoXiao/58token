@@ -10,16 +10,6 @@ const { helpCenterGet, apiGet, showError } = vi.hoisted(() => ({
   showError: vi.fn(),
 }))
 
-class MockAbortController {
-  signal = { aborted: false }
-
-  abort() {
-    this.signal.aborted = true
-  }
-}
-
-vi.stubGlobal('AbortController', MockAbortController)
-
 vi.mock('@/api', () => ({
   helpCenterAPI: {
     get: helpCenterGet,
@@ -214,45 +204,22 @@ describe('HelpCenterView image preview', () => {
     expect(apiGet).toHaveBeenCalledWith('/help-center/attachments/codex-config.zip', { responseType: 'blob' })
   })
 
-  it('shows each uploaded image as soon as that image request finishes', async () => {
+  it('renders uploaded images with native browser urls instead of blob downloads', async () => {
     helpCenterGet.mockResolvedValue({
       config: helpCenterConfigWithUploadedImages(),
       key_prompt_dismissed: false,
       help_center_key_prompt_dismissed: false,
     })
 
-    let resolveFirst!: (value: { data: Blob }) => void
-    let resolveSecond!: (value: { data: Blob }) => void
-    apiGet.mockImplementation((url: string) => {
-      if (url.endsWith('first.png')) {
-        return new Promise((resolve) => {
-          resolveFirst = resolve
-        })
-      }
-      if (url.endsWith('second.png')) {
-        return new Promise((resolve) => {
-          resolveSecond = resolve
-        })
-      }
-      return Promise.resolve({ data: new Blob(['attachment']) })
-    })
-
     const wrapper = mountHelpCenter()
-    await flushPromises()
-
-    expect(wrapper.findAll('img')).toHaveLength(0)
-
-    resolveFirst({ data: new Blob(['first']) })
-    await flushPromises()
-
-    expect(wrapper.findAll('img')).toHaveLength(1)
-    expect(wrapper.find('img').attributes('src')).toBe('blob:5')
-
-    resolveSecond({ data: new Blob(['second-image']) })
     await flushPromises()
 
     const images = wrapper.findAll('img')
     expect(images).toHaveLength(2)
-    expect(images[1].attributes('src')).toBe('blob:12')
+    expect(images[0].attributes('src')).toBe('/api/v1/help-center/attachments/first.png')
+    expect(images[0].attributes('loading')).toBe('lazy')
+    expect(images[0].attributes('decoding')).toBe('async')
+    expect(images[1].attributes('src')).toBe('/api/v1/help-center/attachments/second.png')
+    expect(apiGet).not.toHaveBeenCalled()
   })
 })

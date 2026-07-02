@@ -1,10 +1,13 @@
 package handler
 
 import (
+	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -79,12 +82,16 @@ func (h *HelpCenterHandler) DismissKeyCreatedPrompt(c *gin.Context) {
 
 func (h *HelpCenterHandler) DownloadAttachment(c *gin.Context) {
 	filename := strings.TrimPrefix(c.Param("filename"), "/")
+	if !h.isPublishedAttachment(c, filename) {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
 	if h.attachmentsDir != "" {
 		path, ok := resolveHelpCenterAttachmentPath(h.attachmentsDir, filename)
 		if ok {
 			info, err := os.Stat(path)
 			if err == nil && !info.IsDir() {
-				c.File(path)
+				serveHelpCenterAttachmentFile(c, path)
 				return
 			}
 		}
@@ -92,7 +99,7 @@ func (h *HelpCenterHandler) DownloadAttachment(c *gin.Context) {
 	if h.bundledDir != "" && serveBundledHelpCenterAttachment(c, h.bundledDir, filename) {
 		return
 	}
-	c.Status(http.StatusNotFound)
+	c.AbortWithStatus(http.StatusNotFound)
 }
 
 func serveBundledHelpCenterAttachment(c *gin.Context, bundledDir, filename string) bool {
@@ -104,8 +111,100 @@ func serveBundledHelpCenterAttachment(c *gin.Context, bundledDir, filename strin
 	if err != nil || info.IsDir() {
 		return false
 	}
-	c.File(path)
+	serveHelpCenterAttachmentFile(c, path)
 	return true
+}
+
+func (h *HelpCenterHandler) isPublishedAttachment(c *gin.Context, filename string) bool {
+	if h == nil || h.helpCenterService == nil {
+		return false
+	}
+	relPath, ok := cleanHelpCenterAttachmentRelativePath(filename)
+	if !ok {
+		return false
+	}
+	cfg, err := h.helpCenterService.GetPublished(c.Request.Context())
+	if err != nil || !cfg.Enabled {
+		return false
+	}
+	return helpCenterConfigReferencesAttachment(cfg, filepath.ToSlash(relPath))
+}
+
+func serveHelpCenterAttachmentFile(c *gin.Context, path string) {
+	setHelpCenterAttachmentHeaders(c, filepath.Base(path))
+	c.File(path)
+}
+
+func setHelpCenterAttachmentHeaders(c *gin.Context, filename string) {
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.Header("X-Content-Type-Options", "nosniff")
+	if !isInlineSafeHelpCenterAttachment(filename) {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", sanitizeHelpCenterDownloadFilename(filename)))
+	}
+}
+
+func isInlineSafeHelpCenterAttachment(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif":
+		return true
+	}
+	contentType := mime.TypeByExtension(ext)
+	return strings.HasPrefix(contentType, "image/") && ext != ".svg"
+}
+
+func sanitizeHelpCenterDownloadFilename(filename string) string {
+	name := filepath.Base(filename)
+	name = strings.ReplaceAll(name, `"`, "")
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	if name == "." || name == string(filepath.Separator) || strings.TrimSpace(name) == "" {
+		return "attachment"
+	}
+	return name
+}
+
+func helpCenterConfigReferencesAttachment(cfg service.HelpCenterConfig, relPath string) bool {
+	if relPath == "" {
+		return false
+	}
+	for _, tutorial := range cfg.Tutorials {
+		if !tutorial.Enabled {
+			continue
+		}
+		for _, step := range tutorial.Steps {
+			if helpCenterAttachmentListReferences(step.Images, relPath) || helpCenterAttachmentListReferences(step.Attachments, relPath) {
+				return true
+			}
+		}
+		if helpCenterAttachmentListReferences(tutorial.Attachments, relPath) {
+			return true
+		}
+	}
+	return false
+}
+
+func helpCenterAttachmentListReferences(items []service.HelpCenterAttachment, relPath string) bool {
+	return slices.ContainsFunc(items, func(item service.HelpCenterAttachment) bool {
+		itemRelPath, ok := helpCenterAttachmentRelativePathFromURL(item.URL)
+		return ok && itemRelPath == relPath
+	})
+}
+
+func helpCenterAttachmentRelativePathFromURL(rawURL string) (string, bool) {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return "", false
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "", false
+	}
+	path := parsed.Path
+	if !strings.HasPrefix(path, "/api/v1/help-center/attachments/") {
+		return "", false
+	}
+	return cleanHelpCenterAttachmentRelativePath(strings.TrimPrefix(path, "/api/v1/help-center/attachments/"))
 }
 
 func resolveHelpCenterAttachmentPath(attachmentsDir, filename string) (string, bool) {

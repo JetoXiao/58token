@@ -15,6 +15,11 @@ func RegisterUserRoutes(
 	jwtAuth middleware.JWTAuthMiddleware,
 	settingService *service.SettingService,
 ) {
+	publicHelpCenter := v1.Group("/help-center")
+	{
+		publicHelpCenter.GET("/attachments/*filename", h.HelpCenter.DownloadAttachment)
+	}
+
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -73,7 +78,6 @@ func RegisterUserRoutes(
 		helpCenter := authenticated.Group("/help-center")
 		{
 			helpCenter.GET("", h.HelpCenter.Get)
-			helpCenter.GET("/attachments/*filename", h.HelpCenter.DownloadAttachment)
 			helpCenter.POST("/key-created-prompt/dismiss", h.HelpCenter.DismissKeyCreatedPrompt)
 			helpCenter.POST("/key-prompt/dismiss", h.HelpCenter.DismissKeyCreatedPrompt)
 		}

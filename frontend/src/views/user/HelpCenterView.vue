@@ -125,6 +125,7 @@
                             :alt="image.label"
                             class="aspect-video w-full bg-gray-100 object-contain dark:bg-dark-900"
                             loading="lazy"
+                            decoding="async"
                           />
                           <div v-else class="flex aspect-video w-full items-center justify-center bg-gray-100 text-sm text-gray-500 dark:bg-dark-900 dark:text-gray-400">
                             {{ t('common.loading') }}
@@ -372,7 +373,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
@@ -382,7 +383,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
-import { getHelpCenterAttachmentAPIPath, isUploadedHelpCenterAttachment } from '@/utils/helpCenterAttachments'
+import { getHelpCenterAttachmentAPIPath } from '@/utils/helpCenterAttachments'
 import type { HelpCenterAttachment, HelpCenterConfig } from '@/types'
 
 const { t } = useI18n()
@@ -394,12 +395,9 @@ const config = ref<HelpCenterConfig | null>(null)
 const selectedTutorialId = ref('')
 const faqQuery = ref('')
 const downloadingAttachment = ref('')
-const stepImageURLs = ref<Record<string, string>>({})
 const previewImage = ref<(HelpCenterAttachment & { src: string }) | null>(null)
 const previewFitMode = ref<'fit' | 'actual'>('fit')
 const previewNaturalWidth = ref(0)
-let imageURLGeneration = 0
-let imageLoadAbortController: AbortController | null = null
 
 marked.setOptions({
   breaks: true,
@@ -443,10 +441,6 @@ watch(tutorials, (items) => {
   }
 })
 
-watch(selectedTutorial, (tutorial) => {
-  loadStepImages(tutorial?.steps || [])
-}, { immediate: true })
-
 function renderMarkdown(content: string): string {
   const html = marked.parse(content || '') as string
   return DOMPurify.sanitize(html, {
@@ -458,33 +452,8 @@ function isExternalUrl(url: string): boolean {
   return /^https?:\/\//i.test(url)
 }
 
-function stepImageKey(image: HelpCenterAttachment): string {
-  return image.url || `${image.file_name}-${image.label}`
-}
-
 function stepImageSrc(image: HelpCenterAttachment): string {
-  if (!image.url) return ''
-  if (stepImageURLs.value[stepImageKey(image)]) return stepImageURLs.value[stepImageKey(image)]
-  if (!isUploadedHelpCenterAttachment(image.url)) return image.url
-  return ''
-}
-
-function clearStepImageURLs(): void {
-  Object.values(stepImageURLs.value).forEach((url) => {
-    if (url.startsWith('blob:')) URL.revokeObjectURL(url)
-  })
-  stepImageURLs.value = {}
-}
-
-function setStepImageURL(key: string, url: string): void {
-  const previous = stepImageURLs.value[key]
-  if (previous && previous.startsWith('blob:') && previous !== url) {
-    URL.revokeObjectURL(previous)
-  }
-  stepImageURLs.value = {
-    ...stepImageURLs.value,
-    [key]: url,
-  }
+  return image.url || ''
 }
 
 async function copyCode(content: string): Promise<void> {
@@ -535,48 +504,6 @@ async function downloadAttachment(attachment: HelpCenterAttachment): Promise<voi
   }
 }
 
-async function loadStepImages(steps: Array<{ images?: HelpCenterAttachment[] }>): Promise<void> {
-  const generation = ++imageURLGeneration
-  imageLoadAbortController?.abort()
-  const abortController = new AbortController()
-  imageLoadAbortController = abortController
-  clearStepImageURLs()
-  const uploadedImages = steps
-    .flatMap((step) => step.images || [])
-    .filter((image) => image.url && isUploadedHelpCenterAttachment(image.url))
-
-  if (!uploadedImages.length) return
-
-  const uniqueImages = Array.from(
-    new Map(uploadedImages.map((image) => [stepImageKey(image), image])).values(),
-  )
-
-  await Promise.all(uniqueImages.map(async (image) => {
-    const apiPath = getHelpCenterAttachmentAPIPath(image.url)
-    if (!apiPath) return
-    const key = stepImageKey(image)
-    try {
-      const response = await apiClient.get<Blob>(apiPath, {
-        responseType: 'blob',
-        signal: abortController.signal,
-      })
-      const objectURL = URL.createObjectURL(response.data)
-      if (generation !== imageURLGeneration || abortController.signal.aborted) {
-        URL.revokeObjectURL(objectURL)
-        return
-      }
-      setStepImageURL(key, objectURL)
-    } catch (error) {
-      if (generation !== imageURLGeneration || abortController.signal.aborted) return
-      setStepImageURL(key, '')
-    }
-  }))
-
-  if (imageLoadAbortController === abortController) {
-    imageLoadAbortController = null
-  }
-}
-
 async function loadHelpCenter(): Promise<void> {
   loading.value = true
   try {
@@ -591,13 +518,6 @@ async function loadHelpCenter(): Promise<void> {
 
 onMounted(() => {
   loadHelpCenter()
-})
-
-onUnmounted(() => {
-  imageURLGeneration += 1
-  imageLoadAbortController?.abort()
-  imageLoadAbortController = null
-  clearStepImageURLs()
 })
 </script>
 
