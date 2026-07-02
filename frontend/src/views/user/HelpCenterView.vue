@@ -383,7 +383,10 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
-import { getHelpCenterAttachmentAPIPath } from '@/utils/helpCenterAttachments'
+import {
+  getHelpCenterAttachmentAPIPath,
+  getHelpCenterAttachmentBrowserURL,
+} from '@/utils/helpCenterAttachments'
 import type { HelpCenterAttachment, HelpCenterConfig } from '@/types'
 
 const { t } = useI18n()
@@ -453,7 +456,7 @@ function isExternalUrl(url: string): boolean {
 }
 
 function stepImageSrc(image: HelpCenterAttachment): string {
-  return image.url || ''
+  return getHelpCenterAttachmentBrowserURL(image.url || '')
 }
 
 async function copyCode(content: string): Promise<void> {

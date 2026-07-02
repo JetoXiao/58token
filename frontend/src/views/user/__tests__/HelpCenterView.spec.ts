@@ -117,7 +117,7 @@ function helpCenterConfigWithUploadedImages(): HelpCenterConfig {
     },
     {
       label: 'second',
-      url: '/api/v1/help-center/attachments/second.png',
+      url: 'http://127.0.0.1:8080/api/v1/help-center/attachments/second.png',
       file_name: 'second.png',
     },
   ]

@@ -22,3 +22,13 @@ export function getHelpCenterAttachmentAPIPath(url: string): string | null {
     return null
   }
 }
+
+export function getHelpCenterAttachmentBrowserURL(url: string): string {
+  if (!isUploadedHelpCenterAttachment(url)) return url
+  try {
+    const parsed = new URL(url, window.location.origin)
+    return `${parsed.pathname}${parsed.search}`
+  } catch {
+    return url.startsWith(UPLOADED_ATTACHMENT_PREFIX) ? url : ''
+  }
+}

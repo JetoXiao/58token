@@ -48,6 +48,63 @@ func (s *settingPublicRepoStub) Delete(ctx context.Context, key string) error {
 	panic("unexpected Delete call")
 }
 
+type settingAdminReadRepoStub struct {
+	values          map[string]string
+	getMultipleKeys []string
+}
+
+func (s *settingAdminReadRepoStub) Get(ctx context.Context, key string) (*Setting, error) {
+	panic("unexpected Get call")
+}
+
+func (s *settingAdminReadRepoStub) GetValue(ctx context.Context, key string) (string, error) {
+	panic("unexpected GetValue call")
+}
+
+func (s *settingAdminReadRepoStub) Set(ctx context.Context, key, value string) error {
+	panic("unexpected Set call")
+}
+
+func (s *settingAdminReadRepoStub) GetMultiple(ctx context.Context, keys []string) (map[string]string, error) {
+	s.getMultipleKeys = append([]string(nil), keys...)
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if value, ok := s.values[key]; ok {
+			out[key] = value
+		}
+	}
+	return out, nil
+}
+
+func (s *settingAdminReadRepoStub) SetMultiple(ctx context.Context, settings map[string]string) error {
+	panic("unexpected SetMultiple call")
+}
+
+func (s *settingAdminReadRepoStub) GetAll(ctx context.Context) (map[string]string, error) {
+	panic("GetAll should not be used when reading admin settings")
+}
+
+func (s *settingAdminReadRepoStub) Delete(ctx context.Context, key string) error {
+	panic("unexpected Delete call")
+}
+
+func TestSettingService_GetAllSettings_DoesNotReadHelpCenterConfigs(t *testing.T) {
+	repo := &settingAdminReadRepoStub{
+		values: map[string]string{
+			SettingKeyRegistrationEnabled: "true",
+		},
+	}
+	svc := NewSettingService(repo, &config.Config{})
+
+	settings, err := svc.GetAllSettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, settings.RegistrationEnabled)
+	require.Contains(t, repo.getMultipleKeys, SettingKeyDingTalkConnectSyncCorpEmailAttrName)
+	require.Contains(t, repo.getMultipleKeys, SettingKeyForceEmailOnThirdPartySignup)
+	require.NotContains(t, repo.getMultipleKeys, SettingKeyHelpCenterDraftConfig)
+	require.NotContains(t, repo.getMultipleKeys, SettingKeyHelpCenterPublishedConfig)
+}
+
 func TestSettingService_GetPublicSettings_ExposesRegistrationEmailSuffixWhitelist(t *testing.T) {
 	repo := &settingPublicRepoStub{
 		values: map[string]string{
