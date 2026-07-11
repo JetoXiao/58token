@@ -54,6 +54,9 @@ func (s *GatewayService) ForwardAsChatCompletions(
 	if err != nil {
 		return nil, fmt.Errorf("convert responses to anthropic: %w", err)
 	}
+	if maxTokens, ok := requestedChatCompletionsMaxTokens(&ccReq); ok {
+		anthropicReq.MaxTokens = maxTokens
+	}
 
 	// 3. Force upstream streaming
 	anthropicReq.Stream = true

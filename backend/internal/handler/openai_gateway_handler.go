@@ -40,6 +40,12 @@ type OpenAIGatewayHandler struct {
 	cfg                      *config.Config
 }
 
+const (
+	openAIUsageRecordMaxAttempts    = 3
+	openAIUsageRecordAttemptTimeout = 15 * time.Second
+	openAIUsageRecordRetryDelay     = 250 * time.Millisecond
+)
+
 func resolveOpenAIMessagesDispatchMappedModel(apiKey *service.APIKey, requestedModel string) string {
 	if apiKey == nil || apiKey.Group == nil {
 		return ""
@@ -392,6 +398,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						return
 					}
 					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+					h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
 					// 池模式：同账号重试
 					if failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -467,30 +474,32 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 
 		// 使用量记录通过有界 worker 池提交，避免请求热路径创建无界 goroutine。
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
-				Result:             result,
-				APIKey:             apiKey,
-				User:               apiKey.User,
-				Account:            account,
-				Subscription:       subscription,
-				InboundEndpoint:    inboundEndpoint,
-				UpstreamEndpoint:   upstreamEndpoint,
-				UserAgent:          userAgent,
-				IPAddress:          clientIP,
-				RequestPayloadHash: requestPayloadHash,
-				RequestParams:      requestParams,
-				APIKeyService:      h.apiKeyService,
-				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
-			}); err != nil {
-				logger.L().With(
+			recordOpenAIUsageWithRetry(ctx, logger.L(), "openai.record_usage_failed",
+				[]zap.Field{
 					zap.String("component", "handler.openai_gateway.responses"),
 					zap.Int64("user_id", subject.UserID),
 					zap.Int64("api_key_id", apiKey.ID),
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
-				).Error("openai.record_usage_failed", zap.Error(err))
-			}
+				},
+				func(attemptCtx context.Context) error {
+					return h.gatewayService.RecordUsage(attemptCtx, &service.OpenAIRecordUsageInput{
+						Result:             result,
+						APIKey:             apiKey,
+						User:               apiKey.User,
+						Account:            account,
+						Subscription:       subscription,
+						InboundEndpoint:    inboundEndpoint,
+						UpstreamEndpoint:   upstreamEndpoint,
+						UserAgent:          userAgent,
+						IPAddress:          clientIP,
+						RequestPayloadHash: requestPayloadHash,
+						RequestParams:      requestParams,
+						APIKeyService:      h.apiKeyService,
+						ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+					})
+				})
 		})
 		reqLog.Debug("openai.request_completed",
 			zap.Int64("account_id", account.ID),
@@ -812,6 +821,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+					h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
 					// 池模式：同账号重试
 					if failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -877,30 +887,32 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
-				Result:             result,
-				APIKey:             apiKey,
-				User:               apiKey.User,
-				Account:            account,
-				Subscription:       subscription,
-				InboundEndpoint:    inboundEndpoint,
-				UpstreamEndpoint:   upstreamEndpoint,
-				UserAgent:          userAgent,
-				IPAddress:          clientIP,
-				RequestPayloadHash: requestPayloadHash,
-				RequestParams:      requestParams,
-				APIKeyService:      h.apiKeyService,
-				ChannelUsageFields: channelMappingMsg.ToUsageFields(reqModel, result.UpstreamModel),
-			}); err != nil {
-				logger.L().With(
+			recordOpenAIUsageWithRetry(ctx, logger.L(), "openai_messages.record_usage_failed",
+				[]zap.Field{
 					zap.String("component", "handler.openai_gateway.messages"),
 					zap.Int64("user_id", subject.UserID),
 					zap.Int64("api_key_id", apiKey.ID),
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
-				).Error("openai_messages.record_usage_failed", zap.Error(err))
-			}
+				},
+				func(attemptCtx context.Context) error {
+					return h.gatewayService.RecordUsage(attemptCtx, &service.OpenAIRecordUsageInput{
+						Result:             result,
+						APIKey:             apiKey,
+						User:               apiKey.User,
+						Account:            account,
+						Subscription:       subscription,
+						InboundEndpoint:    inboundEndpoint,
+						UpstreamEndpoint:   upstreamEndpoint,
+						UserAgent:          userAgent,
+						IPAddress:          clientIP,
+						RequestPayloadHash: requestPayloadHash,
+						RequestParams:      requestParams,
+						APIKeyService:      h.apiKeyService,
+						ChannelUsageFields: channelMappingMsg.ToUsageFields(reqModel, result.UpstreamModel),
+					})
+				})
 		})
 		reqLog.Debug("openai_messages.request_completed",
 			zap.Int64("account_id", account.ID),
@@ -1445,27 +1457,28 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 			upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
 			requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 			h.submitOpenAIUsageRecordTask(result, func(taskCtx context.Context) {
-				if err := h.gatewayService.RecordUsage(taskCtx, &service.OpenAIRecordUsageInput{
-					Result:             result,
-					APIKey:             apiKey,
-					User:               apiKey.User,
-					Account:            account,
-					Subscription:       subscription,
-					InboundEndpoint:    inboundEndpoint,
-					UpstreamEndpoint:   upstreamEndpoint,
-					UserAgent:          userAgent,
-					IPAddress:          clientIP,
-					RequestPayloadHash: service.HashUsageRequestPayload(firstMessage),
-					RequestParams:      requestParams,
-					APIKeyService:      h.apiKeyService,
-					ChannelUsageFields: channelMappingWS.ToUsageFields(reqModel, result.UpstreamModel),
-				}); err != nil {
-					reqLog.Error("openai.websocket_record_usage_failed",
+				recordOpenAIUsageWithRetry(taskCtx, reqLog, "openai.websocket_record_usage_failed",
+					[]zap.Field{
 						zap.Int64("account_id", account.ID),
 						zap.String("request_id", result.RequestID),
-						zap.Error(err),
-					)
-				}
+					},
+					func(attemptCtx context.Context) error {
+						return h.gatewayService.RecordUsage(attemptCtx, &service.OpenAIRecordUsageInput{
+							Result:             result,
+							APIKey:             apiKey,
+							User:               apiKey.User,
+							Account:            account,
+							Subscription:       subscription,
+							InboundEndpoint:    inboundEndpoint,
+							UpstreamEndpoint:   upstreamEndpoint,
+							UserAgent:          userAgent,
+							IPAddress:          clientIP,
+							RequestPayloadHash: service.HashUsageRequestPayload(firstMessage),
+							RequestParams:      requestParams,
+							APIKeyService:      h.apiKeyService,
+							ChannelUsageFields: channelMappingWS.ToUsageFields(reqModel, result.UpstreamModel),
+						})
+					})
 			})
 		},
 	}
@@ -1597,6 +1610,88 @@ func getContextInt64(c *gin.Context, key string) (int64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func recordOpenAIUsageWithRetry(ctx context.Context, log *zap.Logger, failureMessage string, fields []zap.Field, record func(context.Context) error) {
+	if record == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if log == nil {
+		log = logger.L()
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= openAIUsageRecordMaxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			lastErr = err
+			break
+		}
+
+		attemptCtx, cancel := context.WithTimeout(ctx, openAIUsageRecordAttemptTimeout)
+		err := record(attemptCtx)
+		cancel()
+		if err == nil {
+			if attempt > 1 {
+				log.With(appendUsageRecordLogFields(fields,
+					zap.Int("attempt", attempt),
+					zap.Int("max_attempts", openAIUsageRecordMaxAttempts),
+				)...).Info("openai.record_usage_retry_succeeded")
+			}
+			return
+		}
+
+		lastErr = err
+		if attempt == openAIUsageRecordMaxAttempts || !isRetryableUsageRecordError(err) {
+			break
+		}
+
+		log.With(appendUsageRecordLogFields(fields,
+			zap.Int("attempt", attempt),
+			zap.Int("max_attempts", openAIUsageRecordMaxAttempts),
+			zap.Error(err),
+		)...).Warn("openai.record_usage_retrying")
+
+		timer := time.NewTimer(openAIUsageRecordRetryDelay * time.Duration(attempt))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			lastErr = ctx.Err()
+			attempt = openAIUsageRecordMaxAttempts
+		case <-timer.C:
+		}
+	}
+
+	log.With(appendUsageRecordLogFields(fields,
+		zap.Int("max_attempts", openAIUsageRecordMaxAttempts),
+		zap.Error(lastErr),
+	)...).Error(failureMessage)
+}
+
+func appendUsageRecordLogFields(fields []zap.Field, extra ...zap.Field) []zap.Field {
+	out := make([]zap.Field, 0, len(fields)+len(extra))
+	out = append(out, fields...)
+	out = append(out, extra...)
+	return out
+}
+
+func isRetryableUsageRecordError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "deadline exceeded") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "too many connections") ||
+		strings.Contains(msg, "deadlock detected") ||
+		strings.Contains(msg, "could not serialize access")
 }
 
 func (h *OpenAIGatewayHandler) submitUsageRecordTask(task service.UsageRecordTask) {

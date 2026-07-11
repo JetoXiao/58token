@@ -132,6 +132,9 @@ func (f fakeGoogleSubscriptionRepo) Delete(ctx context.Context, id int64) error 
 func (f fakeGoogleSubscriptionRepo) ListByUserID(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
 	return nil, errors.New("not implemented")
 }
+func (f fakeGoogleSubscriptionRepo) ListVisibleByUserID(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
+	return nil, errors.New("not implemented")
+}
 func (f fakeGoogleSubscriptionRepo) ListActiveByUserID(ctx context.Context, userID int64) ([]service.UserSubscription, error) {
 	return nil, errors.New("not implemented")
 }

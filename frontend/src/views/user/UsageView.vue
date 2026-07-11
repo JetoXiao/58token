@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout class="usage-page-layout">
       <template #actions>
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Total Requests -->
@@ -996,3 +996,23 @@ onMounted(() => {
   loadUsageStats()
 })
 </script>
+
+<style scoped>
+.usage-page-layout.table-page-layout {
+  height: auto;
+  min-height: calc(100vh - 64px - 4rem);
+}
+
+.usage-page-layout :deep(.layout-section-scrollable),
+.usage-page-layout :deep(.table-scroll-container) {
+  min-height: clamp(680px, 72vh, 900px);
+}
+
+@media (max-width: 1023px) {
+  .usage-page-layout.table-page-layout,
+  .usage-page-layout :deep(.layout-section-scrollable),
+  .usage-page-layout :deep(.table-scroll-container) {
+    min-height: 0;
+  }
+}
+</style>

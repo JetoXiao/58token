@@ -331,6 +331,20 @@ func TestChatCompletionsToResponses_ServiceTier(t *testing.T) {
 	assert.Equal(t, "flex", resp.ServiceTier)
 }
 
+func TestChatCompletionsToResponses_PreservesParallelToolCallsFalse(t *testing.T) {
+	parallel := false
+	req := &ChatCompletionsRequest{
+		Model:             "gpt-4o",
+		Messages:          []ChatMessage{{Role: "user", Content: json.RawMessage(`"Hi"`)}},
+		ParallelToolCalls: &parallel,
+	}
+
+	resp, err := ChatCompletionsToResponses(req)
+	require.NoError(t, err)
+	require.NotNil(t, resp.ParallelToolCalls)
+	assert.False(t, *resp.ParallelToolCalls)
+}
+
 // ---------------------------------------------------------------------------
 // temperature / top_p stripping for reasoning models
 // ---------------------------------------------------------------------------

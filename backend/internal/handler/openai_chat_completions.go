@@ -235,6 +235,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						return
 					}
 					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+					h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
 					// Pool mode: retry on the same account
 					if failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -299,29 +300,31 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		requestParams := getOpsRequestParamsWithTTFTObservation(c, account, result)
 
 		h.submitOpenAIUsageRecordTask(result, func(ctx context.Context) {
-			if err := h.gatewayService.RecordUsage(ctx, &service.OpenAIRecordUsageInput{
-				Result:             result,
-				APIKey:             apiKey,
-				User:               apiKey.User,
-				Account:            account,
-				Subscription:       subscription,
-				InboundEndpoint:    inboundEndpoint,
-				UpstreamEndpoint:   upstreamEndpoint,
-				UserAgent:          userAgent,
-				IPAddress:          clientIP,
-				RequestParams:      requestParams,
-				APIKeyService:      h.apiKeyService,
-				ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
-			}); err != nil {
-				logger.L().With(
+			recordOpenAIUsageWithRetry(ctx, logger.L(), "openai_chat_completions.record_usage_failed",
+				[]zap.Field{
 					zap.String("component", "handler.openai_gateway.chat_completions"),
 					zap.Int64("user_id", subject.UserID),
 					zap.Int64("api_key_id", apiKey.ID),
 					zap.Any("group_id", apiKey.GroupID),
 					zap.String("model", reqModel),
 					zap.Int64("account_id", account.ID),
-				).Error("openai_chat_completions.record_usage_failed", zap.Error(err))
-			}
+				},
+				func(attemptCtx context.Context) error {
+					return h.gatewayService.RecordUsage(attemptCtx, &service.OpenAIRecordUsageInput{
+						Result:             result,
+						APIKey:             apiKey,
+						User:               apiKey.User,
+						Account:            account,
+						Subscription:       subscription,
+						InboundEndpoint:    inboundEndpoint,
+						UpstreamEndpoint:   upstreamEndpoint,
+						UserAgent:          userAgent,
+						IPAddress:          clientIP,
+						RequestParams:      requestParams,
+						APIKeyService:      h.apiKeyService,
+						ChannelUsageFields: channelMapping.ToUsageFields(reqModel, result.UpstreamModel),
+					})
+				})
 		})
 		reqLog.Debug("openai_chat_completions.request_completed",
 			zap.Int64("account_id", account.ID),

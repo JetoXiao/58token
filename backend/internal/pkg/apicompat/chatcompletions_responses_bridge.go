@@ -28,6 +28,7 @@ func ResponsesToChatCompletionsRequest(req *ResponsesRequest) (*ChatCompletionsR
 		TopP:                req.TopP,
 		Stream:              req.Stream,
 		ServiceTier:         req.ServiceTier,
+		ParallelToolCalls:   req.ParallelToolCalls,
 	}
 	if req.Reasoning != nil {
 		out.ReasoningEffort = req.Reasoning.Effort
@@ -430,9 +431,22 @@ func ChatUsageToResponsesUsage(usage *ChatUsage) *ResponsesUsage {
 	if out.TotalTokens == 0 {
 		out.TotalTokens = out.InputTokens + out.OutputTokens
 	}
-	if usage.PromptTokensDetails != nil && usage.PromptTokensDetails.CachedTokens > 0 {
-		out.InputTokensDetails = &ResponsesInputTokensDetails{
-			CachedTokens: usage.PromptTokensDetails.CachedTokens,
+	if usage.PromptTokensDetails != nil {
+		details := usage.PromptTokensDetails
+		cacheCreationTokens := details.CacheWriteTokens
+		if cacheCreationTokens == 0 {
+			cacheCreationTokens = details.CacheCreationTokens
+		}
+		if cacheCreationTokens > 0 {
+			out.CacheCreationInputTokens = cacheCreationTokens
+		}
+		if details.CachedTokens > 0 || details.AudioTokens > 0 || details.CacheCreationTokens > 0 || details.CacheWriteTokens > 0 {
+			out.InputTokensDetails = &ResponsesInputTokensDetails{
+				CachedTokens:        details.CachedTokens,
+				AudioTokens:         details.AudioTokens,
+				CacheCreationTokens: details.CacheCreationTokens,
+				CacheWriteTokens:    details.CacheWriteTokens,
+			}
 		}
 	}
 	return out

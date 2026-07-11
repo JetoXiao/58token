@@ -2132,7 +2132,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.full_rebuild_interval_seconds", 300)
 	viper.SetDefault("gateway.usage_record.worker_count", 128)
 	viper.SetDefault("gateway.usage_record.queue_size", 16384)
-	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 5)
+	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 30)
 	viper.SetDefault("gateway.usage_record.overflow_policy", UsageRecordOverflowPolicySample)
 	viper.SetDefault("gateway.usage_record.overflow_sample_percent", 10)
 	viper.SetDefault("gateway.usage_record.auto_scale_enabled", true)

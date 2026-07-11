@@ -463,6 +463,12 @@
             </span>
           </template>
 
+          <template #cell-last_used_at="{ value }">
+            <span class="text-sm text-gray-500 dark:text-dark-400">
+              {{ value ? formatDateTime(value) : '-' }}
+            </span>
+          </template>
+
           <template #cell-actions="{ row }">
             <div class="flex items-center gap-1">
               <!-- Edit Button -->
@@ -715,6 +721,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'concurrency', label: t('admin.users.columns.concurrency'), sortable: true },
   { key: 'status', label: t('admin.users.columns.status'), sortable: true },
   { key: 'last_active_at', label: t('admin.users.columns.lastActive'), sortable: true },
+  { key: 'last_used_at', label: t('admin.users.columns.lastUsed'), sortable: true },
   { key: 'created_at', label: t('admin.users.columns.created'), sortable: true },
   { key: 'actions', label: t('admin.users.columns.actions'), sortable: false }
 ])
@@ -734,7 +741,6 @@ const DEFAULT_HIDDEN_COLUMNS = [
 ]
 const REMOVED_COLUMNS = new Set([
   'last_login_at',
-  'last_used_at',
   'usage',
   'usage_anthropic',
   'usage_openai',
@@ -751,9 +757,12 @@ const HIDDEN_COLUMNS_KEY = 'user-hidden-columns'
 // 并在 VERSION_NEW_HIDDEN_COLUMNS 中登记该版本新增的 key。
 // 这样老用户升级后这些新列会被自动隐藏一次，而不会影响他们对其它老列的偏好。
 const COLUMN_SETTINGS_VERSION_KEY = 'user-column-settings-version'
-const COLUMN_SETTINGS_VERSION = 2
+const COLUMN_SETTINGS_VERSION = 3
 const VERSION_NEW_HIDDEN_COLUMNS: Record<number, string[]> = {
   2: ['usage_anthropic', 'usage_openai', 'usage_gemini', 'usage_antigravity']
+}
+const VERSION_RESTORED_VISIBLE_COLUMNS: Record<number, string[]> = {
+  3: ['last_used_at']
 }
 
 // Load saved column settings
@@ -775,6 +784,11 @@ const loadSavedColumns = () => {
             if (REMOVED_COLUMNS.has(key) || FORCED_VISIBLE_COLUMNS.has(key)) continue
             if (!hiddenColumns.has(key)) {
               hiddenColumns.add(key)
+              mutated = true
+            }
+          }
+          for (const key of VERSION_RESTORED_VISIBLE_COLUMNS[v] ?? []) {
+            if (hiddenColumns.delete(key)) {
               mutated = true
             }
           }
@@ -848,7 +862,7 @@ const searchQuery = ref('')
 const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
   const fallback = { sort_by: 'created_at', sort_order: 'desc' as 'asc' | 'desc' }
-  const sortable = new Set(['email', 'id', 'username', 'role', 'balance', 'concurrency', 'status', 'last_active_at', 'created_at'])
+  const sortable = new Set(['email', 'id', 'username', 'role', 'balance', 'concurrency', 'status', 'last_active_at', 'last_used_at', 'created_at'])
   try {
     const raw = localStorage.getItem(USER_SORT_STORAGE_KEY)
     if (!raw) return fallback

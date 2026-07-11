@@ -51,6 +51,9 @@ func (s *GeminiMessagesCompatService) ForwardAsChatCompletions(
 	if err != nil {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
+	if maxTokens, ok := requestedChatCompletionsMaxTokens(&ccReq); ok {
+		anthropicReq.MaxTokens = maxTokens
+	}
 	anthropicReq.Stream = clientStream
 
 	claudeBody, err := json.Marshal(anthropicReq)

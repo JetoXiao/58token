@@ -428,6 +428,9 @@ func paymentOrderAllowsRegistryFallback(order *dbent.PaymentOrder) bool {
 	if strings.TrimSpace(psStringValue(order.ProviderInstanceID)) != "" {
 		return false
 	}
+	if psOrderProviderSnapshot(order) != nil {
+		return false
+	}
 	return true
 }
 

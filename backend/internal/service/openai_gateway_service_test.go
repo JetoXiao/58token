@@ -1826,6 +1826,43 @@ func TestNormalizeOpenAICompactRequestBodyPreservesCurrentCodexPayloadFields(t *
 	require.False(t, gjson.GetBytes(normalized, "prompt_cache_key").Exists())
 }
 
+func TestNormalizeOpenAICodexCompactReasoningEffortDowngradesGPT56Max(t *testing.T) {
+	body := []byte(`{"model":"gpt-5.6-sol","reasoning":{"effort":"max"}}`)
+
+	normalized, changed, err := normalizeOpenAICodexCompactReasoningEffort(body, "gpt-5.6-sol")
+
+	require.NoError(t, err)
+	require.True(t, changed)
+	require.Equal(t, "xhigh", gjson.GetBytes(normalized, "reasoning.effort").String())
+}
+
+func TestNormalizeOpenAIReasoningEffortForModelKeepsMaxOnlyForGPT56(t *testing.T) {
+	require.Equal(t, "max", normalizeOpenAIReasoningEffortForModel("max", "gpt-5.6-sol"))
+	require.Equal(t, "max", normalizeOpenAIReasoningEffortForModel(" max ", "openai/gpt-5.6-terra"))
+	require.Equal(t, "xhigh", normalizeOpenAIReasoningEffortForModel("max", "gpt-5.4"))
+
+	effort := extractOpenAIReasoningEffortFromBody([]byte(`{"reasoning":{"effort":"max"}}`), "gpt-5.6-luna")
+	require.NotNil(t, effort)
+	require.Equal(t, "max", *effort)
+}
+
+func TestOpenAIUsageFromGJSONParsesCacheWriteAliases(t *testing.T) {
+	usage, ok := openAIUsageFromGJSON(gjson.Parse(`{
+		"input_tokens": 100,
+		"output_tokens": 20,
+		"input_tokens_details": {
+			"cached_tokens": 30,
+			"cache_write_tokens": 12
+		}
+	}`))
+
+	require.True(t, ok)
+	require.Equal(t, 100, usage.InputTokens)
+	require.Equal(t, 20, usage.OutputTokens)
+	require.Equal(t, 30, usage.CacheReadInputTokens)
+	require.Equal(t, 12, usage.CacheCreationInputTokens)
+}
+
 func TestOpenAIBuildUpstreamRequestOpenAIPassthroughPreservesCompactPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

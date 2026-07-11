@@ -87,9 +87,23 @@ func ResponsesToChatCompletions(resp *ResponsesResponse, model string) *ChatComp
 			CompletionTokens: resp.Usage.OutputTokens,
 			TotalTokens:      resp.Usage.InputTokens + resp.Usage.OutputTokens,
 		}
-		if resp.Usage.InputTokensDetails != nil && resp.Usage.InputTokensDetails.CachedTokens > 0 {
+		if resp.Usage.InputTokensDetails != nil {
+			details := resp.Usage.InputTokensDetails
+			if details.CachedTokens > 0 || details.AudioTokens > 0 || details.CacheCreationTokens > 0 || details.CacheWriteTokens > 0 || resp.Usage.CacheCreationInputTokens > 0 {
+				cacheWriteTokens := details.CacheWriteTokens
+				if cacheWriteTokens == 0 {
+					cacheWriteTokens = resp.Usage.CacheCreationInputTokens
+				}
+				usage.PromptTokensDetails = &ChatTokenDetails{
+					CachedTokens:        details.CachedTokens,
+					AudioTokens:         details.AudioTokens,
+					CacheCreationTokens: details.CacheCreationTokens,
+					CacheWriteTokens:    cacheWriteTokens,
+				}
+			}
+		} else if resp.Usage.CacheCreationInputTokens > 0 {
 			usage.PromptTokensDetails = &ChatTokenDetails{
-				CachedTokens: resp.Usage.InputTokensDetails.CachedTokens,
+				CacheWriteTokens: resp.Usage.CacheCreationInputTokens,
 			}
 		}
 		out.Usage = usage
@@ -301,9 +315,23 @@ func resToChatHandleCompleted(evt *ResponsesStreamEvent, state *ResponsesEventTo
 				CompletionTokens: u.OutputTokens,
 				TotalTokens:      u.InputTokens + u.OutputTokens,
 			}
-			if u.InputTokensDetails != nil && u.InputTokensDetails.CachedTokens > 0 {
+			if u.InputTokensDetails != nil {
+				details := u.InputTokensDetails
+				if details.CachedTokens > 0 || details.AudioTokens > 0 || details.CacheCreationTokens > 0 || details.CacheWriteTokens > 0 || u.CacheCreationInputTokens > 0 {
+					cacheWriteTokens := details.CacheWriteTokens
+					if cacheWriteTokens == 0 {
+						cacheWriteTokens = u.CacheCreationInputTokens
+					}
+					usage.PromptTokensDetails = &ChatTokenDetails{
+						CachedTokens:        details.CachedTokens,
+						AudioTokens:         details.AudioTokens,
+						CacheCreationTokens: details.CacheCreationTokens,
+						CacheWriteTokens:    cacheWriteTokens,
+					}
+				}
+			} else if u.CacheCreationInputTokens > 0 {
 				usage.PromptTokensDetails = &ChatTokenDetails{
-					CachedTokens: u.InputTokensDetails.CachedTokens,
+					CacheWriteTokens: u.CacheCreationInputTokens,
 				}
 			}
 			state.Usage = usage

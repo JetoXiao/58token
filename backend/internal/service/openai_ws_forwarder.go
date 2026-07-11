@@ -862,6 +862,7 @@ func isOpenAIWSClientDisconnectError(err error) bool {
 		strings.Contains(message, "unexpected eof") ||
 		strings.Contains(message, "use of closed network connection") ||
 		strings.Contains(message, "connection reset by peer") ||
+		strings.Contains(message, "an existing connection was forcibly closed") ||
 		strings.Contains(message, "broken pipe") ||
 		strings.Contains(message, "an established connection was aborted")
 }

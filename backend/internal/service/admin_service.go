@@ -595,6 +595,7 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 	if err != nil {
 		return nil, 0, err
 	}
+	s.populateUsersLastUsedAt(ctx, users)
 	// 批量加载用户专属分组倍率
 	if s.userGroupRateRepo != nil && len(users) > 0 {
 		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {
@@ -618,6 +619,31 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 		}
 	}
 	return users, result.Total, nil
+}
+
+func (s *adminServiceImpl) populateUsersLastUsedAt(ctx context.Context, users []User) {
+	if s.userRepo == nil || len(users) == 0 {
+		return
+	}
+	userIDs := make([]int64, 0, len(users))
+	for i := range users {
+		if users[i].ID > 0 {
+			userIDs = append(userIDs, users[i].ID)
+		}
+	}
+	if len(userIDs) == 0 {
+		return
+	}
+	lastUsedByUserID, err := s.userRepo.GetLatestUsedAtByUserIDs(ctx, userIDs)
+	if err != nil {
+		logger.LegacyPrintf("service.admin", "failed to load users last_used_at: err=%v", err)
+		return
+	}
+	for i := range users {
+		if lastUsedAt, ok := lastUsedByUserID[users[i].ID]; ok {
+			users[i].LastUsedAt = lastUsedAt
+		}
+	}
 }
 
 func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users []User) {

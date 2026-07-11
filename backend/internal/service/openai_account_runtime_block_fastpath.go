@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -10,10 +12,22 @@ const (
 	openAIAccountStateUpdateTimeout       = 5 * time.Second
 	openAIOAuth429FallbackCooldown        = 5 * time.Second
 	openAIStopSchedulingBridgeCooldown    = 2 * time.Minute
+	openAIAccountFailureBreakerThreshold  = 3
+	openAIAccountFailureBreakerWindow     = 2 * time.Minute
+	openAIAccountFailureBreakerCooldown   = openAIStopSchedulingBridgeCooldown
 	openAIOAuth429StormWindow             = 10 * time.Second
 	openAIOAuth429StormThreshold          = 20
 	openAIOAuth429StormMaxAccountSwitches = 1
 )
+
+type openAIAccountConsecutiveFailureState struct {
+	mu             sync.Mutex
+	count          int
+	firstFailureAt time.Time
+	lastFailureAt  time.Time
+	lastStatusCode int
+	lastReason     string
+}
 
 func openAIAccountStateContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	base := context.Background()
@@ -35,10 +49,13 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 	stateCtx, cancel := openAIAccountStateContext(ctx)
 	defer cancel()
 
+	if s == nil || account == nil {
+		return false
+	}
 	if statusCode == http.StatusTooManyRequests {
 		s.markOpenAIOAuth429RateLimited(stateCtx, account, headers, responseBody)
 	}
-	if s == nil || account == nil || s.rateLimitService == nil {
+	if s.rateLimitService == nil {
 		return false
 	}
 	shouldDisable := s.rateLimitService.HandleUpstreamError(stateCtx, account, statusCode, headers, responseBody)
@@ -46,6 +63,68 @@ func (s *OpenAIGatewayService) handleOpenAIAccountUpstreamError(ctx context.Cont
 		s.BlockAccountScheduling(account, time.Time{}, "upstream_disable")
 	}
 	return shouldDisable
+}
+
+func (s *OpenAIGatewayService) RecordOpenAIAccountFailover(account *Account, failoverErr *UpstreamFailoverError) bool {
+	if s == nil || failoverErr == nil {
+		return false
+	}
+	return s.recordOpenAIAccountConsecutiveFailure(account, failoverErr.StatusCode, "failover")
+}
+
+func (s *OpenAIGatewayService) recordOpenAIAccountConsecutiveFailure(account *Account, statusCode int, reason string) bool {
+	if s == nil || !isOpenAIAccount(account) || account.ID <= 0 {
+		return false
+	}
+	if s.isOpenAIAccountRuntimeBlocked(account) {
+		return true
+	}
+
+	now := time.Now()
+	value, _ := s.openaiAccountConsecutiveFailures.LoadOrStore(account.ID, &openAIAccountConsecutiveFailureState{})
+	state, ok := value.(*openAIAccountConsecutiveFailureState)
+	if !ok || state == nil {
+		state = &openAIAccountConsecutiveFailureState{}
+		s.openaiAccountConsecutiveFailures.Store(account.ID, state)
+	}
+
+	state.mu.Lock()
+	if state.lastFailureAt.IsZero() || now.Sub(state.lastFailureAt) > openAIAccountFailureBreakerWindow {
+		state.count = 0
+		state.firstFailureAt = now
+	}
+	state.count++
+	state.lastFailureAt = now
+	state.lastStatusCode = statusCode
+	state.lastReason = reason
+	count := state.count
+	firstFailureAt := state.firstFailureAt
+	shouldBlock := count >= openAIAccountFailureBreakerThreshold
+	state.mu.Unlock()
+
+	if !shouldBlock {
+		return false
+	}
+
+	until := now.Add(openAIAccountFailureBreakerCooldown)
+	s.openaiAccountConsecutiveFailures.Delete(account.ID)
+	s.BlockAccountScheduling(account, until, "consecutive_failures")
+	slog.Warn("openai_account_consecutive_failures_blocked",
+		"account_id", account.ID,
+		"status_code", statusCode,
+		"reason", reason,
+		"count", count,
+		"first_failure_at", firstFailureAt.Format(time.RFC3339),
+		"cooldown_until", until.Format(time.RFC3339),
+	)
+	return true
+}
+
+func (s *OpenAIGatewayService) clearOpenAIAccountConsecutiveFailures(accountID int64) {
+	if s == nil || accountID <= 0 {
+		return
+	}
+	s.openaiAccountConsecutiveFailures.Delete(accountID)
 }
 
 func (s *OpenAIGatewayService) markOpenAIOAuth429RateLimited(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
@@ -110,6 +189,7 @@ func (s *OpenAIGatewayService) ClearAccountSchedulingBlock(accountID int64) {
 		return
 	}
 	s.openaiAccountRuntimeBlockUntil.Delete(accountID)
+	s.clearOpenAIAccountConsecutiveFailures(accountID)
 }
 
 func (s *OpenAIGatewayService) isOpenAIAccountRuntimeBlocked(account *Account) bool {

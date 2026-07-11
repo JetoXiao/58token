@@ -17,7 +17,7 @@ import (
 const (
 	defaultUsageRecordWorkerCount          = 128
 	defaultUsageRecordQueueSize            = 16384
-	defaultUsageRecordTaskTimeoutSeconds   = 5
+	defaultUsageRecordTaskTimeoutSeconds   = 30
 	defaultUsageRecordOverflowPolicy       = config.UsageRecordOverflowPolicySample
 	defaultUsageRecordOverflowSampleRatio  = 10
 	defaultUsageRecordAutoScaleEnabled     = true

@@ -83,6 +83,54 @@ func TestOpenAIRuntimeBlock_ClearAccountSchedulingBlock(t *testing.T) {
 	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
+func TestOpenAIConsecutiveFailureBreaker_BlocksAfterThreshold(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 48, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadGateway}
+
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+
+	require.True(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
+func TestOpenAIConsecutiveFailureBreaker_SuccessClearsFailures(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 49, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadGateway}
+
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+
+	svc.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
+
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
+func TestOpenAIConsecutiveFailureBreaker_ResetsAfterWindow(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 50, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadGateway}
+
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	value, ok := svc.openaiAccountConsecutiveFailures.Load(account.ID)
+	require.True(t, ok)
+	state, ok := value.(*openAIAccountConsecutiveFailureState)
+	require.True(t, ok)
+	state.mu.Lock()
+	state.lastFailureAt = time.Now().Add(-openAIAccountFailureBreakerWindow - time.Second)
+	state.mu.Unlock()
+
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.True(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
 func TestShouldStopOpenAIOAuth429Failover_OnlyDuringStorm(t *testing.T) {
 	svc := &OpenAIGatewayService{}
 	account := &Account{ID: 42, Platform: PlatformOpenAI, Type: AccountTypeOAuth}

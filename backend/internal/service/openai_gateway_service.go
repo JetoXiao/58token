@@ -42,7 +42,7 @@ const (
 	// OpenAI Platform API for API Key accounts (fallback)
 	openaiPlatformAPIURL   = "https://api.openai.com/v1/responses"
 	openaiStickySessionTTL = time.Hour // 粘性会话TTL
-	codexCLIUserAgent      = "codex_cli_rs/0.125.0"
+	codexCLIUserAgent      = "codex_cli_rs/0.144.1 (Ubuntu 22.4.0; x86_64) xterm-256color"
 	// codex_cli_only 拒绝时单个请求头日志长度上限（字符）
 	codexCLIOnlyHeaderValueMaxBytes = 256
 
@@ -56,7 +56,7 @@ const (
 	openAIWSRetryBackoffMaxDefault     = 2 * time.Second
 	openAIWSRetryJitterRatioDefault    = 0.2
 	openAICompactSessionSeedKey        = "openai_compact_session_seed"
-	codexCLIVersion                    = "0.125.0"
+	codexCLIVersion                    = "0.144.1"
 	// Codex 限额快照仅用于后台展示/诊断，不需要每个成功请求都立即落库。
 	openAICodexSnapshotPersistMinInterval = 30 * time.Second
 )
@@ -359,6 +359,7 @@ type OpenAIGatewayService struct {
 
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
+	openaiAccountConsecutiveFailures    sync.Map // key: int64(accountID), value: *openAIAccountConsecutiveFailureState
 	openaiOAuth429WindowStartUnixNano   atomic.Int64
 	openaiOAuth429WindowCount           atomic.Int64
 	openaiWSRetryMetrics                openAIWSRetryMetrics
@@ -2187,7 +2188,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	passthroughEnabled := account.IsOpenAIPassthroughEnabled()
 	if passthroughEnabled {
 		// 透传分支只需要轻量提取字段，避免热路径全量 Unmarshal。
-		reasoningEffort := extractOpenAIReasoningEffortFromBody(body, reqModel)
+		mappedReqModel := normalizeOpenAIModelForUpstream(account, account.GetMappedModel(reqModel))
+		reasoningEffort := extractOpenAIReasoningEffortFromBody(body, mappedReqModel, reqModel)
 		return s.forwardOpenAIPassthrough(ctx, c, account, originalBody, reqModel, reasoningEffort, reqStream, startTime)
 	}
 
@@ -2926,7 +2928,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		}
 		defer func() { _ = resp.Body.Close() }()
 
-		reasoningEffort := extractOpenAIReasoningEffort(reqBody, originalModel)
+		reasoningEffort := extractOpenAIReasoningEffort(reqBody, upstreamModel, billingModel, originalModel)
 		serviceTier := extractOpenAIServiceTier(reqBody)
 		releaseOpenAIParsedRequestBody(c)
 
@@ -3033,6 +3035,21 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 				},
 			})
 			return nil, fmt.Errorf("openai passthrough rejected before upstream: %s", rejectReason)
+		}
+
+		if isOpenAIResponsesCompactPath(c) {
+			effectiveModel := upstreamPassthroughModel
+			if effectiveModel == "" {
+				effectiveModel = strings.TrimSpace(gjson.GetBytes(body, "model").String())
+			}
+			normalizedBody, changed, normalizeErr := normalizeOpenAICodexCompactReasoningEffort(body, effectiveModel)
+			if normalizeErr != nil {
+				return nil, normalizeErr
+			}
+			if changed {
+				body = normalizedBody
+				reasoningEffort = extractOpenAIReasoningEffortFromBody(body, effectiveModel, reqModel)
+			}
 		}
 
 		normalizedBody, normalized, err := normalizeOpenAIPassthroughOAuthBody(body, isOpenAIResponsesCompactPath(c))
@@ -4945,10 +4962,8 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 	if outputTokens == 0 {
 		outputTokens = value.Get("completion_tokens").Int()
 	}
-	cacheReadTokens := value.Get("input_tokens_details.cached_tokens").Int()
-	if cacheReadTokens == 0 {
-		cacheReadTokens = value.Get("prompt_tokens_details.cached_tokens").Int()
-	}
+	cacheReadTokens := openAICacheReadTokensFromUsage(value)
+	cacheCreationTokens := openAICacheCreationTokensFromUsage(value)
 	imageOutputTokens := value.Get("output_tokens_details.image_tokens").Int()
 	if imageOutputTokens == 0 {
 		imageOutputTokens = value.Get("completion_tokens_details.image_tokens").Int()
@@ -4956,10 +4971,46 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 	return OpenAIUsage{
 		InputTokens:              int(inputTokens),
 		OutputTokens:             int(outputTokens),
-		CacheCreationInputTokens: int(value.Get("cache_creation_input_tokens").Int()),
+		CacheCreationInputTokens: cacheCreationTokens,
 		CacheReadInputTokens:     int(cacheReadTokens),
 		ImageOutputTokens:        int(imageOutputTokens),
 	}, true
+}
+
+func openAICacheReadTokensFromUsage(value gjson.Result) int {
+	return firstPositiveGJSONInt(
+		value.Get("input_tokens_details.cached_tokens"),
+		value.Get("prompt_tokens_details.cached_tokens"),
+		value.Get("cache_read_input_tokens"),
+		value.Get("cache_read_tokens"),
+		value.Get("cached_tokens"),
+	)
+}
+
+func openAICacheCreationTokensFromUsage(value gjson.Result) int {
+	return firstPositiveGJSONInt(
+		value.Get("input_tokens_details.cache_write_tokens"),
+		value.Get("prompt_tokens_details.cache_write_tokens"),
+		value.Get("input_tokens_details.cache_creation_tokens"),
+		value.Get("prompt_tokens_details.cache_creation_tokens"),
+		value.Get("cache_write_tokens"),
+		value.Get("cache_creation_input_tokens"),
+		value.Get("cache_write_input_tokens"),
+		value.Get("cache_creation_tokens"),
+	)
+}
+
+func firstPositiveGJSONInt(values ...gjson.Result) int {
+	for _, value := range values {
+		if !value.Exists() {
+			continue
+		}
+		n := value.Int()
+		if n > 0 {
+			return int(n)
+		}
+	}
+	return 0
 }
 
 func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, originalModel, mappedModel string) (*openaiNonStreamingResult, error) {
@@ -5523,9 +5574,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	subscription := input.Subscription
 	ApplyOpenAIImageBillingResolution(result)
 
-	// 计算实际的新输入token（减去缓存读取的token）
-	// 因为 input_tokens 包含了 cache_read_tokens，而缓存读取的token不应按输入价格计费
-	actualInputTokens := result.Usage.InputTokens - result.Usage.CacheReadInputTokens
+	// OpenAI input_tokens includes cache read/write buckets. Split them out so
+	// cache write is not billed once as input and again as cache creation.
+	actualInputTokens := result.Usage.InputTokens - result.Usage.CacheReadInputTokens - result.Usage.CacheCreationInputTokens
 	if actualInputTokens < 0 {
 		actualInputTokens = 0
 	}
@@ -6035,7 +6086,7 @@ func (s *OpenAIGatewayService) UpdateCodexUsageSnapshotFromHeaders(ctx context.C
 	}
 }
 
-func getOpenAIReasoningEffortFromReqBody(reqBody map[string]any) (value string, present bool) {
+func getOpenAIReasoningEffortFromReqBody(reqBody map[string]any, requestedModel string) (value string, present bool) {
 	if reqBody == nil {
 		return "", false
 	}
@@ -6043,13 +6094,13 @@ func getOpenAIReasoningEffortFromReqBody(reqBody map[string]any) (value string, 
 	// Primary: reasoning.effort
 	if reasoning, ok := reqBody["reasoning"].(map[string]any); ok {
 		if effort, ok := reasoning["effort"].(string); ok {
-			return normalizeOpenAIReasoningEffort(effort), true
+			return normalizeOpenAIReasoningEffortForModel(effort, requestedModel), true
 		}
 	}
 
 	// Fallback: some clients may use a flat field.
 	if effort, ok := reqBody["reasoning_effort"].(string); ok {
-		return normalizeOpenAIReasoningEffort(effort), true
+		return normalizeOpenAIReasoningEffortForModel(effort, requestedModel), true
 	}
 
 	return "", false
@@ -6078,7 +6129,16 @@ func deriveOpenAIReasoningEffortFromModel(model string) string {
 		return ""
 	}
 
-	return normalizeOpenAIReasoningEffort(parts[len(parts)-1])
+	return normalizeOpenAIReasoningEffortForModel(parts[len(parts)-1], modelID)
+}
+
+func deriveOpenAIReasoningEffortFromModelCandidates(modelCandidates ...string) string {
+	for _, model := range modelCandidates {
+		if value := deriveOpenAIReasoningEffortFromModel(model); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func extractOpenAIRequestMetaFromBody(body []byte) (model string, stream bool, promptCacheKey string) {
@@ -6090,6 +6150,20 @@ func extractOpenAIRequestMetaFromBody(body []byte) (model string, stream bool, p
 	stream = gjson.GetBytes(body, "stream").Bool()
 	promptCacheKey = strings.TrimSpace(gjson.GetBytes(body, "prompt_cache_key").String())
 	return model, stream, promptCacheKey
+}
+
+func normalizeOpenAICodexCompactReasoningEffort(body []byte, effectiveModel string) ([]byte, bool, error) {
+	if len(body) == 0 ||
+		!isOpenAIGPT56Model(effectiveModel) ||
+		!strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()), "max") {
+		return body, false, nil
+	}
+
+	normalized, err := sjson.SetBytes(body, "reasoning.effort", "xhigh")
+	if err != nil {
+		return body, false, fmt.Errorf("normalize compact reasoning effort: %w", err)
+	}
+	return normalized, true, nil
 }
 
 // normalizeOpenAIPassthroughOAuthBody 将透传 OAuth 请求体收敛为旧链路关键行为：
@@ -6173,20 +6247,20 @@ func detectOpenAIPassthroughInstructionsRejectReason(reqModel string, body []byt
 	return ""
 }
 
-func extractOpenAIReasoningEffortFromBody(body []byte, requestedModel string) *string {
+func extractOpenAIReasoningEffortFromBody(body []byte, modelCandidates ...string) *string {
 	reasoningEffort := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String())
 	if reasoningEffort == "" {
 		reasoningEffort = strings.TrimSpace(gjson.GetBytes(body, "reasoning_effort").String())
 	}
 	if reasoningEffort != "" {
-		normalized := normalizeOpenAIReasoningEffort(reasoningEffort)
+		normalized := normalizeOpenAIReasoningEffortForModel(reasoningEffort, firstNonEmpty(modelCandidates...))
 		if normalized == "" {
 			return nil
 		}
 		return &normalized
 	}
 
-	value := deriveOpenAIReasoningEffortFromModel(requestedModel)
+	value := deriveOpenAIReasoningEffortFromModelCandidates(modelCandidates...)
 	if value == "" {
 		return nil
 	}
@@ -6682,15 +6756,15 @@ func releaseOpenAIParsedRequestBody(c *gin.Context) {
 	delete(c.Keys, OpenAIParsedRequestBodyKey)
 }
 
-func extractOpenAIReasoningEffort(reqBody map[string]any, requestedModel string) *string {
-	if value, present := getOpenAIReasoningEffortFromReqBody(reqBody); present {
+func extractOpenAIReasoningEffort(reqBody map[string]any, modelCandidates ...string) *string {
+	if value, present := getOpenAIReasoningEffortFromReqBody(reqBody, firstNonEmpty(modelCandidates...)); present {
 		if value == "" {
 			return nil
 		}
 		return &value
 	}
 
-	value := deriveOpenAIReasoningEffortFromModel(requestedModel)
+	value := deriveOpenAIReasoningEffortFromModelCandidates(modelCandidates...)
 	if value == "" {
 		return nil
 	}
@@ -6711,10 +6785,17 @@ func normalizeOpenAIReasoningEffort(raw string) string {
 		return ""
 	case "low", "medium", "high":
 		return value
-	case "xhigh", "extrahigh":
+	case "xhigh", "extrahigh", "max":
 		return "xhigh"
 	default:
 		// Only store known effort levels for now to keep UI consistent.
 		return ""
 	}
+}
+
+func normalizeOpenAIReasoningEffortForModel(raw, model string) string {
+	if strings.EqualFold(strings.TrimSpace(raw), "max") && isOpenAIGPT56Model(model) {
+		return "max"
+	}
+	return normalizeOpenAIReasoningEffort(raw)
 }
