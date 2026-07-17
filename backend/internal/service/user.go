@@ -141,14 +141,65 @@ func NormalizeUserMenuPermissions(items []string) []string {
 	return out
 }
 
+func NormalizeSubAdminMenuPermissions(items []string) []string {
+	normalized := NormalizeAdminMenuPermissions(items)
+	if len(normalized) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(normalized))
+	for _, item := range normalized {
+		if isSubAdminMenuPermissionKey(item) || isCustomAdminMenuPermissionKey(item) {
+			out = append(out, item)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func NormalizeMenuPermissionsForRole(role string, items []string) []string {
 	switch NormalizeUserRole(role) {
 	case RoleSubAdmin:
-		return NormalizeAdminMenuPermissions(items)
+		return NormalizeSubAdminMenuPermissions(items)
 	case RoleUser:
 		return NormalizeUserMenuPermissions(items)
 	default:
 		return nil
+	}
+}
+
+func isSubAdminMenuPermissionKey(item string) bool {
+	switch item {
+	case "admin_dashboard",
+		"admin_ops",
+		"admin_ttft_analysis",
+		"admin_response_cache",
+		"admin_requests",
+		"admin_users",
+		"admin_groups",
+		"admin_channel_pricing",
+		"admin_channel_monitor",
+		"admin_subscriptions",
+		"admin_accounts",
+		"admin_announcements",
+		"admin_proxies",
+		"admin_risk_control",
+		"admin_redeem",
+		"admin_promo_codes",
+		"admin_affiliate_usage",
+		"admin_affiliate_applications",
+		"admin_affiliate_invites",
+		"admin_affiliate_rebates",
+		"admin_affiliate_transfers",
+		"admin_order_dashboard",
+		"admin_orders",
+		"admin_order_plans",
+		"admin_usage",
+		"admin_settings":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -176,6 +227,11 @@ func isUserMenuPermissionKey(item string) bool {
 
 func isCustomUserMenuPermissionKey(item string) bool {
 	const prefix = "custom:user:"
+	return strings.HasPrefix(item, prefix) && strings.TrimSpace(strings.TrimPrefix(item, prefix)) != ""
+}
+
+func isCustomAdminMenuPermissionKey(item string) bool {
+	const prefix = "custom:admin:"
 	return strings.HasPrefix(item, prefix) && strings.TrimSpace(strings.TrimPrefix(item, prefix)) != ""
 }
 

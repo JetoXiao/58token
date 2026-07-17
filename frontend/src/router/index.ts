@@ -11,7 +11,7 @@ import { useNavigationLoadingState } from '@/composables/useNavigationLoading'
 import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { isOptionalUserMenuItem, isUserMenuItemEnabled, resolveUserMenuFallbackPath } from '@/utils/userMenuItems'
-import { hasAdminMenuPermission, resolveReadonlyAdminFallbackPath } from '@/utils/adminMenuPermissions'
+import { hasAdminMenuPermission, resolveReadonlyAdminRouteRedirect } from '@/utils/adminMenuPermissions'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveDocumentTitle } from './title'
 
@@ -988,20 +988,24 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  if (authStore.isReadonlyAdmin) {
-    const permissionKey = to.meta.adminMenuKey ?? to.meta.userMenuKey
-    if (permissionKey && !hasAdminMenuPermission(authStore.user?.admin_menu_permissions, permissionKey)) {
-      next(resolveReadonlyAdminFallbackPath(authStore.user?.admin_menu_permissions))
-      return
-    }
+  const readonlyAdminRedirect = resolveReadonlyAdminRouteRedirect({
+    isReadonlyAdmin: authStore.isReadonlyAdmin,
+    requiresAdmin,
+    adminMenuKey: to.meta.adminMenuKey,
+    permissions: authStore.user?.admin_menu_permissions,
+  })
+  if (readonlyAdminRedirect) {
+    next(readonlyAdminRedirect)
+    return
   }
 
-  if (!authStore.isAdmin && to.meta.userMenuKey) {
+  if ((!authStore.isAdmin || authStore.isReadonlyAdmin) && to.meta.userMenuKey) {
     const settings = appStore.publicSettingsLoaded
       ? appStore.cachedPublicSettings
       : await appStore.fetchPublicSettings()
     const userMenuItems = settings?.user_menu_items ?? appStore.cachedPublicSettings?.user_menu_items
-    const hasPersonalPermission = isOptionalUserMenuItem(to.meta.userMenuKey)
+    const hasPersonalPermission = !authStore.isReadonlyAdmin
+      && isOptionalUserMenuItem(to.meta.userMenuKey)
       && hasAdminMenuPermission(authStore.user?.admin_menu_permissions, to.meta.userMenuKey)
     if (!isUserMenuItemEnabled(userMenuItems, to.meta.userMenuKey) && !hasPersonalPermission) {
       next(resolveUserMenuFallbackPath(userMenuItems))

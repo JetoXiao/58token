@@ -250,6 +250,7 @@ function applyUserMenuItems(items: NavItem[]): NavItem[] {
 }
 
 function hasPersonalUserMenuPermission(item: NavItem): boolean {
+  if (authStore.isReadonlyAdmin) return false
   return Boolean(
     item.menuKey
       && item.permissionKey
@@ -265,7 +266,10 @@ function applyReadonlyAdminPermissions(items: NavItem[]): NavItem[] {
   const out: NavItem[] = []
   for (const item of items) {
     const children = item.children ? applyReadonlyAdminPermissions(item.children) : undefined
-    const allowed = item.permissionKey ? hasAdminMenuPermission(authStore.user?.admin_menu_permissions, item.permissionKey) : false
+    const isAdminScoped = item.path.startsWith('/admin') || item.permissionKey?.startsWith('custom:admin:')
+    const allowed = !isAdminScoped || (item.permissionKey
+      ? hasAdminMenuPermission(authStore.user?.admin_menu_permissions, item.permissionKey)
+      : false)
     if (allowed || (children && children.length > 0)) {
       out.push({ ...item, children })
     }
@@ -780,11 +784,11 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   return items
 }
 
-// finalizeNav 合并三重过滤：featureFlag 过滤 + simple 模式过滤。
+// User-facing navigation follows public menu settings for every role, including read-only admins.
 function finalizeNav(items: NavItem[]): NavItem[] {
   const visible = applyUserMenuItems(applyFeatureFlags(items))
   const simpleFiltered = authStore.isSimpleMode ? visible.filter(item => !item.hideInSimpleMode) : visible
-  return applyReadonlyAdminPermissions(simpleFiltered)
+  return simpleFiltered
 }
 
 // User navigation items (for regular users)

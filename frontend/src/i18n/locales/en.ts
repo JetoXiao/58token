@@ -185,6 +185,7 @@ export default {
       model: 'Model',
       modelPlaceholder: 'gpt-image-2',
       noSupportedModels: 'No image models are available for this key group',
+      mode: 'Creation mode',
       prompt: 'Prompt',
       promptPlaceholder: 'Describe the subject, style, composition, lighting, colors, and any exact text you need in the image...',
       promptHint: 'Specific prompts usually produce more consistent results.',
@@ -193,9 +194,25 @@ export default {
       count: 'Outputs',
       templates: 'Prompt starters'
     },
+    modes: {
+      generate: 'Text to image',
+      edit: 'Image to image'
+    },
+    referenceImages: {
+      title: 'Reference images',
+      action: 'Choose images',
+      remove: 'Remove reference image',
+      hint: 'PNG, JPG, or WebP. This model accepts up to {count} images, {fileSize} each and {totalSize} total.',
+      errors: {
+        count: 'This model accepts up to {count} reference images.',
+        type: '“{name}” is not supported. Upload PNG, JPG, or WebP.',
+        fileSize: '“{name}” exceeds the {size} per-image limit.',
+        totalSize: 'Reference images cannot exceed {size} in total.'
+      }
+    },
     emptyKeys: {
       title: 'No image-enabled API key',
-      description: 'Create or update an active OpenAI API key in a group that allows image generation.',
+      description: 'Create or update an active OpenAI, Gemini, or Antigravity API key in a group that allows image generation.',
       action: 'Manage API keys'
     },
     sizes: {
@@ -252,25 +269,45 @@ export default {
       auto: 'Auto'
     },
     templates: {
-      product: {
-        title: 'Product shot',
-        description: 'Clean commercial image for a real product.',
-        prompt: 'Create a clean product image on a neutral studio background. Show the object clearly, use soft directional lighting, realistic materials, crisp edges, and enough negative space for interface placement.'
+      typography: {
+        title: 'Precision type poster',
+        description: 'Tests complex layout, exact text, and material rendering.',
+        prompt: 'Design a vertical key-art poster for an experimental film festival. Center a futuristic theater made of translucent red glass in a neon-lit rainy night, with cinematic volumetric light and physically accurate refraction. Typeset exactly: headline “BEYOND THE FRAME”, subtitle “Experimental Moving Image Season”, date “OCT 18—27”, venue “WEST BUND ART CENTER”. Use a rigorous Swiss grid and bold modern grotesk type. Every character must be legible and exact, with no extra text. Make it worthy of an international design award.'
       },
-      poster: {
-        title: 'Campaign poster',
-        description: 'Bold editorial composition with readable text.',
-        prompt: 'Design a polished campaign poster with a clear visual hierarchy, refined typography, strong focal image, restrained color palette, and readable headline text. Keep the composition modern and premium.'
+      characterSheet: {
+        title: 'Consistent character sheet',
+        description: 'Keeps one character stable across views and expressions.',
+        prompt: 'Create a professional animation character sheet for an original character named Lan: a 25-year-old Asian woman mechanical engineer with short silver-gray hair, a thin scar through her left eyebrow, a forest-green utility jacket, and an orange circular pin on her chest. Include front, side, and back full-body views, six clear facial expressions, and one dynamic pose holding a toolbox. Keep facial structure, hairstyle, garment construction, pin placement, and body proportions perfectly consistent in every panel. Light gray studio background, precise concept-art finish.'
       },
-      icon: {
-        title: 'App icon',
-        description: 'Compact brand asset with strong silhouette.',
-        prompt: 'Create a modern app icon with a simple geometric symbol, strong silhouette, balanced contrast, subtle depth, and a transparent or clean solid background. Avoid tiny unreadable details.'
+      cinematicProduct: {
+        title: 'Cinematic product ad',
+        description: 'Tests lifelike materials, macro detail, and commercial light.',
+        prompt: 'Create a cinematic landscape advertisement for an unbranded precision mechanical watch. The watch floats above rain-wet black volcanic rock. Use brushed titanium, controlled highlights on the sapphire crystal, and clearly resolved gears and indices. Cold dawn mist flows between the rocks, with warm gold rim light from the rear left and soft cool-blue fill from the right. Emulate a 100mm macro lens, shallow depth of field, physically realistic materials, and high dynamic range. Leave clean negative space on the right. No logos, gibberish, or extra components.'
       },
-      infographic: {
-        title: 'Infographic',
-        description: 'Structured visual explanation for social posts.',
-        prompt: 'Create a minimal infographic with a central topic node and four surrounding content modules. Use clean line icons, clear labels, balanced spacing, and a calm professional visual style.'
+      technicalDiagram: {
+        title: 'Technical explainer',
+        description: 'Tests spatial reasoning, causal structure, and labels.',
+        prompt: 'Draw a landscape museum-grade explainer titled “HOW OFFSHORE WIND POWER WORKS”. On the left, show a cutaway offshore turbine; in the center, connect blades, gearbox, generator, and subsea cable with unambiguous arrows; on the right, show electricity entering the city grid. Use restrained teal, blue, and safety yellow, isometric technical illustration, one line-weight system, and numbered stages. Labels must be limited to “BLADES, GEARBOX, GENERATOR, SUBSEA CABLE, SUBSTATION, CITY GRID”, all perfectly legible and causally correct.'
+      },
+      productComposite: {
+        title: 'Multi-image product composite',
+        description: 'Combines products, accessories, and a scene as one shoot.',
+        prompt: 'Use the product in reference image 1 as the absolute hero. Preserve its shape, colors, logo, label text, and material details exactly. Take accessories and environmental elements from reference images 2 and 3 and combine them into one premium, photorealistic campaign image. Unify perspective, light direction, shadow softness, and color temperature so everything looks photographed together. Repair cutout edges and reflections, but do not redesign the product or alter any packaging text.'
+      },
+      characterEdit: {
+        title: 'Identity-preserving scene edit',
+        description: 'Keeps the person while changing wardrobe, pose, and place.',
+        prompt: 'Strictly preserve the referenced person’s identity: face shape, feature proportions, skin tone, hairstyle, and apparent age must not change. Place them on a rainy Tokyo street in the 1960s, wearing a period-accurate tailored trench coat and holding a transparent umbrella while looking back at the camera beneath neon signs. Use a 35mm cinema-film look, natural skin texture, realistic rain, and wet-street reflections. Do not beautify them into a different person or alter facial structure.'
+      },
+      sketchRender: {
+        title: 'Sketch to finished design',
+        description: 'Turns line structure into a plausible manufactured object.',
+        prompt: 'Transform the reference sketch into a manufacturable premium desktop speaker render. Follow the sketch’s silhouette, button positions, opening proportions, and structural relationships exactly; do not invent extra parts. Use an anodized aluminum body, charcoal woven grille, and matte control knob. Show a three-quarter hero view, with a faint engineering side-profile drawing in the background. Real studio lighting, industrial-design portfolio quality.'
+      },
+      multiImage: {
+        title: 'Multi-reference world blend',
+        description: 'Tests subject understanding, relationships, and style unity.',
+        prompt: 'Combine the main subjects from every reference image into one coherent scene: they are preparing dinner together inside a glass greenhouse floating above a sea of clouds. Preserve each subject’s recognizable appearance, colors, textures, and relative proportions, and give them natural interactions instead of lining them up. Use a photoreal cinematic look, golden-hour backlight, accurate glass refraction, plant shadows, and contact shadows on the table. Build clear foreground, middle ground, and background. Do not duplicate or omit any subject.'
       }
     },
     actions: {
@@ -2805,10 +2842,11 @@ export default {
       form: {
         roleLabel: 'Role',
         selectRole: 'Select role',
-        readonlyAdminHint: 'Read-only administrators can only view authorized menus and cannot create, edit, or delete data.',
+        readonlyAdminHint: 'Read-only administrators can only view authorized admin menus, while public user features remain fully usable.',
         superAdminProtectedHint: 'Super administrators have full permissions and cannot be downgraded here.',
         adminMenuPermissions: 'Accessible menus',
-        adminMenuPermissionsHint: 'Select admin/user menus for read-only admins, or individually enabled user menus for regular users.',
+        readonlyAdminMenuPermissionsHint: 'Select the admin menus this read-only administrator can view. Admin create, edit, and delete actions remain blocked.',
+        userMenuPermissionsHint: 'Select user menus that are individually enabled for this regular user.',
         adminMenus: 'Admin menus',
         userMenus: 'User menus',
         partnerLevel: 'Partner Level',

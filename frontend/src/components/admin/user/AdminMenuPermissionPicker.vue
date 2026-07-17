@@ -3,7 +3,9 @@
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <label class="input-label mb-1">{{ t('admin.users.form.adminMenuPermissions') }}</label>
-        <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.users.form.adminMenuPermissionsHint') }}</p>
+        <p class="text-xs text-gray-500 dark:text-dark-400">
+          {{ t(role === 'sub_admin' ? 'admin.users.form.readonlyAdminMenuPermissionsHint' : 'admin.users.form.userMenuPermissionsHint') }}
+        </p>
       </div>
       <div class="flex gap-2">
         <button type="button" class="btn btn-secondary px-3 py-1 text-xs" @click="selectAll">
@@ -16,7 +18,7 @@
     </div>
 
     <div class="space-y-4">
-      <div>
+      <div v-if="role === 'sub_admin'">
         <h4 class="mb-2 text-sm font-semibold text-gray-800 dark:text-dark-100">{{ t('admin.users.form.adminMenus') }}</h4>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label
@@ -35,7 +37,7 @@
         </div>
       </div>
 
-      <div>
+      <div v-else>
         <h4 class="mb-2 text-sm font-semibold text-gray-800 dark:text-dark-100">{{ t('admin.users.form.userMenus') }}</h4>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label
@@ -63,7 +65,10 @@ import { useI18n } from 'vue-i18n'
 import { ADMIN_MENU_ITEMS, normalizeAdminMenuPermissions, type AdminPermissionKey } from '@/utils/adminMenuPermissions'
 import { DEFAULT_USER_MENU_ITEMS, OPTIONAL_USER_MENU_ITEMS, type UserMenuItem } from '@/utils/userMenuItems'
 
-const props = defineProps<{ modelValue: string[] }>()
+const props = defineProps<{
+  modelValue: string[]
+  role: 'sub_admin' | 'user'
+}>()
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
 const { t } = useI18n()
 
@@ -113,11 +118,16 @@ const userLabelKeys: Record<UserMenuItem, string> = {
   profile: 'nav.profile',
 }
 
-const selectedSet = computed(() => new Set(normalizeAdminMenuPermissions(props.modelValue)))
 const adminOptions = computed(() => ADMIN_MENU_ITEMS.map((key) => ({ key, label: t(adminLabelKeys[key]) })))
 const userPermissionItems = computed(() => [...DEFAULT_USER_MENU_ITEMS, ...OPTIONAL_USER_MENU_ITEMS] as UserMenuItem[])
 const userOptions = computed(() => userPermissionItems.value.map((key) => ({ key, label: t(userLabelKeys[key]) })))
-const allKeys = computed(() => [...ADMIN_MENU_ITEMS, ...userPermissionItems.value])
+const allKeys = computed<AdminPermissionKey[]>(() => props.role === 'sub_admin'
+  ? [...ADMIN_MENU_ITEMS]
+  : [...userPermissionItems.value])
+const selectedSet = computed(() => {
+  const allowed = new Set<string>(allKeys.value)
+  return new Set(normalizeAdminMenuPermissions(props.modelValue).filter((key) => allowed.has(key)))
+})
 
 function toggle(key: AdminPermissionKey) {
   const next = new Set(selectedSet.value)

@@ -37,6 +37,7 @@
       <AdminMenuPermissionPicker
         v-if="form.role !== 'admin'"
         v-model="form.admin_menu_permissions"
+        :role="form.role"
       />
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

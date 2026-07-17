@@ -83,17 +83,27 @@ export function hasAdminMenuPermission(value: unknown, key?: string): boolean {
   return normalizeAdminMenuPermissions(value).includes(key)
 }
 
+export function resolveReadonlyAdminRouteRedirect(options: {
+  isReadonlyAdmin: boolean
+  requiresAdmin: boolean
+  adminMenuKey?: string
+  permissions: unknown
+}): string | undefined {
+  if (!options.isReadonlyAdmin || !options.requiresAdmin || !options.adminMenuKey) {
+    return undefined
+  }
+  if (hasAdminMenuPermission(options.permissions, options.adminMenuKey)) {
+    return undefined
+  }
+  return resolveReadonlyAdminFallbackPath(options.permissions)
+}
+
 export function resolveReadonlyAdminFallbackPath(value: unknown): string {
   const permissions = normalizeAdminMenuPermissions(value)
   for (const item of ADMIN_MENU_ITEMS) {
     if (permissions.includes(item)) return ADMIN_MENU_PATHS[item]
   }
-  if (permissions.includes('dashboard')) return '/dashboard'
-  if (permissions.includes('help_center')) return '/help-center'
-  if (permissions.includes('support_contact')) return '/support-contact'
-  if (permissions.includes('profile')) return '/profile'
-  if (permissions.includes('api_keys')) return '/keys'
-  return '/home'
+  return '/dashboard'
 }
 
 function parsePermissionValue(value: unknown): unknown {

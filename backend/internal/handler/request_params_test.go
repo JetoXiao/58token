@@ -97,6 +97,13 @@ func TestBuildTTFTObservationParamsIncludesResponseCacheBypassReason(t *testing.
 	require.Equal(t, "prompt_too_long", got["response_cache_bypass_reason"])
 }
 
+func TestSchedulerDecisionReasonReportsStickyTTFTBypass(t *testing.T) {
+	require.Equal(t, "sticky_ttft_bypass", schedulerDecisionReason(service.OpenAIAccountScheduleDecision{
+		Layer:            "load_balance",
+		StickyTTFTBypass: true,
+	}))
+}
+
 func TestShouldCaptureResponseForCacheIncludesShadowCandidates(t *testing.T) {
 	require.True(t, shouldCaptureResponseForCache(service.ResponseCacheDecision{ExactEnabled: true}))
 	require.True(t, shouldCaptureResponseForCache(service.ResponseCacheDecision{ShadowEnabled: true}))

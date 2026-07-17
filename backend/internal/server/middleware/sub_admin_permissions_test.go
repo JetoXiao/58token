@@ -54,11 +54,27 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 			wantStatus:  http.StatusOK,
 		},
 		{
+			name:        "sub_admin_ttft_analysis_uses_dedicated_permission",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_ttft_analysis"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/ops/ttft-analysis",
+			wantStatus:  http.StatusOK,
+		},
+		{
 			name:        "sub_admin_settings_help_center_alias_uses_settings_permission",
 			role:        service.RoleSubAdmin,
 			permissions: []string{"admin_settings"},
 			method:      http.MethodGet,
 			path:        "/api/v1/admin/settings/help-center",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "sub_admin_trial_cards_uses_redeem_permission",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_redeem"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/trial-cards",
 			wantStatus:  http.StatusOK,
 		},
 		{
@@ -92,74 +108,6 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 		})
 	}
 }
-
-func TestSubAdminUserPermissionGuard(t *testing.T) {
-	tests := []struct {
-		name        string
-		permissions []string
-		method      string
-		path        string
-		wantStatus  int
-		wantBody    string
-	}{
-		{
-			name:        "authorized_get_allowed",
-			permissions: []string{"orders"},
-			method:      http.MethodGet,
-			path:        "/api/v1/payment/orders",
-			wantStatus:  http.StatusOK,
-		},
-		{
-			name:        "query_post_allowed",
-			permissions: []string{"dashboard"},
-			method:      http.MethodPost,
-			path:        "/api/v1/usage/dashboard/api-keys-usage",
-			wantStatus:  http.StatusOK,
-		},
-		{
-			name:        "auxiliary_announcements_get_allowed",
-			permissions: nil,
-			method:      http.MethodGet,
-			path:        "/api/v1/announcements",
-			wantStatus:  http.StatusOK,
-		},
-		{
-			name:        "auxiliary_profile_get_allowed",
-			permissions: nil,
-			method:      http.MethodGet,
-			path:        "/api/v1/user/profile",
-			wantStatus:  http.StatusOK,
-		},
-		{
-			name:        "missing_menu_denied",
-			permissions: []string{"profile"},
-			method:      http.MethodGet,
-			path:        "/api/v1/payment/orders",
-			wantStatus:  http.StatusForbidden,
-			wantBody:    "MENU_FORBIDDEN",
-		},
-		{
-			name:        "write_denied",
-			permissions: []string{"api_keys"},
-			method:      http.MethodPost,
-			path:        "/api/v1/keys",
-			wantStatus:  http.StatusForbidden,
-			wantBody:    "READ_ONLY_ADMIN",
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			code, body := runSubAdminGuardRequest(SubAdminUserPermissionGuard(), service.RoleSubAdmin, tc.permissions, tc.method, tc.path)
-			require.Equal(t, tc.wantStatus, code)
-			if tc.wantBody != "" {
-				require.Contains(t, body, tc.wantBody)
-			}
-		})
-	}
-}
-
 func runSubAdminGuardRequest(guard gin.HandlerFunc, role string, permissions []string, method string, path string) (int, string) {
 	gin.SetMode(gin.TestMode)
 

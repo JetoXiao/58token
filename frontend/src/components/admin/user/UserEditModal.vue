@@ -46,6 +46,7 @@
       <AdminMenuPermissionPicker
         v-if="form.role !== 'admin'"
         v-model="form.admin_menu_permissions"
+        :role="form.role"
       />
       <div>
         <label class="input-label">{{ t('admin.users.form.partnerLevel') }}</label>

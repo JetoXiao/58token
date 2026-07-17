@@ -59,7 +59,7 @@ func TestAdminService_CreateUser_KeepsUserMenuPermissionsForRegularUser(t *testi
 	require.Equal(t, []string{"affiliate_usage", "custom:user:42"}, repo.created[0].AdminMenuPermissions)
 }
 
-func TestAdminService_CreateUser_KeepsAllMenuPermissionsForSubAdmin(t *testing.T) {
+func TestAdminService_CreateUser_KeepsOnlyAdminMenuPermissionsForSubAdmin(t *testing.T) {
 	repo := &userRepoStub{nextID: 12}
 	svc := &adminServiceImpl{userRepo: repo}
 
@@ -67,11 +67,11 @@ func TestAdminService_CreateUser_KeepsAllMenuPermissionsForSubAdmin(t *testing.T
 		Email:                "readonly-admin@test.com",
 		Password:             "strong-pass",
 		Role:                 RoleSubAdmin,
-		AdminMenuPermissions: []string{"admin_users", "affiliate_usage", "custom:user:42"},
+		AdminMenuPermissions: []string{"admin_users", "affiliate_usage", "custom:user:42", "custom:admin:7"},
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, []string{"admin_users", "affiliate_usage", "custom:user:42"}, user.AdminMenuPermissions)
+	require.Equal(t, []string{"admin_users", "custom:admin:7"}, user.AdminMenuPermissions)
 }
 
 func TestAdminService_CreateUser_EmailExists(t *testing.T) {

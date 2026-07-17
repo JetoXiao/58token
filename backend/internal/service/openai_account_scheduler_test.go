@@ -468,6 +468,19 @@ func TestOpenAIGatewayService_OpenAIAccountSchedulerMetrics_DisabledNoOp(t *test
 
 	snapshot := svc.SnapshotOpenAIAccountSchedulerMetrics()
 	require.Equal(t, OpenAIAccountSchedulerMetricsSnapshot{}, snapshot)
+	recordedTTFT, samples, ok := svc.getOpenAIAccountRuntimeStats().ttftSnapshot(10)
+	require.True(t, ok)
+	require.Equal(t, int64(1), samples)
+	require.Equal(t, 120.0, recordedTTFT)
+}
+
+func TestShouldBypassOpenAIStickyTTFT(t *testing.T) {
+	require.False(t, shouldBypassOpenAIStickyTTFT(7999, 20, 1000, 20, true))
+	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 4, 1000, 20, true))
+	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 20, 9000, 20, false))
+	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 20, 2000, 2, false))
+	require.True(t, shouldBypassOpenAIStickyTTFT(12000, 20, 2000, 20, false))
+	require.True(t, shouldBypassOpenAIStickyTTFT(20000, 20, 0, 0, true))
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyRateLimitedAccountFallsBackToFreshCandidate(t *testing.T) {
@@ -674,6 +687,141 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionSticky(t *testin
 	require.NotNil(t, selection.Account)
 	require.Equal(t, account.ID, selection.Account.ID)
 	require.Equal(t, openAIAccountScheduleLayerSessionSticky, decision.Layer)
+	require.True(t, decision.StickySessionHit)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_SlowStickyTTFTBypassesLegacyAccount(t *testing.T) {
+	for _, loadBatchEnabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("load_batch_%t", loadBatchEnabled), func(t *testing.T) {
+			ctx := context.Background()
+			groupID := int64(10110)
+			const (
+				slowAccountID = int64(38001)
+				fastAccountID = int64(38002)
+				sessionHash   = "session_hash_slow_legacy"
+			)
+			accounts := []Account{
+				{ID: slowAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0},
+				{ID: fastAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 9},
+			}
+			cache := &schedulerTestGatewayCache{sessionBindings: map[string]int64{"openai:" + sessionHash: slowAccountID}}
+			cfg := &config.Config{}
+			cfg.Gateway.Scheduling.LoadBatchEnabled = loadBatchEnabled
+			svc := &OpenAIGatewayService{
+				accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+				cache:              cache,
+				cfg:                cfg,
+				rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("false"),
+				concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+			}
+
+			slowTTFT, fastTTFT := 12000, 2000
+			for range int(openAIStickyTTFTMinSamples) {
+				svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
+				svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+			}
+
+			selection, decision, err := svc.SelectAccountWithScheduler(
+				ctx,
+				&groupID,
+				"",
+				sessionHash,
+				"gpt-5.6-sol",
+				nil,
+				OpenAIUpstreamTransportAny,
+				false,
+			)
+			require.NoError(t, err)
+			require.NotNil(t, selection)
+			require.NotNil(t, selection.Account)
+			require.Equal(t, fastAccountID, selection.Account.ID)
+			require.True(t, decision.StickyTTFTBypass)
+			require.False(t, decision.StickySessionHit)
+			require.Equal(t, openAIAccountScheduleLayerLoadBalance, decision.Layer)
+			require.Equal(t, fastAccountID, cache.sessionBindings["openai:"+sessionHash])
+			if selection.ReleaseFunc != nil {
+				selection.ReleaseFunc()
+			}
+		})
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_SlowStickyTTFTBypassesAdvancedAccount(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10111)
+	const (
+		slowAccountID = int64(38101)
+		fastAccountID = int64(38102)
+		sessionHash   = "session_hash_slow_advanced"
+	)
+	accounts := []Account{
+		{ID: slowAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0},
+		{ID: fastAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 9},
+	}
+	cache := &schedulerTestGatewayCache{sessionBindings: map[string]int64{"openai:" + sessionHash: slowAccountID}}
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              cache,
+		cfg:                &config.Config{},
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("true"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+	slowTTFT, fastTTFT := 12000, 2000
+	for range int(openAIStickyTTFTMinSamples) {
+		svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
+		svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", sessionHash, "gpt-5.6-sol", nil, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, fastAccountID, selection.Account.ID)
+	require.True(t, decision.StickyTTFTBypass)
+	require.False(t, decision.StickySessionHit)
+	require.Equal(t, fastAccountID, cache.sessionBindings["openai:"+sessionHash])
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_PreviousResponseDisablesSlowStickyTTFTBypass(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10112)
+	const (
+		slowAccountID = int64(38201)
+		fastAccountID = int64(38202)
+		sessionHash   = "session_hash_previous_response"
+	)
+	accounts := []Account{
+		{ID: slowAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0},
+		{ID: fastAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 9},
+	}
+	cache := &schedulerTestGatewayCache{sessionBindings: map[string]int64{"openai:" + sessionHash: slowAccountID}}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              cache,
+		cfg:                cfg,
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("false"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+	slowTTFT, fastTTFT := 12000, 2000
+	for range int(openAIStickyTTFTMinSamples) {
+		svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
+		svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+	}
+
+	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "resp_strong_sticky", sessionHash, "gpt-5.6-sol", nil, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, slowAccountID, selection.Account.ID)
+	require.False(t, decision.StickyTTFTBypass)
 	require.True(t, decision.StickySessionHit)
 	if selection.ReleaseFunc != nil {
 		selection.ReleaseFunc()
@@ -1090,6 +1238,9 @@ func TestOpenAIAccountRuntimeStats_ReportConcurrent(t *testing.T) {
 		require.LessOrEqual(t, errorRate, 1.0)
 		require.True(t, hasTTFT)
 		require.Greater(t, ttft, 0.0)
+		_, samples, ok := stats.ttftSnapshot(accountID)
+		require.True(t, ok)
+		require.Equal(t, int64(workers*iterations/accountCount), samples)
 	}
 }
 

@@ -50,7 +50,7 @@
                   <span class="max-w-full break-words">{{ selectedKey.group?.name || t('imageGeneration.form.noGroup') }}</span>
                   <span class="text-gray-300 dark:text-slate-600">/</span>
                   <span class="max-w-full break-all">{{ maskApiKey(selectedKey.key) }}</span>
-                  <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">OpenAI</span>
+                  <span class="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">{{ selectedPlatformLabel }}</span>
                 </div>
                 <div v-if="imageKeys.length === 0" class="min-w-0 rounded-2xl border border-dashed border-gray-300 bg-gray-50/80 p-5 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-300">
                   <p class="font-medium text-gray-900 dark:text-white">{{ t('imageGeneration.emptyKeys.title') }}</p>
@@ -72,6 +72,99 @@
                     {{ option }}
                   </option>
                 </select>
+              </div>
+
+              <div>
+                <label class="input-label">{{ t('imageGeneration.form.mode') }}</label>
+                <div class="grid min-w-0 grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1 dark:bg-white/[0.06]">
+                  <button
+                    type="button"
+                    class="flex min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
+                    :class="generationMode === 'generate' ? 'bg-white text-gray-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-gray-500 hover:text-gray-950 dark:text-slate-400 dark:hover:text-white'"
+                    @click="generationMode = 'generate'"
+                  >
+                    <Icon name="sparkles" size="xs" />
+                    <span>{{ t('imageGeneration.modes.generate') }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="flex min-w-0 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition"
+                    :class="generationMode === 'edit' ? 'bg-white text-gray-950 shadow-sm dark:bg-slate-800 dark:text-white' : 'text-gray-500 hover:text-gray-950 dark:text-slate-400 dark:hover:text-white'"
+                    @click="generationMode = 'edit'"
+                  >
+                    <Icon name="edit" size="xs" />
+                    <span>{{ t('imageGeneration.modes.edit') }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="generationMode === 'edit'" class="min-w-0">
+                <div class="mb-1.5 flex min-w-0 items-center justify-between gap-3">
+                  <label class="input-label !mb-0">{{ t('imageGeneration.referenceImages.title') }}</label>
+                  <span class="shrink-0 text-xs font-medium text-gray-400 dark:text-slate-500">
+                    {{ referenceImages.length }} / {{ referenceImageLimit }}
+                  </span>
+                </div>
+                <input
+                  ref="referenceInput"
+                  type="file"
+                  class="sr-only"
+                  accept="image/png,image/jpeg,image/webp"
+                  multiple
+                  @change="handleReferenceInput"
+                />
+                <div
+                  class="min-w-0 rounded-xl border border-dashed p-4 transition sm:p-5"
+                  :class="referenceDragActive ? 'border-cyan-400 bg-cyan-50 dark:border-cyan-300/60 dark:bg-cyan-300/10' : 'border-gray-300 bg-gray-50/70 dark:border-white/15 dark:bg-white/[0.025]'"
+                  @dragenter.prevent="referenceDragActive = true"
+                  @dragover.prevent="referenceDragActive = true"
+                  @dragleave.prevent="referenceDragActive = false"
+                  @drop.prevent="handleReferenceDrop"
+                >
+                  <div class="flex min-w-0 flex-col items-center text-center">
+                    <div class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white text-cyan-700 shadow-sm ring-1 ring-gray-100 dark:bg-white/10 dark:text-cyan-200 dark:ring-white/10">
+                      <Icon name="upload" size="sm" />
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" @click="openReferencePicker">
+                      <Icon name="plus" size="xs" />
+                      {{ t('imageGeneration.referenceImages.action') }}
+                    </button>
+                    <p class="mt-2 max-w-xl text-xs leading-5 text-gray-500 dark:text-slate-400">
+                      {{ t('imageGeneration.referenceImages.hint', {
+                        count: referenceImageLimit,
+                        fileSize: formatFileSize(referenceFileByteLimit),
+                        totalSize: formatFileSize(referenceTotalByteLimit)
+                      }) }}
+                    </p>
+                  </div>
+
+                  <div v-if="referenceImages.length > 0" class="mt-4 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div
+                      v-for="item in referenceImages"
+                      :key="item.id"
+                      class="group relative min-w-0 overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-white/10 dark:bg-slate-900"
+                    >
+                      <img
+                        :src="item.previewUrl"
+                        :alt="item.file.name"
+                        class="aspect-square w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        class="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-gray-950/80 text-white shadow-sm transition hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white"
+                        :title="t('imageGeneration.referenceImages.remove')"
+                        :aria-label="t('imageGeneration.referenceImages.remove')"
+                        @click="removeReferenceImage(item.id)"
+                      >
+                        <Icon name="x" size="xs" />
+                      </button>
+                      <div class="min-w-0 px-2 py-1.5">
+                        <p class="truncate text-[11px] font-medium text-gray-700 dark:text-slate-200" :title="item.file.name">{{ item.file.name }}</p>
+                        <p class="text-[10px] text-gray-400 dark:text-slate-500">{{ formatFileSize(item.file.size) }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <TextArea
@@ -399,7 +492,26 @@ import { keysAPI, imageGenerationAPI } from '@/api'
 import { useAppStore } from '@/stores/app'
 import { maskApiKey } from '@/utils/maskApiKey'
 import type { ApiKey } from '@/types'
-import type { GeneratedImage, ImageGenerationQuality, ImageGenerationSize } from '@/api/imageGeneration'
+import {
+  geminiImageModels,
+  isGeminiImageModel,
+  openAIImageModels,
+  referenceImageLimitForModel
+} from '@/api/imageGeneration'
+import type {
+  GeneratedImage,
+  ImageGenerationPlatform,
+  ImageGenerationQuality,
+  ImageGenerationSize
+} from '@/api/imageGeneration'
+
+type GenerationMode = 'generate' | 'edit'
+
+interface ReferenceImageItem {
+  id: string
+  file: File
+  previewUrl: string
+}
 
 interface HistoryItem {
   id: string
@@ -419,6 +531,8 @@ interface GenerateRequestedImagesParams {
   size: ImageGenerationSize
   quality: ImageGenerationQuality
   requestedCount: number
+  platform: ImageGenerationPlatform
+  referenceImages: File[]
   clientRequestId: string
   signal: AbortSignal
 }
@@ -439,6 +553,11 @@ const MAX_IMAGE_PIXELS = 8294400
 const MAX_IMAGE_SIDE = 3840
 const IMAGE_SIZE_STEP = 16
 const MAX_IMAGE_RATIO = 3
+const MAX_OPENAI_REFERENCE_BYTES = 20 * 1024 * 1024
+const MAX_OPENAI_REFERENCE_TOTAL_BYTES = 200 * 1024 * 1024
+const MAX_GEMINI_REFERENCE_BYTES = 15 * 1024 * 1024
+const MAX_GEMINI_REFERENCE_TOTAL_BYTES = 15 * 1024 * 1024
+const SUPPORTED_REFERENCE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
 
 type ImageSizeTier = '1K' | '2K' | '4K'
 const imageGenerationQualities: ImageGenerationQuality[] = ['low', 'medium', 'high', 'auto']
@@ -465,6 +584,10 @@ const loadingKeys = ref(false)
 const selectedKeyId = ref<number | null>(null)
 const model = ref('gpt-image-2')
 const prompt = ref('')
+const generationMode = ref<GenerationMode>('generate')
+const referenceImages = ref<ReferenceImageItem[]>([])
+const referenceInput = ref<HTMLInputElement | null>(null)
+const referenceDragActive = ref(false)
 const size = ref<ImageGenerationSize>('1024x1024')
 const quality = ref<ImageGenerationQuality>('high')
 const n = ref(1)
@@ -490,13 +613,17 @@ let historyRevision = 0
 let historySaveQueue: Promise<void> = Promise.resolve()
 
 const countOptions = [1, 2, 3, 4]
-const allImageModelOptions = ['gpt-image-2', 'gpt-image-1.5', 'gpt-image-1']
 const imageModelScopeAliases: Record<string, string[]> = {
   'gpt-image-2': ['gpt-image-2', 'gpt_image_2', 'gptimage2', 'image2', 'image_2', 'image-2', 'openai_image_2', 'openai-image-2'],
   'gpt-image-1.5': ['gpt-image-1.5', 'gpt_image_1_5', 'gptimage15', 'image1.5', 'image_1_5', 'image-1.5', 'openai_image_1_5', 'openai-image-1.5'],
-  'gpt-image-1': ['gpt-image-1', 'gpt_image_1', 'gptimage1', 'image1', 'image_1', 'image-1', 'openai_image_1', 'openai-image-1']
+  'gpt-image-1': ['gpt-image-1', 'gpt_image_1', 'gptimage1', 'image1', 'image_1', 'image-1', 'openai_image_1', 'openai-image-1'],
+  'gemini-3.1-flash-image': ['gemini-3.1-flash-image', 'gemini_3_1_flash_image', 'gemini31flashimage', 'gemini-3.1-image'],
+  'gemini-3-pro-image': ['gemini-3-pro-image', 'gemini_3_pro_image', 'gemini3proimage', 'nano-banana-pro'],
+  'gemini-2.5-flash-image': ['gemini-2.5-flash-image', 'gemini_2_5_flash_image', 'gemini25flashimage', 'nano-banana']
 }
-const allImageModelScopeAliases = ['gpt-image', 'gpt_image', 'gptimage', 'openai_image', 'openai-image', 'openaiimage', 'image_generation', 'image-generation', 'imagegeneration', 'image']
+const openAIImageModelScopeAliases = ['gpt-image', 'gpt_image', 'gptimage', 'openai_image', 'openai-image', 'openaiimage']
+const geminiImageModelScopeAliases = ['gemini_image', 'gemini-image', 'geminiimage', 'nano_banana', 'nano-banana', 'nanobanana']
+const allImageModelScopeAliases = ['image_generation', 'image-generation', 'imagegeneration', 'image']
 const presetSizeOptions = computed(() => [
   { value: '1024x1024', label: formatSizeOptionLabel('1024x1024', t('imageGeneration.sizes.square1k')) },
   { value: '1536x1024', label: formatSizeOptionLabel('1536x1024', t('imageGeneration.sizes.landscape1_5k')) },
@@ -510,33 +637,45 @@ const presetSizeOptions = computed(() => [
 
 const imageKeys = computed(() =>
   keys.value.filter((key) => {
+    const platform = key.group?.platform
     return key.status === 'active' &&
-      key.group?.platform === 'openai' &&
+      (platform === 'openai' || platform === 'gemini' || platform === 'antigravity') &&
       key.group?.allow_image_generation === true
   })
 )
 
 const selectedKey = computed(() => imageKeys.value.find((key) => key.id === selectedKeyId.value) || null)
+const selectedPlatform = computed<ImageGenerationPlatform>(() => {
+  const platform = selectedKey.value?.group?.platform
+  return platform === 'gemini' || platform === 'antigravity' ? platform : 'openai'
+})
+const selectedPlatformLabel = computed(() => {
+  if (selectedPlatform.value === 'gemini') return 'Gemini'
+  if (selectedPlatform.value === 'antigravity') return 'Antigravity'
+  return 'OpenAI'
+})
+const platformImageModelOptions = computed(() => imageModelsForPlatform(selectedPlatform.value))
 
 const modelOptions = computed(() => {
   if (!selectedKey.value) return []
 
-  const scopedOptions = imageModelsFromScopes(selectedKey.value.group?.supported_model_scopes)
+  const platformOptions = platformImageModelOptions.value
+  const scopedOptions = imageModelsFromScopes(selectedKey.value.group?.supported_model_scopes, platformOptions)
   const namedOptions = scopedOptions.explicit
     ? []
-    : imageModelsFromText(`${selectedKey.value.group?.name || ''} ${selectedKey.value.group?.description || ''}`)
+    : imageModelsFromText(`${selectedKey.value.group?.name || ''} ${selectedKey.value.group?.description || ''}`, platformOptions)
   const configuredOptions = scopedOptions.explicit
     ? scopedOptions.models
     : namedOptions.length > 0
       ? namedOptions
-      : [...allImageModelOptions]
-  const availableOptions = imageModelsFromAvailableIds(keyModelIds.value)
+      : [...platformOptions]
+  const availableOptions = imageModelsFromAvailableIds(keyModelIds.value, platformOptions)
 
   if (keyModelsLoaded.value && keyModelIds.value.length > 0 && availableOptions.length === 0) {
     return []
   }
 
-  if (availableOptions.length > 0 && availableOptions.length < allImageModelOptions.length) {
+  if (availableOptions.length > 0 && availableOptions.length < platformOptions.length) {
     const intersection = configuredOptions.filter((option) => availableOptions.includes(option))
     return intersection.length > 0 ? intersection : availableOptions
   }
@@ -544,12 +683,22 @@ const modelOptions = computed(() => {
   return configuredOptions
 })
 
+const referenceImageLimit = computed(() => referenceImageLimitForModel(model.value, selectedPlatform.value))
+const referenceFileByteLimit = computed(() => isGeminiImageModel(model.value)
+  ? MAX_GEMINI_REFERENCE_BYTES
+  : MAX_OPENAI_REFERENCE_BYTES)
+const referenceTotalByteLimit = computed(() => isGeminiImageModel(model.value)
+  ? MAX_GEMINI_REFERENCE_TOTAL_BYTES
+  : MAX_OPENAI_REFERENCE_TOTAL_BYTES)
+const referenceTotalBytes = computed(() => referenceImages.value.reduce((total, item) => total + item.file.size, 0))
+
 const canGenerate = computed(() => {
   return !generating.value &&
     !!selectedKey.value &&
     model.value.trim() !== '' &&
     modelOptions.value.includes(model.value) &&
     prompt.value.trim().length >= 3 &&
+    (generationMode.value === 'generate' || referenceImages.value.length > 0) &&
     validateImageSize(size.value).valid
 })
 
@@ -576,32 +725,17 @@ const qualityOptions = computed(() => [
   { value: 'auto', label: t('imageGeneration.qualities.auto') }
 ] as Array<{ value: ImageGenerationQuality; label: string }>)
 
-const templates = computed(() => [
-  {
-    key: 'product',
-    title: t('imageGeneration.templates.product.title'),
-    description: t('imageGeneration.templates.product.description'),
-    prompt: t('imageGeneration.templates.product.prompt')
-  },
-  {
-    key: 'poster',
-    title: t('imageGeneration.templates.poster.title'),
-    description: t('imageGeneration.templates.poster.description'),
-    prompt: t('imageGeneration.templates.poster.prompt')
-  },
-  {
-    key: 'icon',
-    title: t('imageGeneration.templates.icon.title'),
-    description: t('imageGeneration.templates.icon.description'),
-    prompt: t('imageGeneration.templates.icon.prompt')
-  },
-  {
-    key: 'infographic',
-    title: t('imageGeneration.templates.infographic.title'),
-    description: t('imageGeneration.templates.infographic.description'),
-    prompt: t('imageGeneration.templates.infographic.prompt')
-  }
-])
+const templates = computed(() => {
+  const keys = generationMode.value === 'edit'
+    ? ['productComposite', 'characterEdit', 'sketchRender', 'multiImage']
+    : ['typography', 'characterSheet', 'cinematicProduct', 'technicalDiagram']
+  return keys.map((key) => ({
+    key,
+    title: t(`imageGeneration.templates.${key}.title`),
+    description: t(`imageGeneration.templates.${key}.description`),
+    prompt: t(`imageGeneration.templates.${key}.prompt`)
+  }))
+})
 
 const statusText = computed(() => {
   if (generating.value) return t('imageGeneration.preview.generating', { seconds: generationElapsedSeconds.value })
@@ -666,45 +800,56 @@ function normalizeModelScope(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-function imageModelsFromScopes(scopes: string[] | undefined): { explicit: boolean; models: string[] } {
+function imageModelsForPlatform(platform: ImageGenerationPlatform): string[] {
+  return platform === 'openai' ? [...openAIImageModels] : [...geminiImageModels]
+}
+
+function imageModelsFromScopes(scopes: string[] | undefined, platformOptions: string[]): { explicit: boolean; models: string[] } {
   if (!Array.isArray(scopes) || scopes.length === 0) {
-    return { explicit: false, models: [...allImageModelOptions] }
+    return { explicit: false, models: [...platformOptions] }
   }
 
   const normalizedScopes = new Set(scopes.map(normalizeModelScope).filter(Boolean))
   if (normalizedScopes.size === 0) {
-    return { explicit: false, models: [...allImageModelOptions] }
+    return { explicit: false, models: [...platformOptions] }
   }
-  if (allImageModelScopeAliases.some((scope) => normalizedScopes.has(normalizeModelScope(scope)))) {
-    return { explicit: true, models: [...allImageModelOptions] }
+  const familyAliases = selectedPlatform.value === 'openai'
+    ? openAIImageModelScopeAliases
+    : geminiImageModelScopeAliases
+  if ([...allImageModelScopeAliases, ...familyAliases].some((scope) => normalizedScopes.has(normalizeModelScope(scope)))) {
+    return { explicit: true, models: [...platformOptions] }
   }
 
   return {
     explicit: true,
-    models: allImageModelOptions.filter((option) => {
+    models: platformOptions.filter((option) => {
       const aliases = [option, ...(imageModelScopeAliases[option] || [])]
       return aliases.some((scope) => normalizedScopes.has(normalizeModelScope(scope)))
     })
   }
 }
 
-function imageModelsFromAvailableIds(ids: string[]): string[] {
+function imageModelsFromAvailableIds(ids: string[], platformOptions: string[]): string[] {
   if (!Array.isArray(ids) || ids.length === 0) return []
   const normalizedIds = new Set(ids.map((id) => id.trim().toLowerCase()).filter(Boolean))
-  return allImageModelOptions.filter((option) => normalizedIds.has(option))
+  return platformOptions.filter((option) => normalizedIds.has(option))
 }
 
-function imageModelsFromText(value: string): string[] {
+function imageModelsFromText(value: string, platformOptions: string[]): string[] {
   const text = value.trim().toLowerCase()
   if (!text) return []
-  return allImageModelOptions.filter((option) => {
+  return platformOptions.filter((option) => {
     if (option === 'gpt-image-2') {
       return /gpt[-_\s]?image[-_\s]?2|openai[-_\s]?image[-_\s]?2|image[-_\s]?2/.test(text)
     }
     if (option === 'gpt-image-1.5') {
       return /gpt[-_\s]?image[-_\s]?1(?:\.|[-_\s])?5|openai[-_\s]?image[-_\s]?1(?:\.|[-_\s])?5|image[-_\s]?1(?:\.|[-_\s])?5/.test(text)
     }
-    return /gpt[-_\s]?image[-_\s]?1(?![\d.])|openai[-_\s]?image[-_\s]?1(?![\d.])|image[-_\s]?1(?![\d.])/.test(text)
+    if (option === 'gpt-image-1') {
+      return /gpt[-_\s]?image[-_\s]?1(?![\d.])|openai[-_\s]?image[-_\s]?1(?![\d.])|image[-_\s]?1(?![\d.])/.test(text)
+    }
+    const aliases = [option, ...(imageModelScopeAliases[option] || [])]
+    return aliases.some((alias) => text.includes(alias.toLowerCase().replace(/_/g, '-')) || text.includes(alias.toLowerCase()))
   })
 }
 
@@ -900,7 +1045,10 @@ async function loadSelectedKeyModels(key: ApiKey | null) {
   const controller = new AbortController()
   keyModelsAbortController = controller
   try {
-    const models = await imageGenerationAPI.listModels(key.key, controller.signal)
+    const platform = key.group?.platform === 'gemini' || key.group?.platform === 'antigravity'
+      ? key.group.platform
+      : 'openai'
+    const models = await imageGenerationAPI.listModels(key.key, controller.signal, platform)
     if (keyModelsAbortController !== controller) return
     keyModelIds.value = models
     keyModelsLoaded.value = true
@@ -917,9 +1065,102 @@ function applyTemplate(value: string) {
   prompt.value = value
 }
 
+function openReferencePicker() {
+  referenceInput.value?.click()
+}
+
+function handleReferenceInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  addReferenceFiles(Array.from(input.files || []))
+  input.value = ''
+}
+
+function handleReferenceDrop(event: DragEvent) {
+  referenceDragActive.value = false
+  addReferenceFiles(Array.from(event.dataTransfer?.files || []))
+}
+
+function addReferenceFiles(files: File[]) {
+  if (files.length === 0) return
+  const existing = new Set(referenceImages.value.map((item) => referenceFileIdentity(item.file)))
+  const accepted: ReferenceImageItem[] = []
+  let projectedBytes = referenceTotalBytes.value
+  let validationMessage = ''
+
+  for (const file of files) {
+    if (referenceImages.value.length + accepted.length >= referenceImageLimit.value) {
+      validationMessage = t('imageGeneration.referenceImages.errors.count', { count: referenceImageLimit.value })
+      break
+    }
+    if (!SUPPORTED_REFERENCE_TYPES.has(file.type.toLowerCase())) {
+      validationMessage = t('imageGeneration.referenceImages.errors.type', { name: file.name })
+      continue
+    }
+    if (file.size > referenceFileByteLimit.value) {
+      validationMessage = t('imageGeneration.referenceImages.errors.fileSize', {
+        name: file.name,
+        size: formatFileSize(referenceFileByteLimit.value)
+      })
+      continue
+    }
+    if (projectedBytes + file.size > referenceTotalByteLimit.value) {
+      validationMessage = t('imageGeneration.referenceImages.errors.totalSize', {
+        size: formatFileSize(referenceTotalByteLimit.value)
+      })
+      break
+    }
+    const identity = referenceFileIdentity(file)
+    if (existing.has(identity)) continue
+    existing.add(identity)
+    projectedBytes += file.size
+    accepted.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      file,
+      previewUrl: URL.createObjectURL(file)
+    })
+  }
+
+  if (accepted.length > 0) {
+    referenceImages.value = [...referenceImages.value, ...accepted]
+  }
+  if (validationMessage) {
+    appStore.showError(validationMessage)
+  }
+}
+
+function referenceFileIdentity(file: File): string {
+  return `${file.name}:${file.size}:${file.lastModified}`
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`
+  return `${Math.round(bytes / (1024 * 1024))} MB`
+}
+
+function removeReferenceImage(id: string) {
+  const item = referenceImages.value.find((candidate) => candidate.id === id)
+  if (item) URL.revokeObjectURL(item.previewUrl)
+  referenceImages.value = referenceImages.value.filter((candidate) => candidate.id !== id)
+}
+
+function clearReferenceImages() {
+  referenceImages.value.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+  referenceImages.value = []
+}
+
+function trimReferenceImagesToModelLimit() {
+  const overflow = referenceImages.value.slice(referenceImageLimit.value)
+  if (overflow.length === 0) return
+  overflow.forEach((item) => URL.revokeObjectURL(item.previewUrl))
+  referenceImages.value = referenceImages.value.slice(0, referenceImageLimit.value)
+  appStore.showError(t('imageGeneration.referenceImages.errors.count', { count: referenceImageLimit.value }))
+}
+
 function resetForm() {
   prompt.value = ''
   model.value = modelOptions.value[0] || ''
+  generationMode.value = 'generate'
+  clearReferenceImages()
   size.value = '1024x1024'
   quality.value = 'high'
   n.value = 1
@@ -957,6 +1198,8 @@ async function startGenerate() {
       size: sizeValidation.normalized,
       quality: quality.value,
       requestedCount,
+      platform: selectedPlatform.value,
+      referenceImages: generationMode.value === 'edit' ? referenceImages.value.map((item) => item.file) : [],
       clientRequestId: activeClientRequestId.value,
       signal: abortController.signal
     })
@@ -1000,7 +1243,9 @@ async function generateRequestedImages(params: GenerateRequestedImagesParams): P
       prompt: params.prompt,
       size: params.size,
       quality: params.quality,
-      n: requestIndex === 1 ? remaining : 1,
+      n: isGeminiImageModel(params.model) ? 1 : requestIndex === 1 ? remaining : 1,
+      platform: params.platform,
+      referenceImages: params.referenceImages,
       clientRequestId: requestIndex === 1 ? params.clientRequestId : `${params.clientRequestId}-${requestIndex}`,
       signal: params.signal
     })
@@ -1434,6 +1679,10 @@ watch(modelOptions, (options) => {
   }
 }, { immediate: true })
 
+watch(model, () => {
+  trimReferenceImagesToModelLimit()
+})
+
 watch(selectedKey, (key) => {
   loadSelectedKeyModels(key)
 }, { immediate: true })
@@ -1448,5 +1697,6 @@ onBeforeUnmount(() => {
   abortController?.abort()
   keyModelsAbortController?.abort()
   stopGenerationTimer()
+  clearReferenceImages()
 })
 </script>

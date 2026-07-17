@@ -130,6 +130,9 @@ func mergeOpsSchedulerDecision(c *gin.Context, decision service.OpenAIAccountSch
 }
 
 func schedulerDecisionReason(decision service.OpenAIAccountScheduleDecision) string {
+	if decision.StickyTTFTBypass {
+		return "sticky_ttft_bypass"
+	}
 	switch strings.TrimSpace(decision.Layer) {
 	case "previous_response_id":
 		return "previous_response_sticky"

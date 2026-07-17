@@ -9,14 +9,6 @@ import (
 )
 
 func SubAdminAdminPermissionGuard() gin.HandlerFunc {
-	return subAdminPermissionGuard(true)
-}
-
-func SubAdminUserPermissionGuard() gin.HandlerFunc {
-	return subAdminPermissionGuard(false)
-}
-
-func subAdminPermissionGuard(adminScope bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := GetUserRoleFromContext(c)
 		if role != service.RoleSubAdmin {
@@ -24,21 +16,12 @@ func subAdminPermissionGuard(adminScope bool) gin.HandlerFunc {
 			return
 		}
 
-		if !isReadOnlyMethod(c.Request.Method) && !isReadOnlyQueryEndpoint(c.Request.Method, c.Request.URL.Path, adminScope) {
+		if !isReadOnlyMethod(c.Request.Method) && !isReadOnlyAdminQueryEndpoint(c.Request.Method, c.Request.URL.Path) {
 			AbortWithError(c, http.StatusForbidden, "READ_ONLY_ADMIN", "This admin role has read-only access")
 			return
 		}
-		if isAuxiliaryReadEndpoint(c.Request.Method, c.Request.URL.Path, adminScope) {
-			c.Next()
-			return
-		}
 
-		key := ""
-		if adminScope {
-			key = adminMenuKeyForAPIPath(c.Request.URL.Path)
-		} else {
-			key = userMenuKeyForAPIPath(c.Request.URL.Path)
-		}
+		key := adminMenuKeyForAPIPath(c.Request.URL.Path)
 		if key == "" || !hasAdminMenuPermission(c, key) {
 			AbortWithError(c, http.StatusForbidden, "MENU_FORBIDDEN", "Menu permission required")
 			return
@@ -57,31 +40,20 @@ func isReadOnlyMethod(method string) bool {
 	}
 }
 
-func isReadOnlyQueryEndpoint(method, path string, adminScope bool) bool {
+func isReadOnlyAdminQueryEndpoint(method, path string) bool {
 	if method != http.MethodPost {
 		return false
 	}
 	p := trimAPIV1(path)
-	if adminScope {
-		switch p {
-		case "/admin/dashboard/users-usage",
-			"/admin/dashboard/api-keys-usage",
-			"/admin/accounts/today-stats/batch",
-			"/admin/user-attributes/batch":
-			return true
-		default:
-			return false
-		}
-	}
-	return p == "/usage/dashboard/api-keys-usage"
-}
-
-func isAuxiliaryReadEndpoint(method, path string, adminScope bool) bool {
-	if !isReadOnlyMethod(method) || adminScope {
+	switch p {
+	case "/admin/dashboard/users-usage",
+		"/admin/dashboard/api-keys-usage",
+		"/admin/accounts/today-stats/batch",
+		"/admin/user-attributes/batch":
+		return true
+	default:
 		return false
 	}
-	p := trimAPIV1(path)
-	return p == "/user/profile" || strings.HasPrefix(p, "/announcements")
 }
 
 func hasAdminMenuPermission(c *gin.Context, key string) bool {
@@ -109,6 +81,8 @@ func adminMenuKeyForAPIPath(path string) string {
 		return "admin_dashboard"
 	case strings.HasPrefix(p, "/ops/response-cache"):
 		return "admin_response_cache"
+	case strings.HasPrefix(p, "/ops/ttft-analysis"):
+		return "admin_ttft_analysis"
 	case strings.HasPrefix(p, "/ops/requests"):
 		return "admin_requests"
 	case strings.HasPrefix(p, "/ops"):
@@ -132,6 +106,8 @@ func adminMenuKeyForAPIPath(path string) string {
 	case strings.HasPrefix(p, "/risk-control"):
 		return "admin_risk_control"
 	case strings.HasPrefix(p, "/redeem-codes"):
+		return "admin_redeem"
+	case strings.HasPrefix(p, "/trial-cards") || strings.HasPrefix(p, "/free-quota"):
 		return "admin_redeem"
 	case strings.HasPrefix(p, "/promo-codes"):
 		return "admin_promo_codes"
@@ -163,41 +139,6 @@ func adminMenuKeyForAPIPath(path string) string {
 		return "admin_settings"
 	case strings.HasPrefix(p, "/settings") || strings.HasPrefix(p, "/system") || strings.HasPrefix(p, "/data-management") || strings.HasPrefix(p, "/backups") || strings.HasPrefix(p, "/scheduled-test-plans") || strings.HasPrefix(p, "/error-passthrough-rules") || strings.HasPrefix(p, "/tls-fingerprint-profiles"):
 		return "admin_settings"
-	default:
-		return ""
-	}
-}
-
-func userMenuKeyForAPIPath(path string) string {
-	p := trimAPIV1(path)
-	switch {
-	case strings.HasPrefix(p, "/usage/dashboard"):
-		return "dashboard"
-	case strings.HasPrefix(p, "/help-center"):
-		return "help_center"
-	case strings.HasPrefix(p, "/keys") || strings.HasPrefix(p, "/groups"):
-		return "api_keys"
-	case strings.HasPrefix(p, "/usage"):
-		return "usage"
-	case strings.HasPrefix(p, "/channels") || strings.HasPrefix(p, "/channel-monitors"):
-		return "channel_status"
-	case strings.HasPrefix(p, "/subscriptions"):
-		return "subscriptions"
-	case strings.HasPrefix(p, "/payment"):
-		if strings.HasPrefix(p, "/payment/orders") {
-			return "orders"
-		}
-		return "purchase"
-	case strings.HasPrefix(p, "/redeem"):
-		return "redeem"
-	case strings.HasPrefix(p, "/user/aff/usage") || strings.HasPrefix(p, "/user/aff/settlements"):
-		return "affiliate_usage"
-	case strings.HasPrefix(p, "/user/aff"):
-		return "affiliate"
-	case strings.HasPrefix(p, "/user"):
-		return "profile"
-	case strings.HasPrefix(p, "/pages"):
-		return "profile"
 	default:
 		return ""
 	}
