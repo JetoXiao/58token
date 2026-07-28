@@ -46,6 +46,23 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 			wantStatus:  http.StatusOK,
 		},
 		{
+			name:        "sub_admin_visitor_ip_lookup_allowed",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_visitor_analytics"},
+			method:      http.MethodPost,
+			path:        "/api/v1/admin/visitor-analytics/ip-lookup",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "sub_admin_visitor_settings_write_denied",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_visitor_analytics"},
+			method:      http.MethodPut,
+			path:        "/api/v1/admin/visitor-analytics/settings",
+			wantStatus:  http.StatusForbidden,
+			wantBody:    "READ_ONLY_ADMIN",
+		},
+		{
 			name:        "sub_admin_help_center_uses_settings_permission",
 			role:        service.RoleSubAdmin,
 			permissions: []string{"admin_settings"},

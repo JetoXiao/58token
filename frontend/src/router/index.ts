@@ -488,6 +488,19 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/visitor-analytics',
+    name: 'AdminVisitorAnalytics',
+    component: () => import('@/views/admin/VisitorAnalyticsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      adminMenuKey: 'admin_visitor_analytics',
+      title: 'Visitor Analytics',
+      titleKey: 'admin.visitorAnalytics.title',
+      descriptionKey: 'admin.visitorAnalytics.description'
+    }
+  },
+  {
     path: '/admin/ops/response-cache',
     name: 'AdminResponseCache',
     component: () => import('@/views/admin/ops/ResponseCacheView.vue'),

@@ -20,6 +20,7 @@ func RegisterAdminRoutes(
 	{
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
+		registerVisitorAnalyticsRoutes(admin, h)
 
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
@@ -100,6 +101,23 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerVisitorAnalyticsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	analytics := admin.Group("/visitor-analytics")
+	{
+		analytics.GET("/overview", h.VisitorAnalytics.Overview)
+		analytics.GET("/trend", h.VisitorAnalytics.Trend)
+		analytics.GET("/channel-stats", h.VisitorAnalytics.ChannelStats)
+		analytics.GET("/events", h.VisitorAnalytics.ListEvents)
+		analytics.GET("/channels", h.VisitorAnalytics.ListChannels)
+		analytics.POST("/channels", h.VisitorAnalytics.CreateChannel)
+		analytics.PUT("/channels/:id", h.VisitorAnalytics.UpdateChannel)
+		analytics.DELETE("/channels/:id", h.VisitorAnalytics.DeleteChannel)
+		analytics.POST("/ip-lookup", h.VisitorAnalytics.LookupIP)
+		analytics.GET("/settings", h.VisitorAnalytics.GetSettings)
+		analytics.PUT("/settings", h.VisitorAnalytics.UpdateSettings)
 	}
 }
 
@@ -315,6 +333,8 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.GET("/:id/stats", h.Admin.Account.GetStats)
 		accounts.POST("/:id/clear-error", h.Admin.Account.ClearError)
 		accounts.GET("/:id/usage", h.Admin.Account.GetUsage)
+		accounts.GET("/:id/rate-limit-reset-credits", h.Admin.Account.GetOpenAIRateLimitResetCredits)
+		accounts.POST("/:id/rate-limit-reset-credits/consume", h.Admin.Account.ConsumeOpenAIRateLimitResetCredit)
 		accounts.GET("/:id/today-stats", h.Admin.Account.GetTodayStats)
 		accounts.POST("/today-stats/batch", h.Admin.Account.GetBatchTodayStats)
 		accounts.POST("/:id/clear-rate-limit", h.Admin.Account.ClearRateLimit)

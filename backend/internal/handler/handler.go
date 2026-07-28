@@ -62,6 +62,7 @@ type Handlers struct {
 	ModelPricing     *ModelPricingHandler
 	ModelMarketplace *ModelMarketplaceHandler
 	HelpCenter       *HelpCenterHandler
+	VisitorAnalytics *VisitorAnalyticsHandler
 }
 
 // BuildInfo contains build-time information

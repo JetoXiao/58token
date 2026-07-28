@@ -1093,6 +1093,26 @@ export interface AccountUsageInfo {
   error?: string            // usage 获取失败时的错误信息
 }
 
+export interface OpenAIRateLimitResetCredit {
+  id: string
+  reset_type: string
+  status: string
+  granted_at: string
+  expires_at: string | null
+  title: string | null
+  description: string | null
+}
+
+export interface OpenAIRateLimitResetCredits {
+  credits: OpenAIRateLimitResetCredit[]
+  available_count: number
+}
+
+export interface ConsumeOpenAIRateLimitResetCreditResult {
+  code: 'reset' | 'nothing_to_reset' | 'no_credit' | 'already_redeemed' | string
+  windows_reset: number
+}
+
 // OpenAI Codex usage snapshot (from response headers)
 export interface CodexUsageSnapshot {
   // Legacy fields (kept for backwards compatibility)

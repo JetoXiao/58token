@@ -126,30 +126,6 @@
           :show-now-when-idle="true"
           color="emerald"
         />
-        <div class="flex items-center gap-1.5 mt-0.5">
-          <button
-            type="button"
-            class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-            :disabled="activeQueryLoading"
-            @click="loadActiveUsage"
-          >
-            <svg
-              class="h-2.5 w-2.5"
-              :class="{ 'animate-spin': activeQueryLoading }"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            {{ t('admin.accounts.usageWindow.activeQuery') }}
-          </button>
-        </div>
       </div>
       <div v-else-if="loading" class="space-y-1.5">
         <div class="flex items-center gap-1">
@@ -164,6 +140,38 @@
         </div>
       </div>
       <div v-else class="text-xs text-gray-400">-</div>
+      <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9px]">
+        <span v-if="openAIAccountExpiry" class="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          {{ t('admin.accounts.usageWindow.expiresAt', { time: openAIAccountExpiry }) }}
+        </span>
+        <button
+          type="button"
+          class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 font-medium text-blue-600 transition-colors hover:bg-blue-50 disabled:cursor-wait disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
+          :disabled="activeQueryLoading"
+          @click="loadActiveUsage"
+        >
+          <svg class="h-2.5 w-2.5" :class="{ 'animate-spin': activeQueryLoading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {{ t('admin.accounts.usageWindow.activeQuery') }}
+        </button>
+        <span
+          class="rounded px-1.5 py-0.5 font-medium"
+          :class="openAIResetCredits?.available_count ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'"
+        >
+          {{ resetCreditsLoading ? t('common.loading') : t('admin.accounts.usageWindow.resetCredits', { count: openAIResetCredits?.available_count ?? 0 }) }}
+        </span>
+        <button
+          v-if="allowOpenAIReset"
+          type="button"
+          class="rounded px-1.5 py-0.5 font-medium text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-amber-400 dark:hover:bg-amber-900/20 dark:disabled:text-gray-600"
+          :disabled="!canResetOpenAIWeeklyQuota"
+          :title="!account.proxy_id ? t('admin.accounts.usageWindow.proxyRequired') : ''"
+          @click="emit('reset-openai-rate-limit', account)"
+        >
+          {{ t('admin.accounts.usageWindow.resetWeeklyQuota') }}
+        </button>
+      </div>
     </template>
 
     <!-- Antigravity OAuth accounts: fetch usage from API -->
@@ -497,7 +505,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
+import type { Account, AccountUsageInfo, GeminiCredentials, OpenAIRateLimitResetCredits, WindowStats } from '@/types'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import { formatCompactNumber } from '@/utils/format'
@@ -506,6 +514,7 @@ import AccountQuotaInfo from './AccountQuotaInfo.vue'
 
 // Module-level cache shared across all AccountUsageCell instances
 const _usageCache = new Map<number, { data: AccountUsageInfo; ts: number }>()
+const _resetCreditsCache = new Map<number, { data: OpenAIRateLimitResetCredits; ts: number }>()
 const USAGE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 const props = withDefaults(
@@ -514,13 +523,18 @@ const props = withDefaults(
     todayStats?: WindowStats | null
     todayStatsLoading?: boolean
     manualRefreshToken?: number
+    allowOpenAIReset?: boolean
   }>(),
   {
     todayStats: null,
     todayStatsLoading: false,
-    manualRefreshToken: 0
+    manualRefreshToken: 0,
+    allowOpenAIReset: true
   }
 )
+const emit = defineEmits<{
+  (event: 'reset-openai-rate-limit', account: Account): void
+}>()
 
 const { t } = useI18n()
 const desktopViewportQuery = '(min-width: 768px)'
@@ -532,6 +546,8 @@ const loading = ref(false)
 const activeQueryLoading = ref(false)
 const error = ref<string | null>(null)
 const usageInfo = ref<AccountUsageInfo | null>(null)
+const openAIResetCredits = ref<OpenAIRateLimitResetCredits | null>(null)
+const resetCreditsLoading = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
 const isDesktopViewport = ref(
   typeof window === 'undefined' ? true : window.matchMedia(desktopViewportQuery).matches
@@ -586,6 +602,33 @@ const hasOpenAIUsageFallback = computed(() => {
   if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return false
   return !!usageInfo.value?.five_hour || !!usageInfo.value?.seven_day
 })
+
+const openAIAccountExpiry = computed(() => {
+  if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return ''
+  const subscriptionExpiry = props.account.credentials?.subscription_expires_at
+  const raw = typeof subscriptionExpiry === 'string'
+    ? subscriptionExpiry
+    : props.account.expires_at
+      ? props.account.expires_at * 1000
+      : null
+  if (!raw) return ''
+  const date = new Date(raw)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date)
+})
+
+const canResetOpenAIWeeklyQuota = computed(() =>
+  props.allowOpenAIReset
+  && !!props.account.proxy_id
+  && !resetCreditsLoading.value
+  && (openAIResetCredits.value?.available_count ?? 0) > 0
+)
 
 const openAIUsageRefreshKey = computed(() => buildOpenAIUsageRefreshKey(props.account))
 
@@ -1008,6 +1051,38 @@ const isAnthropicOAuthOrSetupToken = computed(() => {
   return props.account.platform === 'anthropic' && (props.account.type === 'oauth' || props.account.type === 'setup-token')
 })
 
+const loadOpenAIResetCredits = async (bypassCache = false) => {
+  if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return
+  if (!props.account.proxy_id) {
+    openAIResetCredits.value = { credits: [], available_count: 0 }
+    return
+  }
+
+  if (!bypassCache) {
+    const cached = _resetCreditsCache.get(props.account.id)
+    if (cached && Date.now() - cached.ts < USAGE_CACHE_TTL) {
+      openAIResetCredits.value = cached.data
+      return
+    }
+  }
+
+  resetCreditsLoading.value = true
+  try {
+    const result = await adminAPI.accounts.getOpenAIRateLimitResetCredits(props.account.id)
+    if (!unmounted.value) {
+      openAIResetCredits.value = result
+      _resetCreditsCache.set(props.account.id, { data: result, ts: Date.now() })
+    }
+  } catch (error) {
+    if (!unmounted.value) {
+      openAIResetCredits.value = { credits: [], available_count: 0 }
+      console.error('Failed to load OpenAI rate-limit reset credits:', error)
+    }
+  } finally {
+    if (!unmounted.value) resetCreditsLoading.value = false
+  }
+}
+
 const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?: boolean }) => {
   if (!shouldFetchUsage.value) return
 
@@ -1025,7 +1100,9 @@ const loadUsage = async (options?: { source?: 'passive' | 'active'; bypassCache?
   error.value = null
 
   try {
-    const fetchFn = () => adminAPI.accounts.getUsage(props.account.id, options?.source)
+    const fetchFn = () => options?.source
+      ? adminAPI.accounts.getUsage(props.account.id, options.source)
+      : adminAPI.accounts.getUsage(props.account.id)
     const result = await enqueueUsageRequest(props.account, fetchFn)
     if (!unmounted.value) {
       usageInfo.value = result
@@ -1057,6 +1134,11 @@ const requestAutoLoad = (source?: 'passive' | 'active') => {
     pendingAutoLoad.value = true
     pendingAutoLoadSource.value = source
     return
+  }
+  if (props.account.platform === 'openai' && props.account.type === 'oauth') {
+    loadOpenAIResetCredits().catch((error) => {
+      console.error('Failed to auto load OpenAI reset credits:', error)
+    })
   }
   loadUsage({ source }).catch((e) => {
     console.error('Failed to auto load usage:', e)
@@ -1094,7 +1176,12 @@ const attachVisibilityObserver = () => {
 const loadActiveUsage = async () => {
   activeQueryLoading.value = true
   try {
-    usageInfo.value = await adminAPI.accounts.getUsage(props.account.id, 'active', true)
+    const [usage] = await Promise.all([
+      adminAPI.accounts.getUsage(props.account.id, 'active', true),
+      loadOpenAIResetCredits(true)
+    ])
+    usageInfo.value = usage
+    _usageCache.set(props.account.id, { data: usage, ts: Date.now() })
   } catch (e: any) {
     console.error('Failed to load active usage:', e)
   } finally {
@@ -1212,7 +1299,14 @@ watch(openAIUsageRefreshKey, (nextKey, prevKey) => {
   if (!prevKey || nextKey === prevKey) return
   if (props.account.platform !== 'openai' || props.account.type !== 'oauth') return
 
-  requestAutoLoad()
+  _usageCache.delete(props.account.id)
+  _resetCreditsCache.delete(props.account.id)
+  loadUsage({ bypassCache: true }).catch((error) => {
+    console.error('Failed to refresh OpenAI usage after account update:', error)
+  })
+  loadOpenAIResetCredits(true).catch((error) => {
+    console.error('Failed to refresh OpenAI reset credits after account update:', error)
+  })
 })
 
 watch(
@@ -1223,6 +1317,12 @@ watch(
 
     const source = isAnthropicOAuthOrSetupToken.value ? 'passive' : undefined
     _usageCache.delete(props.account.id)
+    _resetCreditsCache.delete(props.account.id)
+    if (props.account.platform === 'openai' && props.account.type === 'oauth') {
+      loadOpenAIResetCredits(true).catch((error) => {
+        console.error('Failed to refresh OpenAI reset credits:', error)
+      })
+    }
     loadUsage({ source, bypassCache: true }).catch((e) => {
       console.error('Failed to refresh usage after manual refresh:', e)
     })

@@ -94,6 +94,10 @@
       </template>
     </div>
   </div>
+  <PaymentBlessingDialog
+    v-model="showBlessing"
+    :order-key="blessingOrderKey"
+  />
 </template>
 
 <script setup lang="ts">
@@ -101,6 +105,7 @@ import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
+import PaymentBlessingDialog from '@/components/payment/PaymentBlessingDialog.vue'
 import {
   PAYMENT_RECOVERY_STORAGE_KEY,
   clearPaymentRecoverySnapshot,
@@ -123,6 +128,8 @@ const authStore = useAuthStore()
 const order = ref<PaymentOrder | null>(null)
 const loading = ref(true)
 const currency = ref('CNY')
+const showBlessing = ref(false)
+const blessingOrderKey = ref<string | number>('')
 const refreshedTerminalOrderIds = new Set<number>()
 
 interface ReturnInfo {
@@ -199,6 +206,8 @@ function setResolvedOrder(nextOrder: PaymentOrder | null): void {
   }
   if (nextOrder && isSuccessStatus(nextOrder.status) && !refreshedTerminalOrderIds.has(nextOrder.id)) {
     refreshedTerminalOrderIds.add(nextOrder.id)
+    blessingOrderKey.value = nextOrder.id || nextOrder.out_trade_no
+    showBlessing.value = true
     authStore.refreshUser().catch(() => undefined)
   }
 }

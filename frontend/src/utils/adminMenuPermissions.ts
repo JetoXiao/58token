@@ -2,6 +2,7 @@ import type { UserMenuItem } from './userMenuItems'
 
 export const ADMIN_MENU_ITEMS = [
   'admin_dashboard',
+  'admin_visitor_analytics',
   'admin_ops',
   'admin_ttft_analysis',
   'admin_response_cache',
@@ -34,6 +35,7 @@ export type AdminPermissionKey = AdminMenuItem | UserMenuItem | `custom:${string
 
 export const ADMIN_MENU_PATHS: Record<AdminMenuItem, string> = {
   admin_dashboard: '/admin/dashboard',
+  admin_visitor_analytics: '/admin/visitor-analytics',
   admin_ops: '/admin/ops',
   admin_ttft_analysis: '/admin/ops/ttft',
   admin_response_cache: '/admin/ops/response-cache',

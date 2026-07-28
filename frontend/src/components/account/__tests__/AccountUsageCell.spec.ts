@@ -3,14 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import AccountUsageCell from '../AccountUsageCell.vue'
 import type { Account } from '@/types'
 
-const { getUsage } = vi.hoisted(() => ({
-  getUsage: vi.fn()
+const { getUsage, getOpenAIRateLimitResetCredits } = vi.hoisted(() => ({
+  getUsage: vi.fn(),
+  getOpenAIRateLimitResetCredits: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
-      getUsage
+      getUsage,
+      getOpenAIRateLimitResetCredits
     }
   }
 }))
@@ -20,7 +22,8 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key
+      t: (key: string, params?: Record<string, unknown>) =>
+        params ? `${key}:${JSON.stringify(params)}` : key
     })
   }
 })
@@ -57,6 +60,7 @@ function makeAccount(overrides: Partial<Account>): Account {
 describe('AccountUsageCell', () => {
   beforeEach(() => {
     getUsage.mockReset()
+    getOpenAIRateLimitResetCredits.mockReset()
     Object.defineProperty(window, 'matchMedia', {
       writable: true,
       value: vi.fn().mockImplementation(() => ({
@@ -528,6 +532,87 @@ describe('AccountUsageCell', () => {
   expect(getUsage).toHaveBeenCalledWith(2004)
   expect(wrapper.text()).toContain('5h|100|106540000')
   expect(wrapper.text()).toContain('7d|100|106540000')
+  })
+
+  it('OpenAI OAuth 代理账号显示到期时间、重置次数并可发起周额度重置', async () => {
+    getUsage.mockResolvedValue({
+      five_hour: null,
+      seven_day: {
+        utilization: 60,
+        resets_at: '2099-03-13T12:00:00Z',
+        remaining_seconds: 3600,
+        window_stats: null
+      }
+    })
+    getOpenAIRateLimitResetCredits.mockResolvedValue({
+      credits: [{ id: 'credit-1', reset_type: 'weekly', status: 'available' }],
+      available_count: 2
+    })
+
+    const account = makeAccount({
+      id: 2101,
+      platform: 'openai',
+      type: 'oauth',
+      proxy_id: 42,
+      credentials: {
+        subscription_expires_at: '2099-03-20T08:30:00Z'
+      }
+    })
+    const wrapper = mount(AccountUsageCell, {
+      props: { account },
+      global: {
+        stubs: {
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(getOpenAIRateLimitResetCredits).toHaveBeenCalledWith(2101)
+    expect(wrapper.text()).toContain('admin.accounts.usageWindow.expiresAt:')
+    expect(wrapper.text()).toContain('admin.accounts.usageWindow.resetCredits:{"count":2}')
+
+    const resetButton = wrapper.findAll('button').find(
+      button => button.text().includes('admin.accounts.usageWindow.resetWeeklyQuota')
+    )
+    expect(resetButton).toBeDefined()
+    expect(resetButton?.attributes('disabled')).toBeUndefined()
+    await resetButton?.trigger('click')
+    expect(wrapper.emitted('reset-openai-rate-limit')).toEqual([[account]])
+  })
+
+  it('只读管理员保留查询与次数展示，但隐藏周额度重置入口', async () => {
+    getUsage.mockResolvedValue({ five_hour: null, seven_day: null })
+    getOpenAIRateLimitResetCredits.mockResolvedValue({
+      credits: [],
+      available_count: 1
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({
+          id: 2102,
+          platform: 'openai',
+          type: 'oauth',
+          proxy_id: 43
+        }),
+        allowOpenAIReset: false
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('admin.accounts.usageWindow.activeQuery')
+    expect(wrapper.text()).toContain('admin.accounts.usageWindow.resetCredits:{"count":1}')
+    expect(wrapper.text()).not.toContain('admin.accounts.usageWindow.resetWeeklyQuota')
   })
 
   it('Key 账号会展示 today stats 徽章并带 A/U 提示', async () => {

@@ -172,6 +172,7 @@ func NormalizeMenuPermissionsForRole(role string, items []string) []string {
 func isSubAdminMenuPermissionKey(item string) bool {
 	switch item {
 	case "admin_dashboard",
+		"admin_visitor_analytics",
 		"admin_ops",
 		"admin_ttft_analysis",
 		"admin_response_cache",

@@ -49,7 +49,8 @@ func isReadOnlyAdminQueryEndpoint(method, path string) bool {
 	case "/admin/dashboard/users-usage",
 		"/admin/dashboard/api-keys-usage",
 		"/admin/accounts/today-stats/batch",
-		"/admin/user-attributes/batch":
+		"/admin/user-attributes/batch",
+		"/admin/visitor-analytics/ip-lookup":
 		return true
 	default:
 		return false
@@ -79,6 +80,8 @@ func adminMenuKeyForAPIPath(path string) string {
 	switch {
 	case strings.HasPrefix(p, "/dashboard"):
 		return "admin_dashboard"
+	case strings.HasPrefix(p, "/visitor-analytics"):
+		return "admin_visitor_analytics"
 	case strings.HasPrefix(p, "/ops/response-cache"):
 		return "admin_response_cache"
 	case strings.HasPrefix(p, "/ops/ttft-analysis"):

@@ -160,6 +160,7 @@ func ProvideHandlers(
 	modelPricingHandler *ModelPricingHandler,
 	modelMarketplaceHandler *ModelMarketplaceHandler,
 	helpCenterHandler *HelpCenterHandler,
+	visitorAnalyticsHandler *VisitorAnalyticsHandler,
 	_ *service.IdempotencyCoordinator,
 	_ *service.IdempotencyCleanupService,
 ) *Handlers {
@@ -184,6 +185,7 @@ func ProvideHandlers(
 		ModelPricing:     modelPricingHandler,
 		ModelMarketplace: modelMarketplaceHandler,
 		HelpCenter:       helpCenterHandler,
+		VisitorAnalytics: visitorAnalyticsHandler,
 	}
 }
 
@@ -209,6 +211,7 @@ var ProviderSet = wire.NewSet(
 	NewModelPricingHandler,
 	NewModelMarketplaceHandler,
 	ProvideHelpCenterHandler,
+	NewVisitorAnalyticsHandler,
 
 	// Admin handlers
 	admin.NewDashboardHandler,

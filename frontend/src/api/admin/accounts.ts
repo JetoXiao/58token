@@ -19,7 +19,9 @@ import type {
   CodexSessionImportRequest,
   CodexSessionImportResult,
   CheckMixedChannelRequest,
-  CheckMixedChannelResponse
+  CheckMixedChannelResponse,
+  OpenAIRateLimitResetCredits,
+  ConsumeOpenAIRateLimitResetCreditResult
 } from '@/types'
 
 /**
@@ -246,6 +248,20 @@ export async function getUsage(id: number, source?: 'passive' | 'active', force?
   const { data } = await apiClient.get<AccountUsageInfo>(`/admin/accounts/${id}/usage`, {
     params: Object.keys(params).length > 0 ? params : undefined
   })
+  return data
+}
+
+export async function getOpenAIRateLimitResetCredits(id: number): Promise<OpenAIRateLimitResetCredits> {
+  const { data } = await apiClient.get<OpenAIRateLimitResetCredits>(
+    `/admin/accounts/${id}/rate-limit-reset-credits`
+  )
+  return data
+}
+
+export async function consumeOpenAIRateLimitResetCredit(id: number): Promise<ConsumeOpenAIRateLimitResetCreditResult> {
+  const { data } = await apiClient.post<ConsumeOpenAIRateLimitResetCreditResult>(
+    `/admin/accounts/${id}/rate-limit-reset-credits/consume`
+  )
   return data
 }
 
@@ -676,6 +692,8 @@ export const accountsAPI = {
   getStats,
   clearError,
   getUsage,
+  getOpenAIRateLimitResetCredits,
+  consumeOpenAIRateLimitResetCredit,
   getTodayStats,
   getBatchTodayStats,
   clearRateLimit,

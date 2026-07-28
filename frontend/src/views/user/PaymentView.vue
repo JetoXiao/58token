@@ -575,6 +575,10 @@
         </div>
       </Transition>
     </Teleport>
+    <PaymentBlessingDialog
+      v-model="showBlessing"
+      :order-key="blessingOrderKey"
+    />
   </AppLayout>
 </template>
 
@@ -615,6 +619,7 @@ import {
 } from '@/utils/platformColors'
 import SubscriptionPlanCard from '@/components/payment/SubscriptionPlanCard.vue'
 import PaymentStatusPanel from '@/components/payment/PaymentStatusPanel.vue'
+import PaymentBlessingDialog from '@/components/payment/PaymentBlessingDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { formatPaymentAmount, normalizePaymentCurrency } from '@/components/payment/currency'
 import type { PaymentMethodOption } from '@/components/payment/PaymentMethodSelector.vue'
@@ -628,6 +633,8 @@ const router = useRouter()
 const authStore = useAuthStore()
 const paymentStore = usePaymentStore()
 const subscriptionStore = useSubscriptionStore()
+const showBlessing = ref(false)
+const blessingOrderKey = ref<string | number>('')
 const appStore = useAppStore()
 
 const user = computed(() => authStore.user)
@@ -818,6 +825,8 @@ function onPaymentDone() {
 
 function onPaymentSuccess() {
   removeRecoverySnapshot()
+  blessingOrderKey.value = paymentState.value.orderId || paymentState.value.outTradeNo
+  showBlessing.value = true
   authStore.refreshUser()
   if (paymentState.value.orderType === 'subscription') {
     subscriptionStore.fetchActiveSubscriptions(true).catch(() => {})
@@ -1544,6 +1553,8 @@ async function createOrder(orderAmount: number, orderType: OrderType, planId?: n
 
     if (visibleMethod === 'balance' && String(result.status || '').toUpperCase() === 'COMPLETED') {
       removeRecoverySnapshot()
+      blessingOrderKey.value = result.order_id || result.out_trade_no || `balance-${Date.now()}`
+      showBlessing.value = true
       authStore.refreshUser()
       if (orderType === 'subscription') {
         selectedPlan.value = null

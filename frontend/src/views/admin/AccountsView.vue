@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <TablePageLayout>
+    <TablePageLayout class="accounts-table-page-layout">
       <template #filters>
         <div class="flex flex-wrap-reverse items-start justify-between gap-3">
           <AccountTableFilters
@@ -289,6 +289,8 @@
               :today-stats="todayStatsByAccountId[String(row.id)] ?? null"
               :today-stats-loading="todayStatsLoading"
               :manual-refresh-token="usageManualRefreshToken"
+              :allow-open-a-i-reset="!authStore.isReadonlyAdmin"
+              @reset-openai-rate-limit="openOpenAIRateLimitResetDialog"
             />
           </template>
           <template #cell-proxy="{ row }">
@@ -484,6 +486,16 @@
       </template>
     </BaseDialog>
     <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
+    <ConfirmDialog
+      :show="showOpenAIRateLimitResetDialog"
+      :title="t('admin.accounts.usageWindow.resetDialogTitle')"
+      :message="t('admin.accounts.usageWindow.resetDialogMessage', { name: openAIRateLimitResetAccount?.name ?? '' })"
+      :confirm-text="t('admin.accounts.usageWindow.resetWeeklyQuota')"
+      :cancel-text="t('common.cancel')"
+      :danger="true"
+      @confirm="confirmOpenAIRateLimitReset"
+      @cancel="closeOpenAIRateLimitResetDialog"
+    />
     <ConfirmDialog :show="showExportDataDialog" :title="t('admin.accounts.dataExport')" :message="t('admin.accounts.dataExportConfirmMessage')" :confirm-text="t('admin.accounts.dataExportConfirm')" :cancel-text="t('common.cancel')" @confirm="handleExportData" @cancel="showExportDataDialog = false">
       <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
         <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" v-model="includeProxyOnExport" />
@@ -675,6 +687,8 @@ const todayStatsError = ref<string | null>(null)
 const todayStatsReqSeq = ref(0)
 const pendingTodayStatsRefresh = ref(false)
 const usageManualRefreshToken = ref(0)
+const showOpenAIRateLimitResetDialog = ref(false)
+const openAIRateLimitResetAccount = ref<Account | null>(null)
 
 const buildDefaultTodayStats = (): WindowStats => ({
   requests: 0,
@@ -1775,6 +1789,33 @@ const handleResetQuota = async (a: Account) => {
     console.error('Failed to reset quota:', error)
   }
 }
+const openOpenAIRateLimitResetDialog = (account: Account) => {
+  openAIRateLimitResetAccount.value = account
+  showOpenAIRateLimitResetDialog.value = true
+}
+const closeOpenAIRateLimitResetDialog = () => {
+  showOpenAIRateLimitResetDialog.value = false
+  openAIRateLimitResetAccount.value = null
+}
+const confirmOpenAIRateLimitReset = async () => {
+  const account = openAIRateLimitResetAccount.value
+  if (!account) return
+  showOpenAIRateLimitResetDialog.value = false
+  try {
+    const result = await adminAPI.accounts.consumeOpenAIRateLimitResetCredit(account.id)
+    closeOpenAIRateLimitResetDialog()
+    usageManualRefreshToken.value += 1
+    if (result.code === 'reset' && result.windows_reset > 0) {
+      appStore.showSuccess(t('admin.accounts.usageWindow.resetSuccess', { count: result.windows_reset }))
+    } else {
+      appStore.showError(t('admin.accounts.usageWindow.resetNoChange', { code: result.code }))
+    }
+  } catch (error: any) {
+    console.error('Failed to reset OpenAI upstream rate limits:', error)
+    appStore.showError(error?.message || t('admin.accounts.usageWindow.resetFailed'))
+    openAIRateLimitResetAccount.value = null
+  }
+}
 const handleSetPrivacy = async (a: Account) => {
   try {
     const updated = await adminAPI.accounts.setPrivacy(a.id)
@@ -1878,5 +1919,17 @@ onUnmounted(() => {
 
 .account-tools-menu-icon {
   @apply inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md;
+}
+
+.accounts-table-page-layout {
+  min-height: 820px;
+  height: calc(100dvh - 72px - 2rem);
+}
+
+@media (max-width: 1023px) {
+  .accounts-table-page-layout {
+    min-height: 0;
+    height: auto;
+  }
 }
 </style>

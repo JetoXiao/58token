@@ -2,7 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -11,6 +16,97 @@ type accountUsageCodexProbeRepo struct {
 	stubOpenAIAccountRepo
 	updateExtraCh chan map[string]any
 	rateLimitCh   chan time.Time
+}
+
+func TestAccountUsageService_OpenAIRateLimitResetCreditsUseAssignedProxy(t *testing.T) {
+	originalListURL := openAIRateLimitResetCreditsURL
+	originalConsumeURL := openAIConsumeRateLimitResetCreditURL
+	openAIRateLimitResetCreditsURL = "http://upstream.test/backend-api/wham/rate-limit-reset-credits"
+	openAIConsumeRateLimitResetCreditURL = "http://upstream.test/backend-api/wham/rate-limit-reset-credits/consume"
+	defer func() {
+		openAIRateLimitResetCreditsURL = originalListURL
+		openAIConsumeRateLimitResetCreditURL = originalConsumeURL
+	}()
+
+	var consumeCalls int
+	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer test-access-token" {
+			t.Errorf("Authorization = %q", request.Header.Get("Authorization"))
+		}
+		if request.Header.Get("ChatGPT-Account-Id") != "chatgpt-account-1" {
+			t.Errorf("ChatGPT-Account-Id = %q", request.Header.Get("ChatGPT-Account-Id"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/backend-api/wham/rate-limit-reset-credits":
+			_, _ = w.Write([]byte(`{"credits":[{"id":"credit-1","reset_type":"codex_rate_limits","status":"available","granted_at":"2026-07-01T00:00:00Z","expires_at":null,"title":null,"description":null}],"available_count":1}`))
+		case "/backend-api/wham/rate-limit-reset-credits/consume":
+			consumeCalls++
+			var payload consumeOpenAIRateLimitResetCreditRequest
+			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode consume payload: %v", err)
+			}
+			if payload.RedeemRequestID == "" {
+				t.Fatal("redeem_request_id must not be empty")
+			}
+			_, _ = w.Write([]byte(`{"code":"reset","windows_reset":2}`))
+		default:
+			http.NotFound(w, request)
+		}
+	}))
+	defer proxyServer.Close()
+
+	proxyURL, err := url.Parse(proxyServer.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxyPort, err := strconv.Atoi(proxyURL.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := &Proxy{Protocol: proxyURL.Scheme, Host: proxyURL.Hostname(), Port: proxyPort, Status: StatusActive}
+	repo := &stubOpenAIAccountRepo{accounts: []Account{{
+		ID:       88,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeOAuth,
+		ProxyID:  func() *int64 { id := int64(9); return &id }(),
+		Proxy:    proxy,
+		Credentials: map[string]any{
+			"access_token":       "test-access-token",
+			"chatgpt_account_id": "chatgpt-account-1",
+		},
+	}}}
+	service := &AccountUsageService{accountRepo: repo, cache: NewUsageCache()}
+
+	credits, err := service.GetOpenAIRateLimitResetCredits(context.Background(), 88)
+	if err != nil {
+		t.Fatalf("GetOpenAIRateLimitResetCredits() error = %v", err)
+	}
+	if credits.AvailableCount != 1 || len(credits.Credits) != 1 {
+		t.Fatalf("credits = %#v", credits)
+	}
+	result, err := service.ConsumeOpenAIRateLimitResetCredit(context.Background(), 88)
+	if err != nil {
+		t.Fatalf("ConsumeOpenAIRateLimitResetCredit() error = %v", err)
+	}
+	if result.Code != "reset" || result.WindowsReset != 2 || consumeCalls != 1 {
+		t.Fatalf("result = %#v, consumeCalls = %d", result, consumeCalls)
+	}
+}
+
+func TestAccountUsageService_OpenAIRateLimitResetRequiresProxy(t *testing.T) {
+	repo := &stubOpenAIAccountRepo{accounts: []Account{{
+		ID:          89,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeOAuth,
+		Credentials: map[string]any{"access_token": "test-access-token"},
+	}}}
+	service := &AccountUsageService{accountRepo: repo}
+
+	_, err := service.ConsumeOpenAIRateLimitResetCredit(context.Background(), 89)
+	if err == nil || !errors.Is(err, ErrOpenAIRateLimitResetProxyRequired) {
+		t.Fatalf("expected ErrOpenAIRateLimitResetProxyRequired, got %v", err)
+	}
 }
 
 func (r *accountUsageCodexProbeRepo) UpdateExtra(_ context.Context, _ int64, updates map[string]any) error {

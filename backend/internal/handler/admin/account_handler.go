@@ -1701,6 +1701,48 @@ func (h *AccountHandler) GetUsage(c *gin.Context) {
 	response.Success(c, usage)
 }
 
+// GetOpenAIRateLimitResetCredits returns the upstream Codex reset credits.
+// The service requires the account's configured proxy and has no direct fallback.
+func (h *AccountHandler) GetOpenAIRateLimitResetCredits(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	credits, err := h.accountUsageService.GetOpenAIRateLimitResetCredits(c.Request.Context(), accountID)
+	if err != nil {
+		if errors.Is(err, service.ErrOpenAIRateLimitResetUnsupported) || errors.Is(err, service.ErrOpenAIRateLimitResetProxyRequired) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Error(c, http.StatusBadGateway, "Failed to query OpenAI rate-limit reset credits")
+		return
+	}
+	response.Success(c, credits)
+}
+
+// ConsumeOpenAIRateLimitResetCredit consumes one upstream Codex reset credit.
+// The request is always sent through the proxy assigned to the account.
+func (h *AccountHandler) ConsumeOpenAIRateLimitResetCredit(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	result, err := h.accountUsageService.ConsumeOpenAIRateLimitResetCredit(c.Request.Context(), accountID)
+	if err != nil {
+		if errors.Is(err, service.ErrOpenAIRateLimitResetUnsupported) || errors.Is(err, service.ErrOpenAIRateLimitResetProxyRequired) {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Error(c, http.StatusBadGateway, "Failed to reset OpenAI rate limits")
+		return
+	}
+	response.Success(c, result)
+}
+
 // ClearRateLimit handles clearing account rate limit status
 // POST /api/v1/admin/accounts/:id/clear-rate-limit
 func (h *AccountHandler) ClearRateLimit(c *gin.Context) {
