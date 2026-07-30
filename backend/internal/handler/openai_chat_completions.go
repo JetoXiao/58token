@@ -235,10 +235,13 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						return
 					}
 					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
-					h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
+					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
 					// Pool mode: retry on the same account
-					if failoverErr.RetryableOnSameAccount {
+					if !runtimeBlocked && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
+						if failoverErr.MaxSameAccountRetries > 0 && failoverErr.MaxSameAccountRetries < retryLimit {
+							retryLimit = failoverErr.MaxSameAccountRetries
+						}
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++
 							reqLog.Warn("openai_chat_completions.pool_mode_same_account_retry",
@@ -255,6 +258,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 							continue
 						}
 					}
+					h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 					h.gatewayService.RecordOpenAIAccountSwitch()
 					failedAccountIDs[account.ID] = struct{}{}
 					lastFailoverErr = failoverErr
@@ -276,6 +280,14 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					continue
 				}
 				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				if service.IsOpenAIStreamTransportFailure(err) {
+					h.gatewayService.RecordOpenAIAccountStreamTransportFailure(account)
+					h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
+					reqLog.Warn("openai_chat_completions.stream_transport_interrupted",
+						zap.Int64("account_id", account.ID),
+						zap.Error(err),
+					)
+				}
 				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 				reqLog.Warn("openai_chat_completions.forward_failed",
 					zap.Int64("account_id", account.ID),
@@ -286,7 +298,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			}
 		}
 		if result != nil {
-			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, result.FirstTokenMs)
+			h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, true, result.FirstTokenMs)
 		} else {
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, true, nil)
 		}

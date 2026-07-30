@@ -1,8 +1,10 @@
 package repository
 
 import (
+	"crypto/tls"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -48,6 +50,33 @@ func (s *HTTPUpstreamSuite) TestDefaultResponseHeaderTimeout() {
 	transport, ok := entry.client.Transport.(*http.Transport)
 	require.True(s.T(), ok, "expected *http.Transport")
 	require.Equal(s.T(), 300*time.Second, transport.ResponseHeaderTimeout, "ResponseHeaderTimeout mismatch")
+	require.True(s.T(), transport.ForceAttemptHTTP2, "upstream transport should negotiate HTTP/2")
+}
+
+func (s *HTTPUpstreamSuite) TestDo_NegotiatesHTTP2() {
+	upstream := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.Proto)
+	}))
+	upstream.EnableHTTP2 = true
+	upstream.StartTLS()
+	s.T().Cleanup(upstream.Close)
+
+	svc := s.newService()
+	entry := mustGetOrCreateClient(s.T(), svc, "", 1, 1)
+	transport, ok := entry.client.Transport.(*http.Transport)
+	require.True(s.T(), ok, "expected *http.Transport")
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} // Test server uses an ephemeral self-signed certificate.
+
+	req, err := http.NewRequest(http.MethodGet, upstream.URL, nil)
+	require.NoError(s.T(), err)
+	resp, err := svc.Do(req, "", 1, 1)
+	require.NoError(s.T(), err)
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), 2, resp.ProtoMajor)
+	require.Equal(s.T(), "HTTP/2.0", string(body))
 }
 
 // TestCustomResponseHeaderTimeout 测试自定义响应头超时配置

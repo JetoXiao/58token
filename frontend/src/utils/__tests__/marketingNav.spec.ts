@@ -18,11 +18,12 @@ describe('marketingNav utils', () => {
   })
 
   it('normalizes supported items in display order', () => {
-    expect(normalizeMarketingNavItems(['partner', 'unknown', 'models'])).toEqual(
-      ['models', 'partner'],
+    expect(normalizeMarketingNavItems(['partner', 'resources', 'unknown', 'models'])).toEqual(
+      ['models', 'resources', 'partner'],
     )
-    expect(normalizeMarketingNavItems('["partner","docs"]')).toEqual([
+    expect(normalizeMarketingNavItems('["partner","resources","docs"]')).toEqual([
       'docs',
+      'resources',
       'partner',
     ])
   })

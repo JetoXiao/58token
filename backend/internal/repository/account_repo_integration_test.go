@@ -707,6 +707,61 @@ func (s *AccountRepoSuite) TestClearRateLimit() {
 	s.Require().Nil(got.OverloadUntil)
 }
 
+func (s *AccountRepoSuite) TestClearExpiredRuntimeState() {
+	now := time.Now().UTC().Truncate(time.Second)
+	expired := now.Add(-time.Minute)
+	future := now.Add(time.Minute)
+
+	expiredAccount := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:             "expired-runtime-state",
+		Platform:         service.PlatformGemini,
+		RateLimitedAt:    &expired,
+		RateLimitResetAt: &expired,
+		OverloadUntil:    &expired,
+	})
+	s.Require().NoError(s.client.Account.UpdateOneID(expiredAccount.ID).
+		SetTempUnschedulableUntil(expired).
+		SetTempUnschedulableReason("temporary cooldown").
+		Exec(s.ctx))
+
+	futureAccount := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:             "future-runtime-state",
+		Platform:         service.PlatformGemini,
+		RateLimitedAt:    &now,
+		RateLimitResetAt: &future,
+		OverloadUntil:    &future,
+	})
+	s.Require().NoError(s.client.Account.UpdateOneID(futureAccount.ID).
+		SetTempUnschedulableUntil(future).
+		SetTempUnschedulableReason("still cooling down").
+		Exec(s.ctx))
+
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	recovered, err := s.repo.ClearExpiredRuntimeState(s.ctx, now)
+	s.Require().NoError(err)
+	s.Require().Equal([]int64{expiredAccount.ID}, recovered)
+
+	gotExpired, err := s.repo.GetByID(s.ctx, expiredAccount.ID)
+	s.Require().NoError(err)
+	s.Require().Nil(gotExpired.RateLimitedAt)
+	s.Require().Nil(gotExpired.RateLimitResetAt)
+	s.Require().Nil(gotExpired.OverloadUntil)
+	s.Require().Nil(gotExpired.TempUnschedulableUntil)
+	s.Require().Empty(gotExpired.TempUnschedulableReason)
+
+	gotFuture, err := s.repo.GetByID(s.ctx, futureAccount.ID)
+	s.Require().NoError(err)
+	s.Require().NotNil(gotFuture.RateLimitResetAt)
+	s.Require().NotNil(gotFuture.OverloadUntil)
+	s.Require().NotNil(gotFuture.TempUnschedulableUntil)
+	s.Require().Equal("still cooling down", gotFuture.TempUnschedulableReason)
+
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(expiredAccount.ID, cacheRecorder.setAccounts[0].ID)
+}
+
 func (s *AccountRepoSuite) TestTempUnschedulableFieldsLoadedByGetByIDAndGetByIDs() {
 	acc1 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-1"})
 	acc2 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-2"})

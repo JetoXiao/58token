@@ -1035,7 +1035,7 @@ func clampChannelMonitorInterval(v int) int {
 	return v
 }
 
-const defaultMarketingNavItemsJSON = `["models","docs","partner"]`
+const defaultMarketingNavItemsJSON = `["models","docs","resources","partner"]`
 const defaultUserMenuItemsJSON = `["dashboard","api_keys","help_center","image_generation","usage","channel_status","subscriptions","purchase","orders","redeem","affiliate","support_contact","profile"]`
 const defaultSupportContactConfigJSON = `{"enabled":true,"title":"售后联系","description":"如需售后支持，请添加下方客服微信联系。","contacts":[]}`
 const maxSupportContactItems = 3
@@ -1053,7 +1053,7 @@ type SupportContactItem struct {
 	QRImage   string `json:"qr_image"`
 }
 
-var marketingNavItemOrder = []string{"models", "docs", "partner"}
+var marketingNavItemOrder = []string{"models", "docs", "resources", "partner"}
 var userMenuItemOrder = []string{
 	"dashboard",
 	"api_keys",
@@ -1172,6 +1172,8 @@ func normalizeMarketingNavItems(items []string) []string {
 			enabled["models"] = struct{}{}
 		case "docs":
 			enabled["docs"] = struct{}{}
+		case "resources":
+			enabled["resources"] = struct{}{}
 		case "partner":
 			enabled["partner"] = struct{}{}
 		}

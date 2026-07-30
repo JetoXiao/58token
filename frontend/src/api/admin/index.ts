@@ -34,6 +34,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import helpCenterAPI from './helpCenter'
 import visitorAnalyticsAPI from './visitorAnalytics'
+import downloadResourcesAPI from './downloadResources'
 
 /**
  * Unified admin API object for convenient access
@@ -69,7 +70,8 @@ export const adminAPI = {
   affiliates: affiliatesAPI,
   riskControl: riskControlAPI,
   helpCenter: helpCenterAPI,
-  visitorAnalytics: visitorAnalyticsAPI
+  visitorAnalytics: visitorAnalyticsAPI,
+  downloadResources: downloadResourcesAPI
 }
 
 export {
@@ -103,7 +105,8 @@ export {
   affiliatesAPI,
   riskControlAPI,
   helpCenterAPI,
-  visitorAnalyticsAPI
+  visitorAnalyticsAPI,
+  downloadResourcesAPI
 }
 
 export default adminAPI

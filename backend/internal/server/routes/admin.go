@@ -21,6 +21,7 @@ func RegisterAdminRoutes(
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 		registerVisitorAnalyticsRoutes(admin, h)
+		registerDownloadResourceAdminRoutes(admin, h)
 
 		// 用户管理
 		registerUserManagementRoutes(admin, h)

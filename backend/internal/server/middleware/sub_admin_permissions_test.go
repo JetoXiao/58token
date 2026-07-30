@@ -63,6 +63,23 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 			wantBody:    "READ_ONLY_ADMIN",
 		},
 		{
+			name:        "sub_admin_download_resources_read_allowed",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_download_resources"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/download-resources",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "sub_admin_download_resources_write_denied",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_download_resources"},
+			method:      http.MethodPost,
+			path:        "/api/v1/admin/download-resources/upload-url",
+			wantStatus:  http.StatusForbidden,
+			wantBody:    "READ_ONLY_ADMIN",
+		},
+		{
 			name:        "sub_admin_help_center_uses_settings_permission",
 			role:        service.RoleSubAdmin,
 			permissions: []string{"admin_settings"},

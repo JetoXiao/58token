@@ -195,6 +195,11 @@ func buildTTFTObservationParams(c *gin.Context, account *service.Account, result
 	if v, ok := getContextInt64Local(c, service.OpsTimeToFirstTokenMsKey); ok {
 		out["time_to_first_token_ms"] = v
 	}
+	if v, ok := c.Get(service.OpsUpstreamHTTPProtoKey); ok {
+		if proto, ok := v.(string); ok && strings.TrimSpace(proto) != "" {
+			out["upstream_http_proto"] = strings.TrimSpace(proto)
+		}
+	}
 	if v, ok := getContextInt64Local(c, service.OpsOpenAIWSQueueWaitMsKey); ok {
 		out["openai_ws_queue_wait_ms"] = v
 	}

@@ -1923,6 +1923,45 @@ func TestOpenAIBuildUpstreamRequestOAuthMessagesBridgeUsesSessionOnly(t *testing
 	require.Empty(t, req.Header.Get("originator"))
 }
 
+func TestOpenAIBuildUpstreamRequestStreamForcesIdentityEncoding(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader([]byte(`{"model":"gpt-5.6-sol","stream":true}`)))
+	c.Request.Header.Set("Accept-Encoding", "gzip, br")
+
+	svc := &OpenAIGatewayService{}
+	account := &Account{
+		Type:        AccountTypeOAuth,
+		Credentials: map[string]any{"chatgpt_account_id": "chatgpt-acc"},
+	}
+
+	req, err := svc.buildUpstreamRequest(c.Request.Context(), c, account, []byte(`{"model":"gpt-5.6-sol","stream":true}`), "token", true, "session-1", true)
+	require.NoError(t, err)
+	require.Equal(t, "text/event-stream", req.Header.Get("Accept"))
+	require.Equal(t, "identity", req.Header.Get("Accept-Encoding"))
+}
+
+func TestOpenAIBuildUpstreamRequestNonStreamLeavesEncodingAutomatic(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader([]byte(`{"model":"gpt-5.6-sol"}`)))
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{
+		Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}},
+	}}
+	account := &Account{
+		Type:        AccountTypeAPIKey,
+		Platform:    PlatformOpenAI,
+		Credentials: map[string]any{"base_url": "https://example.com/v1"},
+	}
+
+	req, err := svc.buildUpstreamRequest(c.Request.Context(), c, account, []byte(`{"model":"gpt-5.6-sol"}`), "token", false, "", false)
+	require.NoError(t, err)
+	require.Empty(t, req.Header.Get("Accept-Encoding"))
+}
+
 func TestOpenAIBuildUpstreamRequestPreservesCompactPathForAPIKeyBaseURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()

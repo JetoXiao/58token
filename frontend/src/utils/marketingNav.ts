@@ -1,6 +1,6 @@
-export type MarketingNavItem = 'models' | 'docs' | 'partner'
+export type MarketingNavItem = 'models' | 'docs' | 'resources' | 'partner'
 
-export const DEFAULT_MARKETING_NAV_ITEMS: MarketingNavItem[] = ['models', 'docs', 'partner']
+export const DEFAULT_MARKETING_NAV_ITEMS: MarketingNavItem[] = ['models', 'docs', 'resources', 'partner']
 
 const MARKETING_NAV_ITEM_SET = new Set<MarketingNavItem>(DEFAULT_MARKETING_NAV_ITEMS)
 

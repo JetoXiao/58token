@@ -196,6 +196,16 @@ const routes: RouteRecordRaw[] = [
       titleKey: 'gateway.partner.pageTitle'
     }
   },
+  {
+    path: '/downloads',
+    name: 'Downloads',
+    component: () => import('@/views/public/DownloadsView.vue'),
+    meta: {
+      requiresAuth: false,
+      title: 'Downloads',
+      titleKey: 'downloads.title'
+    }
+  },
 
   // ==================== User Routes ====================
   {
@@ -498,6 +508,19 @@ const routes: RouteRecordRaw[] = [
       title: 'Visitor Analytics',
       titleKey: 'admin.visitorAnalytics.title',
       descriptionKey: 'admin.visitorAnalytics.description'
+    }
+  },
+  {
+    path: '/admin/download-resources',
+    name: 'AdminDownloadResources',
+    component: () => import('@/views/admin/DownloadResourcesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      adminMenuKey: 'admin_download_resources',
+      title: 'Download Resources',
+      titleKey: 'admin.downloadResources.title',
+      descriptionKey: 'admin.downloadResources.description'
     }
   },
   {
@@ -883,7 +906,7 @@ let authInitialized = false
 const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
-const BACKEND_MODE_ALLOWED_PATHS = ['/home', '/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal', '/available-channels', '/docs', '/partners']
+const BACKEND_MODE_ALLOWED_PATHS = ['/home', '/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal', '/available-channels', '/docs', '/partners', '/downloads']
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',

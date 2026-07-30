@@ -22,6 +22,7 @@ const (
 	OpsUpstreamLatencyMsKey  = "ops_upstream_latency_ms"
 	OpsResponseLatencyMsKey  = "ops_response_latency_ms"
 	OpsTimeToFirstTokenMsKey = "ops_time_to_first_token_ms"
+	OpsUpstreamHTTPProtoKey  = "ops_upstream_http_proto"
 	// OpenAI WS 关键观测字段
 	OpsOpenAIWSQueueWaitMsKey = "ops_openai_ws_queue_wait_ms"
 	OpsOpenAIWSConnPickMsKey  = "ops_openai_ws_conn_pick_ms"
@@ -44,6 +45,15 @@ func SetOpsLatencyMs(c *gin.Context, key string, value int64) {
 		return
 	}
 	c.Set(key, value)
+}
+
+func SetOpsUpstreamHTTPProto(c *gin.Context, proto string) {
+	if c == nil {
+		return
+	}
+	if proto = strings.TrimSpace(proto); proto != "" {
+		c.Set(OpsUpstreamHTTPProtoKey, proto)
+	}
 }
 
 func MarkOpsClientBusinessLimited(c *gin.Context, reason string) {
@@ -115,7 +125,7 @@ type OpsUpstreamErrorEvent struct {
 	// Best-effort upstream response capture (sanitized+trimmed).
 	UpstreamResponseBody string `json:"upstream_response_body,omitempty"`
 
-	// Kind: http_error | request_error | retry_exhausted | failover
+	// Kind: http_error | request_error | transport_error | retry_exhausted | failover
 	Kind string `json:"kind,omitempty"`
 
 	Message string `json:"message,omitempty"`

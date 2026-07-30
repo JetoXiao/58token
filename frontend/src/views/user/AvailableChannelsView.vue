@@ -20,6 +20,8 @@
       :model-marketplace-label="t('nav.availableChannels')"
       partner-to="/partners"
       :partner-label="t('gateway.common.partner')"
+      resources-to="/downloads"
+      :resources-label="t('gateway.common.resources')"
       :visible-items="marketingNavItems"
     >
       <template #tools>

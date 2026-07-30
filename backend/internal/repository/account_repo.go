@@ -1194,6 +1194,68 @@ func (r *accountRepository) ClearRateLimit(ctx context.Context, id int64) error 
 	return nil
 }
 
+// ClearExpiredRuntimeState removes only runtime blocks whose deadline has already
+// elapsed. Persisted cooldowns are deliberately cleared instead of merely being
+// ignored by the scheduler so account views, single-account snapshots and bucket
+// snapshots all converge on the recovered state.
+func (r *accountRepository) ClearExpiredRuntimeState(ctx context.Context, now time.Time) ([]int64, error) {
+	rows, err := r.sql.QueryContext(ctx, `
+		UPDATE accounts
+		SET rate_limited_at = CASE
+				WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at <= $1 THEN NULL
+				ELSE rate_limited_at
+			END,
+			rate_limit_reset_at = CASE
+				WHEN rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at <= $1 THEN NULL
+				ELSE rate_limit_reset_at
+			END,
+			overload_until = CASE
+				WHEN overload_until IS NOT NULL AND overload_until <= $1 THEN NULL
+				ELSE overload_until
+			END,
+			temp_unschedulable_until = CASE
+				WHEN temp_unschedulable_until IS NOT NULL AND temp_unschedulable_until <= $1 THEN NULL
+				ELSE temp_unschedulable_until
+			END,
+			temp_unschedulable_reason = CASE
+				WHEN temp_unschedulable_until IS NOT NULL AND temp_unschedulable_until <= $1 THEN ''
+				ELSE temp_unschedulable_reason
+			END,
+			updated_at = NOW()
+		WHERE deleted_at IS NULL
+			AND (
+				(rate_limit_reset_at IS NOT NULL AND rate_limit_reset_at <= $1)
+				OR (overload_until IS NOT NULL AND overload_until <= $1)
+				OR (temp_unschedulable_until IS NOT NULL AND temp_unschedulable_until <= $1)
+			)
+		RETURNING id
+	`, now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	accountIDs := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		accountIDs = append(accountIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for _, id := range accountIDs {
+		if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
+			logger.LegacyPrintf("repository.account", "[SchedulerOutbox] enqueue expired runtime state recovery failed: account=%d err=%v", id, err)
+		}
+	}
+	r.syncSchedulerAccountSnapshots(ctx, accountIDs)
+	return accountIDs, nil
+}
+
 func (r *accountRepository) ClearAntigravityQuotaScopes(ctx context.Context, id int64) error {
 	client := clientFromContext(ctx, r.client)
 	result, err := client.ExecContext(

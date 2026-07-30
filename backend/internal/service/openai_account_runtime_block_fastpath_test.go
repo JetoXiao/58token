@@ -97,6 +97,16 @@ func TestOpenAIConsecutiveFailureBreaker_BlocksAfterThreshold(t *testing.T) {
 	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
+func TestOpenAIStreamTransportFailureBreaker_BlocksAfterThreshold(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 481, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+
+	require.False(t, svc.RecordOpenAIAccountStreamTransportFailure(account))
+	require.False(t, svc.RecordOpenAIAccountStreamTransportFailure(account))
+	require.True(t, svc.RecordOpenAIAccountStreamTransportFailure(account))
+	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
 func TestOpenAIConsecutiveFailureBreaker_SuccessClearsFailures(t *testing.T) {
 	svc := &OpenAIGatewayService{}
 	account := &Account{ID: 49, Platform: PlatformOpenAI, Type: AccountTypeOAuth}

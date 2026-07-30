@@ -72,6 +72,14 @@ func (s *OpenAIGatewayService) RecordOpenAIAccountFailover(account *Account, fai
 	return s.recordOpenAIAccountConsecutiveFailure(account, failoverErr.StatusCode, "failover")
 }
 
+// RecordOpenAIAccountStreamTransportFailure counts an upstream SSE connection
+// interruption after output began. It is intentionally separate from generic
+// forwarding errors so client disconnects and response validation errors do not
+// make an account unavailable.
+func (s *OpenAIGatewayService) RecordOpenAIAccountStreamTransportFailure(account *Account) bool {
+	return s.recordOpenAIAccountConsecutiveFailure(account, http.StatusBadGateway, "stream_transport")
+}
+
 func (s *OpenAIGatewayService) recordOpenAIAccountConsecutiveFailure(account *Account, statusCode int, reason string) bool {
 	if s == nil || !isOpenAIAccount(account) || account.ID <= 0 {
 		return false

@@ -7090,6 +7090,11 @@ const marketingNavOptions = computed<
     description: localText("展示 API 接入指南入口。", "Show the API integration guide entry."),
   },
   {
+    value: "resources",
+    label: localText("资源下载", "Downloads"),
+    description: localText("展示客户端安装包与工具下载入口。", "Show client installers and utility downloads."),
+  },
+  {
     value: "partner",
     label: localText("合伙人", "Partners"),
     description: localText("展示合伙人计划介绍入口。", "Show the partner program entry."),
@@ -7098,6 +7103,7 @@ const marketingNavOptions = computed<
 const marketingNavSelection = reactive<Record<MarketingNavItem, boolean>>({
   models: true,
   docs: true,
+  resources: true,
   partner: true,
 });
 

@@ -766,6 +766,10 @@ func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL) (*http.Tra
 		MaxConnsPerHost:       settings.maxConnsPerHost,
 		IdleConnTimeout:       settings.idleConnTimeout,
 		ResponseHeaderTimeout: settings.responseHeaderTimeout,
+		// A custom Transport does not automatically inherit the HTTP/2 settings
+		// from http.DefaultTransport. Enable negotiation explicitly so proxied
+		// streaming requests can reuse multiplexed upstream connections.
+		ForceAttemptHTTP2: true,
 	}
 	if err := proxyutil.ConfigureTransportProxy(transport, proxyURL); err != nil {
 		return nil, err

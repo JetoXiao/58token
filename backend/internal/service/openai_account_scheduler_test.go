@@ -475,12 +475,76 @@ func TestOpenAIGatewayService_OpenAIAccountSchedulerMetrics_DisabledNoOp(t *test
 }
 
 func TestShouldBypassOpenAIStickyTTFT(t *testing.T) {
-	require.False(t, shouldBypassOpenAIStickyTTFT(7999, 20, 1000, 20, true))
-	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 4, 1000, 20, true))
-	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 20, 9000, 20, false))
-	require.False(t, shouldBypassOpenAIStickyTTFT(12000, 20, 2000, 2, false))
-	require.True(t, shouldBypassOpenAIStickyTTFT(12000, 20, 2000, 20, false))
-	require.True(t, shouldBypassOpenAIStickyTTFT(20000, 20, 0, 0, true))
+	require.False(t, shouldBypassOpenAIStickyTTFT(2499, 20, 1000, 20, true))
+	require.False(t, shouldBypassOpenAIStickyTTFT(5000, 7, 1000, 20, true))
+	require.False(t, shouldBypassOpenAIStickyTTFT(4000, 20, 3400, 20, false))
+	require.False(t, shouldBypassOpenAIStickyTTFT(4000, 20, 2000, 4, false))
+	require.True(t, shouldBypassOpenAIStickyTTFT(4000, 20, 2500, 20, false))
+	require.True(t, shouldBypassOpenAIStickyTTFT(10000, 20, 0, 0, true))
+}
+
+func TestOpenAIAccountRuntimeStats_ModelTTFTIsolation(t *testing.T) {
+	stats := newOpenAIAccountRuntimeStats()
+	slowSol, fastSol, fastLuna := 4200, 1600, 900
+	for range int(openAIStickyTTFTMinSamples) {
+		stats.reportForModel(1, "gpt-5.6-sol", true, &slowSol)
+		stats.reportForModel(2, "gpt-5.6-sol", true, &fastSol)
+		stats.reportForModel(1, "gpt-5.6-luna", true, &fastLuna)
+	}
+
+	solTTFT, solSamples, solOK := stats.ttftSnapshotForModel(1, "gpt-5.6-sol")
+	lunaTTFT, lunaSamples, lunaOK := stats.ttftSnapshotForModel(1, "gpt-5.6-luna")
+	require.True(t, solOK)
+	require.True(t, lunaOK)
+	require.Equal(t, openAIStickyTTFTMinSamples, solSamples)
+	require.Equal(t, openAIStickyTTFTMinSamples, lunaSamples)
+	require.Equal(t, float64(slowSol), solTTFT)
+	require.Equal(t, float64(fastLuna), lunaTTFT)
+
+	alternativeTTFT, alternativeSamples, alternativeOK := stats.ttftSnapshotForModel(2, "gpt-5.6-sol")
+	require.True(t, alternativeOK)
+	require.True(t, shouldBypassOpenAIStickyTTFT(solTTFT, solSamples, alternativeTTFT, alternativeSamples, false))
+	_, _, unknownModelOK := stats.ttftSnapshotForModel(1, "gpt-5.5")
+	require.False(t, unknownModelOK)
+}
+
+func TestOpenAIGatewayService_SelectAccountWithScheduler_LegacyUsesModelTTFTTieBreak(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(10113)
+	older := time.Now().Add(-time.Hour)
+	newer := time.Now()
+	const (
+		slowAccountID = int64(38301)
+		fastAccountID = int64(38302)
+		model         = "gpt-5.6-sol"
+	)
+	accounts := []Account{
+		{ID: slowAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0, LastUsedAt: &older},
+		{ID: fastAccountID, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true, Concurrency: 1, Priority: 0, LastUsedAt: &newer},
+	}
+	cfg := &config.Config{}
+	cfg.Gateway.Scheduling.LoadBatchEnabled = true
+	svc := &OpenAIGatewayService{
+		accountRepo:        schedulerTestOpenAIAccountRepo{accounts: accounts},
+		cache:              &schedulerTestGatewayCache{},
+		cfg:                cfg,
+		rateLimitService:   newOpenAIAdvancedSchedulerRateLimitService("false"),
+		concurrencyService: NewConcurrencyService(schedulerTestConcurrencyCache{}),
+	}
+	slowTTFT, fastTTFT := 4200, 1800
+	for range int(openAIStickyTTFTAlternativeMinSamples) {
+		svc.ReportOpenAIAccountScheduleResultForModel(slowAccountID, model, true, &slowTTFT)
+		svc.ReportOpenAIAccountScheduleResultForModel(fastAccountID, model, true, &fastTTFT)
+	}
+
+	selection, _, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", "", model, nil, OpenAIUpstreamTransportAny, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, fastAccountID, selection.Account.ID)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
 }
 
 func TestOpenAIGatewayService_SelectAccountWithScheduler_SessionStickyRateLimitedAccountFallsBackToFreshCandidate(t *testing.T) {
@@ -720,8 +784,8 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SlowStickyTTFTBypassesL
 
 			slowTTFT, fastTTFT := 12000, 2000
 			for range int(openAIStickyTTFTMinSamples) {
-				svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
-				svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+				svc.ReportOpenAIAccountScheduleResultForModel(slowAccountID, "gpt-5.6-sol", true, &slowTTFT)
+				svc.ReportOpenAIAccountScheduleResultForModel(fastAccountID, "gpt-5.6-sol", true, &fastTTFT)
 			}
 
 			selection, decision, err := svc.SelectAccountWithScheduler(
@@ -771,8 +835,8 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_SlowStickyTTFTBypassesA
 	}
 	slowTTFT, fastTTFT := 12000, 2000
 	for range int(openAIStickyTTFTMinSamples) {
-		svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
-		svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+		svc.ReportOpenAIAccountScheduleResultForModel(slowAccountID, "gpt-5.6-sol", true, &slowTTFT)
+		svc.ReportOpenAIAccountScheduleResultForModel(fastAccountID, "gpt-5.6-sol", true, &fastTTFT)
 	}
 
 	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "", sessionHash, "gpt-5.6-sol", nil, OpenAIUpstreamTransportAny, false)
@@ -812,8 +876,8 @@ func TestOpenAIGatewayService_SelectAccountWithScheduler_PreviousResponseDisable
 	}
 	slowTTFT, fastTTFT := 12000, 2000
 	for range int(openAIStickyTTFTMinSamples) {
-		svc.ReportOpenAIAccountScheduleResult(slowAccountID, true, &slowTTFT)
-		svc.ReportOpenAIAccountScheduleResult(fastAccountID, true, &fastTTFT)
+		svc.ReportOpenAIAccountScheduleResultForModel(slowAccountID, "gpt-5.6-sol", true, &slowTTFT)
+		svc.ReportOpenAIAccountScheduleResultForModel(fastAccountID, "gpt-5.6-sol", true, &fastTTFT)
 	}
 
 	selection, decision, err := svc.SelectAccountWithScheduler(ctx, &groupID, "resp_strong_sticky", sessionHash, "gpt-5.6-sol", nil, OpenAIUpstreamTransportAny, false)

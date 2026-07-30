@@ -173,6 +173,7 @@ func isSubAdminMenuPermissionKey(item string) bool {
 	switch item {
 	case "admin_dashboard",
 		"admin_visitor_analytics",
+		"admin_download_resources",
 		"admin_ops",
 		"admin_ttft_analysis",
 		"admin_response_cache",

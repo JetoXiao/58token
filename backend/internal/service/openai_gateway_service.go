@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -1552,9 +1553,9 @@ func (s *OpenAIGatewayService) tryStickySessionHit(
 		return nil, 0
 	}
 
-	if allowStickyTTFTBypass && s.shouldEvaluateOpenAIStickyTTFT(accountID) {
+	if allowStickyTTFTBypass && s.shouldEvaluateOpenAIStickyTTFT(accountID, requestedModel) {
 		accounts, listErr := s.listSchedulableAccounts(ctx, groupID)
-		if listErr == nil && s.shouldBypassOpenAIStickyAccount(accountID, accounts, func(candidate *Account) bool {
+		if listErr == nil && s.shouldBypassOpenAIStickyAccount(accountID, requestedModel, accounts, func(candidate *Account) bool {
 			if _, excluded := excludedIDs[candidate.ID]; excluded {
 				return false
 			}
@@ -1800,8 +1801,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(
 					} else if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 						_ = s.deleteStickySessionAccountID(ctx, groupID, sessionHash)
 					} else {
-						bypassSticky := allowStickyTTFTBypass && s.shouldEvaluateOpenAIStickyTTFT(accountID) &&
-							s.shouldBypassOpenAIStickyAccount(accountID, accounts, func(candidate *Account) bool {
+						bypassSticky := allowStickyTTFTBypass && s.shouldEvaluateOpenAIStickyTTFT(accountID, requestedModel) &&
+							s.shouldBypassOpenAIStickyAccount(accountID, requestedModel, accounts, func(candidate *Account) bool {
 								if isExcluded(candidate.ID) || !isOpenAIAccountEligibleForRequest(candidate, requestedModel, requireCompact) ||
 									s.isOpenAIAccountRuntimeBlocked(candidate) {
 									return false
@@ -1908,6 +1909,17 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(
 		if len(available) == 0 {
 			return nil, false, nil
 		}
+		type legacyTTFTSnapshot struct {
+			ttft    float64
+			samples int64
+			ok      bool
+		}
+		ttftByAccountID := make(map[int64]legacyTTFTSnapshot, len(available))
+		stats := s.getOpenAIAccountRuntimeStats()
+		for _, item := range available {
+			ttft, samples, ok := stats.ttftSnapshotForModel(item.account.ID, requestedModel)
+			ttftByAccountID[item.account.ID] = legacyTTFTSnapshot{ttft: ttft, samples: samples, ok: ok}
+		}
 
 		sort.SliceStable(available, func(i, j int) bool {
 			a, b := available[i], available[j]
@@ -1916,6 +1928,13 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(
 			}
 			if a.loadInfo.LoadRate != b.loadInfo.LoadRate {
 				return a.loadInfo.LoadRate < b.loadInfo.LoadRate
+			}
+			aTTFT, bTTFT := ttftByAccountID[a.account.ID], ttftByAccountID[b.account.ID]
+			if aTTFT.ok && bTTFT.ok &&
+				aTTFT.samples >= openAIStickyTTFTAlternativeMinSamples &&
+				bTTFT.samples >= openAIStickyTTFTAlternativeMinSamples &&
+				math.Abs(aTTFT.ttft-bTTFT.ttft) >= openAILegacyTTFTTieBreakMinDifferenceMs {
+				return aTTFT.ttft < bTTFT.ttft
 			}
 			switch {
 			case a.account.LastUsedAt == nil && b.account.LastUsedAt != nil:
@@ -2992,18 +3011,32 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		upstreamStart := time.Now()
 		resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
+		if resp != nil {
+			SetOpsUpstreamHTTPProto(c, resp.Proto)
+		}
 		if err != nil {
-			// Ensure the client receives an error response (handlers assume Forward writes on non-failover errors).
+			transportFailure := isOpenAIUpstreamTransportError(err)
 			safeErr := sanitizeUpstreamErrorMessage(err.Error())
+			if transportFailure {
+				safeErr = openAIUpstreamTransportErrorMessage(err)
+			}
+			errorKind := "request_error"
+			if transportFailure {
+				errorKind = "transport_error"
+			}
 			setOpsUpstreamError(c, 0, safeErr, "")
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 				Platform:           account.Platform,
 				AccountID:          account.ID,
 				AccountName:        account.Name,
 				UpstreamStatusCode: 0,
-				Kind:               "request_error",
+				Kind:               errorKind,
 				Message:            safeErr,
 			})
+			if transportFailure {
+				return nil, newOpenAITransportRequestFailoverError(err)
+			}
+			// Ensure the client receives an error response (handlers assume Forward writes on non-failover errors).
 			c.JSON(http.StatusBadGateway, gin.H{
 				"error": gin.H{
 					"type":    "upstream_error",
@@ -3308,8 +3341,19 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 	upstreamStart := time.Now()
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
+	if resp != nil {
+		SetOpsUpstreamHTTPProto(c, resp.Proto)
+	}
 	if err != nil {
+		transportFailure := isOpenAIUpstreamTransportError(err)
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
+		if transportFailure {
+			safeErr = openAIUpstreamTransportErrorMessage(err)
+		}
+		errorKind := "request_error"
+		if transportFailure {
+			errorKind = "transport_error"
+		}
 		setOpsUpstreamError(c, 0, safeErr, "")
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
@@ -3317,9 +3361,12 @@ func (s *OpenAIGatewayService) forwardOpenAIPassthrough(
 			AccountName:        account.Name,
 			UpstreamStatusCode: 0,
 			Passthrough:        true,
-			Kind:               "request_error",
+			Kind:               errorKind,
 			Message:            safeErr,
 		})
+		if transportFailure {
+			return nil, newOpenAITransportRequestFailoverError(err)
+		}
 		c.JSON(http.StatusBadGateway, gin.H{
 			"error": gin.H{
 				"type":    "upstream_error",
@@ -4251,6 +4298,12 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	// Ensure required headers exist
 	if req.Header.Get("content-type") == "" {
 		req.Header.Set("content-type", "application/json")
+	}
+	// Compression can buffer small SSE frames at the upstream or proxy and add
+	// avoidable delay before the first event becomes readable. Prefer immediate
+	// delivery for all Responses streams; the payloads are already compact SSE.
+	if isStream || strings.Contains(strings.ToLower(req.Header.Get("accept")), "text/event-stream") {
+		req.Header.Set("accept-encoding", "identity")
 	}
 
 	return req, nil

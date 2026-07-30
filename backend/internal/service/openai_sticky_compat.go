@@ -23,6 +23,8 @@ var (
 	openAIStickyLegacyDualWriteTotal    atomic.Int64
 )
 
+const openAIStickySessionClearTimeout = 500 * time.Millisecond
+
 func openAIStickyCompatStats() (legacyReadFallbackTotal, legacyReadFallbackHit, legacyDualWriteTotal int64) {
 	return openAIStickyLegacyReadFallbackTotal.Load(),
 		openAIStickyLegacyReadFallbackHit.Load(),
@@ -218,4 +220,16 @@ func (s *OpenAIGatewayService) deleteStickySessionAccountID(ctx context.Context,
 		_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), legacyKey)
 	}
 	return err
+}
+
+// ClearOpenAIStickySession removes the affinity binding after a transport
+// failure so the client's next reconnect can be scheduled to a healthy account.
+func (s *OpenAIGatewayService) ClearOpenAIStickySession(ctx context.Context, groupID *int64, sessionHash string) {
+	base := context.Background()
+	if ctx != nil {
+		base = context.WithoutCancel(ctx)
+	}
+	stateCtx, cancel := context.WithTimeout(base, openAIStickySessionClearTimeout)
+	defer cancel()
+	_ = s.deleteStickySessionAccountID(stateCtx, groupID, sessionHash)
 }

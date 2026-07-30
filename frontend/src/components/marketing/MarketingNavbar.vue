@@ -65,6 +65,26 @@
           </a>
         </router-link>
         <router-link
+          v-if="resourcesTo && showResources"
+          :to="resourcesTo"
+          custom
+          v-slot="{ href, navigate, isActive }"
+        >
+          <a
+            :href="href"
+            @click="navigate"
+            :class="[
+              'inline-flex h-10 max-w-[8.5rem] items-center gap-1.5 truncate rounded-xl border px-3 py-2 text-xs font-semibold transition sm:max-w-none sm:px-3.5 sm:text-sm',
+              isActive
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 shadow-[0_10px_28px_rgba(16,185,129,0.16)] dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200'
+                : 'border-transparent text-gray-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 dark:text-slate-300 dark:hover:border-emerald-400/20 dark:hover:bg-emerald-400/10 dark:hover:text-emerald-200',
+            ]"
+          >
+            <span :class="['h-1.5 w-1.5 shrink-0 rounded-full', isActive ? 'bg-emerald-500 dark:bg-emerald-300' : 'bg-emerald-300 dark:bg-emerald-500/60']"></span>
+            <span class="truncate">{{ resourcesLabel }}</span>
+          </a>
+        </router-link>
+        <router-link
           v-if="partnerTo && showPartner"
           :to="partnerTo"
           custom
@@ -128,6 +148,8 @@ const props = defineProps<{
   modelMarketplaceLabel?: string
   partnerTo?: string
   partnerLabel?: string
+  resourcesTo?: string
+  resourcesLabel?: string
   visibleItems?: string[]
 }>()
 
@@ -137,6 +159,7 @@ const visibleNavItems = computed(() =>
 const showModels = computed(() => visibleNavItems.value.includes('models'))
 const showDocs = computed(() => visibleNavItems.value.includes('docs'))
 const showPartner = computed(() => visibleNavItems.value.includes('partner'))
+const showResources = computed(() => visibleNavItems.value.includes('resources'))
 </script>
 
 <style scoped>

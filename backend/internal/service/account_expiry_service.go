@@ -7,7 +7,19 @@ import (
 	"time"
 )
 
-// AccountExpiryService periodically pauses expired accounts when auto-pause is enabled.
+// expiredAccountRuntimeStateCleaner is implemented by repositories that can remove
+// persisted runtime blocks once their own deadline has elapsed.
+//
+// It intentionally stays separate from AccountRepository so existing lightweight
+// repository implementations do not need a database-only maintenance method.
+type expiredAccountRuntimeStateCleaner interface {
+	ClearExpiredRuntimeState(ctx context.Context, now time.Time) ([]int64, error)
+}
+
+// AccountExpiryService periodically maintains time-based account state. Besides
+// pausing expired accounts, it removes expired runtime blocks so an account that
+// has completed a Gemini/OpenAI/Anthropic cooldown is fully restored in the
+// database and scheduler cache.
 type AccountExpiryService struct {
 	accountRepo AccountRepository
 	interval    time.Duration
@@ -59,13 +71,25 @@ func (s *AccountExpiryService) Stop() {
 func (s *AccountExpiryService) runOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	now := time.Now()
 
-	updated, err := s.accountRepo.AutoPauseExpiredAccounts(ctx, time.Now())
+	updated, err := s.accountRepo.AutoPauseExpiredAccounts(ctx, now)
 	if err != nil {
 		log.Printf("[AccountExpiry] Auto pause expired accounts failed: %v", err)
+	} else if updated > 0 {
+		log.Printf("[AccountExpiry] Auto paused %d expired accounts", updated)
+	}
+
+	cleaner, ok := s.accountRepo.(expiredAccountRuntimeStateCleaner)
+	if !ok {
 		return
 	}
-	if updated > 0 {
-		log.Printf("[AccountExpiry] Auto paused %d expired accounts", updated)
+	recovered, err := cleaner.ClearExpiredRuntimeState(ctx, now)
+	if err != nil {
+		log.Printf("[AccountExpiry] Clear expired account runtime state failed: %v", err)
+		return
+	}
+	if len(recovered) > 0 {
+		log.Printf("[AccountExpiry] Restored %d accounts after runtime cooldown", len(recovered))
 	}
 }

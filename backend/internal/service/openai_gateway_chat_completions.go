@@ -225,17 +225,31 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 	upstreamStart := time.Now()
 	resp, err := s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
+	if resp != nil {
+		SetOpsUpstreamHTTPProto(c, resp.Proto)
+	}
 	if err != nil {
+		transportFailure := isOpenAIUpstreamTransportError(err)
 		safeErr := sanitizeUpstreamErrorMessage(err.Error())
+		if transportFailure {
+			safeErr = openAIUpstreamTransportErrorMessage(err)
+		}
+		errorKind := "request_error"
+		if transportFailure {
+			errorKind = "transport_error"
+		}
 		setOpsUpstreamError(c, 0, safeErr, "")
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,
 			AccountName:        account.Name,
 			UpstreamStatusCode: 0,
-			Kind:               "request_error",
+			Kind:               errorKind,
 			Message:            safeErr,
 		})
+		if transportFailure {
+			return nil, newOpenAITransportRequestFailoverError(err)
+		}
 		return nil, newOpenAIChatUpstreamRequestFailoverError()
 	}
 	defer func() { _ = resp.Body.Close() }()
