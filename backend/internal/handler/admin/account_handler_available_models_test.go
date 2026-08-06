@@ -70,6 +70,23 @@ func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream servi
 	return router
 }
 
+func setupUpstreamPricingRouter(adminSvc service.AdminService, upstream service.HTTPUpstream) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	accountTestSvc := service.NewAccountTestService(
+		nil,
+		nil,
+		nil,
+		nil,
+		upstream,
+		&config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		nil,
+	)
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, accountTestSvc, nil, nil, nil, nil, nil)
+	router.GET("/api/v1/admin/accounts/:id/upstream-pricing", handler.GetUpstreamPricing)
+	return router
+}
+
 func TestAccountHandlerGetAvailableModels_OpenAIOAuthUsesExplicitModelMapping(t *testing.T) {
 	svc := &availableModelsAdminService{
 		stubAdminService: newStubAdminService(),
@@ -175,8 +192,9 @@ func TestAccountHandlerSyncUpstreamModels_UpstreamErrorDoesNotExposeBody(t *test
 			Type:     service.AccountTypeAPIKey,
 			Status:   service.StatusActive,
 			Credentials: map[string]any{
-				"api_key":  "openai-key",
-				"base_url": "https://openai.example.com/v1",
+				"api_key":            "openai-key",
+				"base_url":           "https://openai.example.com/v1",
+				"upstream_group_key": "default",
 			},
 		},
 	}
@@ -194,4 +212,36 @@ func TestAccountHandlerSyncUpstreamModels_UpstreamErrorDoesNotExposeBody(t *test
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Contains(t, rec.Body.String(), "Upstream model list request failed with HTTP 502")
 	require.NotContains(t, rec.Body.String(), "SECRET_TOKEN")
+}
+
+func TestAccountHandlerGetUpstreamPricing(t *testing.T) {
+	svc := &availableModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       46,
+			Name:     "new-api-upstream",
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeAPIKey,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{
+				"api_key":            "openai-key",
+				"base_url":           "https://openai.example.com/v1",
+				"upstream_group_key": "default",
+			},
+		},
+	}
+	upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"success":true,"group_ratio":{"default":0.2},"data":[{"model_name":"gpt-test","model_ratio":1.5}]}`)),
+	}}
+	router := setupUpstreamPricingRouter(svc, upstream)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/46/upstream-pricing", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"source":"newapi"`)
+	require.Contains(t, rec.Body.String(), `"model_name":"gpt-test"`)
 }

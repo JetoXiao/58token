@@ -15,6 +15,19 @@ func NewJWTAuthMiddleware(authService *service.AuthService, userService *service
 	return JWTAuthMiddleware(jwtAuth(authService, userService, userService))
 }
 
+// OptionalJWTAuth resolves a user when a bearer token is present while keeping
+// the endpoint available to anonymous visitors. Invalid or expired tokens are
+// still rejected instead of being silently treated as anonymous.
+func OptionalJWTAuth(jwtAuth JWTAuthMiddleware) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.TrimSpace(c.GetHeader("Authorization")) == "" {
+			c.Next()
+			return
+		}
+		gin.HandlerFunc(jwtAuth)(c)
+	}
+}
+
 type jwtUserReader interface {
 	GetByID(ctx context.Context, id int64) (*service.User, error)
 }

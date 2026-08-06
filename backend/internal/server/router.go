@@ -108,8 +108,8 @@ func registerRoutes(
 
 	// Module routes.
 	routes.RegisterAuthRoutes(v1, h, jwtAuth, redisClient, settingService)
-	routes.RegisterVisitorAnalyticsRoutes(v1, h, redisClient)
-	routes.RegisterDownloadResourceRoutes(v1, h)
+	routes.RegisterVisitorAnalyticsRoutes(v1, h, jwtAuth, redisClient)
+	routes.RegisterDownloadResourceRoutes(v1, h, jwtAuth)
 
 	if h.ModelPricing != nil {
 		v1.GET("/public/model-pricing", h.ModelPricing.GetPublicPricing)

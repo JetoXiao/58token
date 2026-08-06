@@ -476,6 +476,36 @@ export interface SyncUpstreamModelsResult {
   models: string[]
 }
 
+export interface UpstreamPricingModel {
+  model_name: string
+  tags?: string
+  quota_type: number
+  model_ratio?: number
+  completion_ratio?: number
+  cache_ratio?: number
+  create_cache_ratio?: number
+  model_price?: number
+  enabled_groups: string[]
+  supported_endpoint_types: string[]
+}
+
+export interface UpstreamPricingSnapshot {
+  source: 'newapi' | 'sub2api' | string
+  endpoint: string
+  checked_at: string
+  ratio_scope?: 'base' | 'effective' | string
+  pricing_version?: string
+  group_ratios: Record<string, number>
+  group_names: Record<string, string>
+  models: UpstreamPricingModel[]
+}
+
+export interface UpstreamPricingGroup {
+  key: string
+  name: string
+  ratio: number
+}
+
 /**
  * Sync live supported models from the account's upstream model-list endpoint
  * @param id - Account ID
@@ -484,6 +514,27 @@ export interface SyncUpstreamModelsResult {
 export async function syncUpstreamModels(id: number): Promise<SyncUpstreamModelsResult> {
   const { data } = await apiClient.post<SyncUpstreamModelsResult>(`/admin/accounts/${id}/models/sync-upstream`)
   return data
+}
+
+/** Fetch live model and group ratios from a New API/Sub2API upstream. */
+export async function getUpstreamPricing(id: number): Promise<UpstreamPricingSnapshot> {
+  const { data } = await apiClient.get<UpstreamPricingSnapshot>(`/admin/accounts/${id}/upstream-pricing`)
+  return data
+}
+
+export async function previewUpstreamPricingGroups(params: {
+  account_id?: number
+  platform?: string
+  base_url?: string
+  api_key?: string
+  upstream_dashboard_access_token?: string
+  upstream_dashboard_user_id?: string
+}): Promise<UpstreamPricingGroup[]> {
+  const { data } = await apiClient.post<{ groups: UpstreamPricingGroup[] }>(
+    '/admin/accounts/upstream-pricing/groups',
+    params
+  )
+  return data.groups
 }
 
 export interface CRSPreviewAccount {
@@ -704,6 +755,8 @@ export const accountsAPI = {
   setSchedulable,
   getAvailableModels,
   syncUpstreamModels,
+  getUpstreamPricing,
+	previewUpstreamPricingGroups,
   generateAuthUrl,
   exchangeCode,
   refreshOpenAIToken,

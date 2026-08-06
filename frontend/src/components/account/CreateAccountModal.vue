@@ -1043,6 +1043,27 @@
           />
           <p class="input-hint">{{ apiKeyHint }}</p>
         </div>
+        <div v-if="form.platform === 'openai' || form.platform === 'anthropic'">
+          <label class="input-label">{{ t('admin.accounts.upstreamPricing.groupLabel') }}</label>
+          <div class="flex gap-2">
+            <select v-model="upstreamGroupKey" class="input flex-1" :disabled="upstreamGroupsLoading">
+              <option value="">{{ upstreamGroupsLoading ? t('admin.accounts.upstreamPricing.loading') : t('admin.accounts.upstreamPricing.groupHint') }}</option>
+              <option v-for="group in upstreamGroups" :key="group.key" :value="group.key">
+                {{ group.name }} ({{ group.key }}) · {{ group.ratio }}x
+              </option>
+            </select>
+            <button type="button" class="btn-secondary whitespace-nowrap" :disabled="upstreamGroupsLoading" @click="loadUpstreamGroups">
+              {{ t('admin.accounts.upstreamPricing.loadGroups') }}
+            </button>
+          </div>
+          <p class="input-hint">{{ t('admin.accounts.upstreamPricing.groupHint') }}</p>
+        </div>
+        <div v-if="form.platform === 'openai' || form.platform === 'anthropic'">
+          <label class="input-label">{{ t('admin.accounts.upstreamPricing.dashboardTokenLabel') }}</label>
+          <input v-model="upstreamDashboardAccessToken" type="password" class="input font-mono" autocomplete="new-password" />
+          <p class="input-hint">{{ t('admin.accounts.upstreamPricing.dashboardTokenHint') }}</p>
+          <input v-model="upstreamDashboardUserId" type="text" class="input mt-2" :placeholder="t('admin.accounts.upstreamPricing.dashboardUserIdPlaceholder')" />
+        </div>
 
         <!-- Gemini API Key tier selection -->
         <div v-if="form.platform === 'gemini'">
@@ -3130,6 +3151,7 @@ import {
 } from '@/composables/useModelWhitelist'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import type { UpstreamPricingGroup } from '@/api/admin/accounts'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import {
   useAccountOAuth,
@@ -3282,6 +3304,35 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const upstreamGroupKey = ref('')
+const upstreamDashboardAccessToken = ref('')
+const upstreamDashboardUserId = ref('')
+const upstreamGroups = ref<UpstreamPricingGroup[]>([])
+const upstreamGroupsLoading = ref(false)
+
+async function loadUpstreamGroups() {
+  if (!apiKeyBaseUrl.value.trim() || !apiKeyValue.value.trim()) {
+    appStore.showError(t('admin.accounts.pleaseEnterApiKey'))
+    return
+  }
+  upstreamGroupsLoading.value = true
+  try {
+    upstreamGroups.value = await adminAPI.accounts.previewUpstreamPricingGroups({
+      platform: form.platform,
+      base_url: apiKeyBaseUrl.value.trim(),
+      api_key: apiKeyValue.value.trim(),
+      upstream_dashboard_access_token: upstreamDashboardAccessToken.value.trim() || undefined,
+      upstream_dashboard_user_id: upstreamDashboardUserId.value.trim() || undefined
+    })
+    if (upstreamGroups.value.length === 1) {
+      upstreamGroupKey.value = upstreamGroups.value[0].key
+    }
+  } catch (error: any) {
+    appStore.showError(error?.response?.data?.detail || error?.response?.data?.message || t('admin.accounts.upstreamPricing.failedShort'))
+  } finally {
+    upstreamGroupsLoading.value = false
+  }
+}
 const editQuotaLimit = ref<number | null>(null)
 const editQuotaDailyLimit = ref<number | null>(null)
 const editQuotaWeeklyLimit = ref<number | null>(null)
@@ -4047,6 +4098,10 @@ const resetForm = () => {
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  upstreamGroupKey.value = ''
+  upstreamDashboardAccessToken.value = ''
+  upstreamDashboardUserId.value = ''
+  upstreamGroups.value = []
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -4438,6 +4493,9 @@ const handleSubmit = async () => {
     base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
     api_key: apiKeyValue.value.trim()
   }
+  if (upstreamGroupKey.value.trim()) credentials.upstream_group_key = upstreamGroupKey.value.trim()
+  if (upstreamDashboardAccessToken.value.trim()) credentials.upstream_dashboard_access_token = upstreamDashboardAccessToken.value.trim()
+  if (upstreamDashboardUserId.value.trim()) credentials.upstream_dashboard_user_id = upstreamDashboardUserId.value.trim()
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value
   }

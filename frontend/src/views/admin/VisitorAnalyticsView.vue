@@ -140,7 +140,7 @@
           <thead><tr>
             <th>{{ t('admin.visitorAnalytics.time') }}</th>
             <th>{{ t('admin.visitorAnalytics.channel') }}</th>
-            <th>{{ t('admin.visitorAnalytics.ip') }}</th>
+            <th>{{ t('admin.visitorAnalytics.identity') }}</th>
             <th>{{ t('admin.visitorAnalytics.location') }}</th>
             <th>{{ t('admin.visitorAnalytics.page') }}</th>
             <th>{{ t('admin.visitorAnalytics.referrer') }}</th>
@@ -150,10 +150,20 @@
             <tr v-for="event in events.items" :key="event.id">
               <td class="time-cell">{{ formatDateTime(event.occurred_at) }}</td>
               <td><span class="source-pill">{{ event.channel_code === 'direct' ? t('admin.visitorAnalytics.direct') : event.channel_name }}</span></td>
-              <td><button class="ip-button" @click="lookupEventIP(event.ip)">{{ event.ip }}</button></td>
+              <td>
+                <div class="identity-ip-cell">
+                  <span v-if="event.username || event.email" class="user-cell">{{ event.username || event.email }}</span>
+                  <div class="ip-cell">
+                    <code>{{ event.ip }}</code>
+                    <button class="inline-lookup" :disabled="lookingUpIP === event.ip" :title="t('admin.visitorAnalytics.lookup')" @click="lookupEventIP(event.ip)">
+                      <Icon name="search" size="xs" />
+                    </button>
+                  </div>
+                </div>
+              </td>
               <td>
                 <div v-if="event.geo_country" class="location-cell"><strong>{{ event.geo_country }}</strong><span>{{ [event.geo_region, event.geo_city].filter(Boolean).join(' · ') }}</span></div>
-                <button v-else class="lookup-button" @click="lookupEventIP(event.ip)">{{ t('admin.visitorAnalytics.lookup') }}</button>
+                <button v-else class="lookup-button" :disabled="lookingUpIP === event.ip" @click="lookupEventIP(event.ip)">{{ lookingUpIP === event.ip ? t('common.loading') : t('admin.visitorAnalytics.lookup') }}</button>
               </td>
               <td><span class="path-cell" :title="event.landing_url">{{ event.path }}</span></td>
               <td><span class="referrer-cell" :title="event.referrer">{{ hostname(event.referrer) || t('admin.visitorAnalytics.sourceUnknown') }}</span></td>
@@ -170,28 +180,6 @@
           <button :disabled="events.page >= events.pages" @click="changePage(events.page + 1)">{{ t('admin.visitorAnalytics.next') }}</button>
         </div>
       </div>
-    </section>
-
-    <section class="panel ip-panel">
-      <div class="ip-copy">
-        <span class="eyebrow">IP INTELLIGENCE</span>
-        <h2>{{ t('admin.visitorAnalytics.ipLookup') }}</h2>
-        <p>{{ t('admin.visitorAnalytics.ipLookupDescription') }}</p>
-        <div class="ip-search">
-          <input v-model="ipQuery" :placeholder="t('admin.visitorAnalytics.ipPlaceholder')" @keyup.enter="lookupIP" />
-          <button class="primary-button" :disabled="lookingUpIP || !ipQuery" @click="lookupIP">{{ t('admin.visitorAnalytics.lookupAction') }}</button>
-        </div>
-      </div>
-      <div v-if="ipResult" class="ip-result">
-        <div class="result-head"><span>{{ ipResult.ip }}</span><strong>{{ [ipResult.city, ipResult.country].filter(Boolean).join(', ') }}</strong></div>
-        <dl>
-          <div><dt>{{ t('admin.visitorAnalytics.country') }}</dt><dd>{{ ipResult.country || '—' }} <small>{{ ipResult.country_code }}</small></dd></div>
-          <div><dt>{{ t('admin.visitorAnalytics.regionCity') }}</dt><dd>{{ [ipResult.region, ipResult.city].filter(Boolean).join(' / ') || '—' }}</dd></div>
-          <div><dt>{{ t('admin.visitorAnalytics.timezone') }}</dt><dd>{{ ipResult.timezone || '—' }}</dd></div>
-          <div><dt>{{ t('admin.visitorAnalytics.coordinates') }}</dt><dd>{{ coordinates(ipResult) }}</dd></div>
-        </dl>
-      </div>
-      <div v-else class="ip-placeholder-art"><Icon name="globe" size="xl" /></div>
     </section>
 
     <Teleport to="body">
@@ -240,7 +228,6 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import visitorAnalyticsAPI, {
-  type IPGeolocation,
   type PaginatedVisitorEvents,
   type VisitorAnalyticsOverview,
   type VisitorAnalyticsSettings,
@@ -276,10 +263,8 @@ const loading = ref(false)
 const loadingEvents = ref(false)
 const savingSettings = ref(false)
 const savingChannel = ref(false)
-const lookingUpIP = ref(false)
+const lookingUpIP = ref('')
 const showChannelManager = ref(false)
-const ipQuery = ref('')
-const ipResult = ref<IPGeolocation | null>(null)
 const retentionOptions = [30, 60, 90, 180, 365, 730]
 
 const channelForm = reactive({ id: 0, name: '', code: '', destination_path: '/home', description: '', active: true })
@@ -334,8 +319,6 @@ function formatDateTime(value: string) { return new Intl.DateTimeFormat(locale.v
 function hostname(value: string) { try { return value ? new URL(value).hostname : '' } catch { return value } }
 function channelLink(code: string, destination: string) { const url = new URL(destination || '/home', window.location.origin); url.searchParams.set('ref', code); return url.toString() }
 async function copyChannelLink(code: string, destination: string) { await navigator.clipboard.writeText(channelLink(code, destination)); appStore.showSuccess(t('admin.visitorAnalytics.linkCopied')) }
-function coordinates(result: IPGeolocation) { return result.latitude == null || result.longitude == null ? '—' : `${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}` }
-
 async function saveSettings() {
   savingSettings.value = true
   try { Object.assign(settings, await visitorAnalyticsAPI.updateSettings(settings)); appStore.showSuccess(t('admin.visitorAnalytics.settingsSaved')) }
@@ -364,14 +347,22 @@ async function deleteChannel() {
   catch { appStore.showError(t('admin.visitorAnalytics.operationFailed')) }
 }
 
-async function lookupIP() {
-  if (!ipQuery.value.trim()) return
-  lookingUpIP.value = true
-  try { ipResult.value = await visitorAnalyticsAPI.lookupIP(ipQuery.value.trim()) }
-  catch { appStore.showError(t('admin.visitorAnalytics.operationFailed')) }
-  finally { lookingUpIP.value = false }
+async function lookupEventIP(ip: string) {
+  if (!ip || lookingUpIP.value) return
+  lookingUpIP.value = ip
+  try {
+    const result = await visitorAnalyticsAPI.lookupIP(ip)
+    for (const event of events.items) {
+      if (event.ip === ip) {
+        event.geo_country = result.country
+        event.geo_region = result.region
+        event.geo_city = result.city
+        event.geo_resolved_at = result.resolved_at
+      }
+    }
+  } catch { appStore.showError(t('admin.visitorAnalytics.operationFailed')) }
+  finally { lookingUpIP.value = '' }
 }
-async function lookupEventIP(ip: string) { ipQuery.value = ip; await lookupIP(); document.querySelector('.ip-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); await reloadEvents() }
 
 watch(() => [filters.start_date, filters.end_date], () => { events.page = 1; void refreshAll() })
 onMounted(refreshAll)
@@ -469,6 +460,17 @@ onMounted(refreshAll)
 .panel {
   padding: 20px;
 }
+.ip-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.identity-ip-cell { display: grid; gap: 3px; }
+.ip-cell code { color: #394150; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inline-lookup { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid #dad8ff; border-radius: 7px; background: #f6f5ff; color: #5f5be8; cursor: pointer; }
+.inline-lookup :deep(svg) { width: 12px; height: 12px; }
+.user-cell { display: block; max-width: 190px; overflow: hidden; color: #374151; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.anonymous-cell { color: #a1a7b3; }
+.location-cell strong, .location-cell span { display: block; white-space: nowrap; }
+.location-cell span { color: #9298a7; font-size: 10px; margin-top: 3px; }
+.lookup-button { border: 1px solid #dad8ff; border-radius: 9px; background: transparent; padding: 6px 9px; color: #5f5be8; cursor: pointer; }
+.inline-lookup:disabled, .lookup-button:disabled { cursor: wait; opacity: .55; }
 .view-bar {
   background: #4f46e5;
 }

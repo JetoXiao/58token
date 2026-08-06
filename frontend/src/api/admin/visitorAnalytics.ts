@@ -38,6 +38,9 @@ export interface VisitorChannelStats {
 
 export interface VisitorEvent {
   id: number
+  user_id?: number
+  username?: string
+  email?: string
   channel_name: string
   channel_code: string
   visitor_id: string

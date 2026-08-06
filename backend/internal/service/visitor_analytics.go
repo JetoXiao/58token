@@ -45,6 +45,7 @@ type VisitorChannel struct {
 }
 
 type VisitorTrackInput struct {
+	UserID      int64
 	ChannelCode string
 	VisitorID   string
 	SessionID   string
@@ -85,6 +86,9 @@ type VisitorChannelStats struct {
 
 type VisitorEvent struct {
 	ID            int64      `json:"id"`
+	UserID        *int64     `json:"user_id,omitempty"`
+	Username      string     `json:"username"`
+	Email         string     `json:"email"`
 	ChannelName   string     `json:"channel_name"`
 	ChannelCode   string     `json:"channel_code"`
 	VisitorID     string     `json:"visitor_id"`
@@ -183,11 +187,11 @@ func (s *VisitorAnalyticsService) Track(ctx context.Context, input VisitorTrackI
 
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO visitor_events (
-			channel_id, channel_code, visitor_id, session_id, ip, country_code,
+			channel_id, channel_code, visitor_id, session_id, user_id, ip, country_code,
 			path, referrer, landing_url, user_agent, language, screen, is_bot
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 	`, nullableInt64(channelID), channelCode, clamp(input.VisitorID, 64), clamp(input.SessionID, 64),
-		clamp(input.IP, 45), strings.ToUpper(clamp(input.CountryCode, 8)), cleanPath(input.Path),
+		nullablePositiveInt64(input.UserID), clamp(input.IP, 45), strings.ToUpper(clamp(input.CountryCode, 8)), cleanPath(input.Path),
 		clamp(input.Referrer, 1024), clamp(input.LandingURL, 1024), clamp(input.UserAgent, 512),
 		clamp(input.Language, 32), clamp(input.Screen, 32), looksLikeBot(input.UserAgent))
 	if err == nil {
@@ -365,12 +369,14 @@ func (s *VisitorAnalyticsService) ListEvents(ctx context.Context, query VisitorE
 	args = append(args, query.PageSize, offset)
 	limitArg, offsetArg := len(args)-1, len(args)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT e.id, COALESCE(c.name, CASE WHEN e.channel_code = 'direct' THEN 'Direct' ELSE e.channel_code END),
+		SELECT e.id, e.user_id, COALESCE(u.username, ''), COALESCE(u.email, ''),
+		       COALESCE(c.name, CASE WHEN e.channel_code = 'direct' THEN 'Direct' ELSE e.channel_code END),
 		       e.channel_code, e.visitor_id, e.session_id, e.ip, e.country_code, e.path,
 		       e.referrer, e.landing_url, e.user_agent, e.language, e.screen, e.is_bot, e.occurred_at,
 		       COALESCE(g.country, ''), COALESCE(g.region, ''), COALESCE(g.city, ''), g.resolved_at
 		FROM visitor_events e
 		LEFT JOIN visitor_channels c ON c.code = e.channel_code
+		LEFT JOIN users u ON u.id = e.user_id
 		LEFT JOIN visitor_ip_geolocation_cache g ON g.ip = e.ip AND g.expires_at > NOW()
 	`+where+fmt.Sprintf(` ORDER BY e.occurred_at DESC LIMIT $%d OFFSET $%d`, limitArg, offsetArg), args...)
 	if err != nil {
@@ -380,12 +386,17 @@ func (s *VisitorAnalyticsService) ListEvents(ctx context.Context, query VisitorE
 	items := make([]VisitorEvent, 0, query.PageSize)
 	for rows.Next() {
 		var item VisitorEvent
+		var userID sql.NullInt64
 		var resolvedAt sql.NullTime
-		if err := rows.Scan(&item.ID, &item.ChannelName, &item.ChannelCode, &item.VisitorID, &item.SessionID,
+		if err := rows.Scan(&item.ID, &userID, &item.Username, &item.Email, &item.ChannelName, &item.ChannelCode, &item.VisitorID, &item.SessionID,
 			&item.IP, &item.CountryCode, &item.Path, &item.Referrer, &item.LandingURL, &item.UserAgent,
 			&item.Language, &item.Screen, &item.IsBot, &item.OccurredAt, &item.GeoCountry, &item.GeoRegion,
 			&item.GeoCity, &resolvedAt); err != nil {
 			return nil, 0, err
+		}
+		if userID.Valid {
+			value := userID.Int64
+			item.UserID = &value
 		}
 		if resolvedAt.Valid {
 			value := resolvedAt.Time
@@ -533,6 +544,13 @@ func nullableInt64(value sql.NullInt64) any {
 		return value.Int64
 	}
 	return nil
+}
+
+func nullablePositiveInt64(value int64) any {
+	if value <= 0 {
+		return nil
+	}
+	return value
 }
 
 func looksLikeBot(userAgent string) bool {

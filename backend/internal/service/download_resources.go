@@ -114,6 +114,9 @@ type DownloadResourceUploadURL struct {
 
 type DownloadResourceDownloadRecord struct {
 	ID           int64     `json:"id"`
+	UserID       *int64    `json:"user_id,omitempty"`
+	Username     string    `json:"username"`
+	Email        string    `json:"email"`
 	ResourceID   int64     `json:"resource_id"`
 	ResourceName string    `json:"resource_name"`
 	Version      string    `json:"version"`
@@ -121,6 +124,9 @@ type DownloadResourceDownloadRecord struct {
 	UserAgent    string    `json:"user_agent"`
 	Referrer     string    `json:"referrer"`
 	RequestedAt  time.Time `json:"requested_at"`
+	GeoCountry   string    `json:"geo_country"`
+	GeoRegion    string    `json:"geo_region"`
+	GeoCity      string    `json:"geo_city"`
 }
 
 type DownloadResourceService struct {
@@ -315,7 +321,7 @@ func (s *DownloadResourceService) CreateUploadURL(ctx context.Context, request D
 	return &DownloadResourceUploadURL{ObjectKey: objectKey, UploadURL: url, ExpiresAt: time.Now().Add(downloadResourceUploadURLTTL)}, nil
 }
 
-func (s *DownloadResourceService) IssueDownload(ctx context.Context, id int64, ip, userAgent, referrer string) (string, error) {
+func (s *DownloadResourceService) IssueDownload(ctx context.Context, id, userID int64, ip, userAgent, referrer string) (string, error) {
 	item, err := s.getPublishedResource(ctx, id)
 	if err != nil {
 		return "", err
@@ -335,7 +341,7 @@ func (s *DownloadResourceService) IssueDownload(ctx context.Context, id int64, i
 	if err != nil {
 		return "", err
 	}
-	if err := s.recordDownload(ctx, item.ID, ip, userAgent, referrer); err != nil {
+	if err := s.recordDownload(ctx, item.ID, userID, ip, userAgent, referrer); err != nil {
 		return "", err
 	}
 	return url, nil
@@ -353,10 +359,14 @@ func (s *DownloadResourceService) ListDownloads(ctx context.Context, page, pageS
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT d.id, d.resource_id, COALESCE(NULLIF(r.name_en, ''), r.name_zh), r.version,
-		       d.ip, d.user_agent, d.referrer, d.requested_at
+		SELECT d.id, d.user_id, COALESCE(u.username, ''), COALESCE(u.email, ''),
+		       d.resource_id, COALESCE(NULLIF(r.name_en, ''), r.name_zh), r.version,
+		       d.ip, d.user_agent, d.referrer, d.requested_at,
+		       COALESCE(g.country, ''), COALESCE(g.region, ''), COALESCE(g.city, '')
 		FROM download_resource_downloads d
 		JOIN download_resources r ON r.id = d.resource_id
+		LEFT JOIN users u ON u.id = d.user_id
+		LEFT JOIN visitor_ip_geolocation_cache g ON g.ip = d.ip AND g.expires_at > NOW()
 		ORDER BY d.requested_at DESC
 		LIMIT $1 OFFSET $2`, pageSize, (page-1)*pageSize)
 	if err != nil {
@@ -366,8 +376,14 @@ func (s *DownloadResourceService) ListDownloads(ctx context.Context, page, pageS
 	items := make([]DownloadResourceDownloadRecord, 0, pageSize)
 	for rows.Next() {
 		var item DownloadResourceDownloadRecord
-		if err := rows.Scan(&item.ID, &item.ResourceID, &item.ResourceName, &item.Version, &item.IP, &item.UserAgent, &item.Referrer, &item.RequestedAt); err != nil {
+		var userID sql.NullInt64
+		if err := rows.Scan(&item.ID, &userID, &item.Username, &item.Email, &item.ResourceID, &item.ResourceName, &item.Version,
+			&item.IP, &item.UserAgent, &item.Referrer, &item.RequestedAt, &item.GeoCountry, &item.GeoRegion, &item.GeoCity); err != nil {
 			return nil, 0, err
+		}
+		if userID.Valid {
+			value := userID.Int64
+			item.UserID = &value
 		}
 		items = append(items, item)
 	}
@@ -412,7 +428,7 @@ func (s *DownloadResourceService) getPublishedResource(ctx context.Context, id i
 	return &item, err
 }
 
-func (s *DownloadResourceService) recordDownload(ctx context.Context, resourceID int64, ip, userAgent, referrer string) error {
+func (s *DownloadResourceService) recordDownload(ctx context.Context, resourceID, userID int64, ip, userAgent, referrer string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -422,12 +438,19 @@ func (s *DownloadResourceService) recordDownload(ctx context.Context, resourceID
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO download_resource_downloads (resource_id, ip, user_agent, referrer)
-		VALUES ($1, $2, $3, $4)`, resourceID, clampDownloadResourceValue(ip, 45), clampDownloadResourceValue(userAgent, 512), clampDownloadResourceValue(referrer, 1024))
+		INSERT INTO download_resource_downloads (resource_id, user_id, ip, user_agent, referrer)
+		VALUES ($1, $2, $3, $4, $5)`, resourceID, nullableDownloadUserID(userID), clampDownloadResourceValue(ip, 45), clampDownloadResourceValue(userAgent, 512), clampDownloadResourceValue(referrer, 1024))
 	if err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+func nullableDownloadUserID(userID int64) any {
+	if userID <= 0 {
+		return nil
+	}
+	return userID
 }
 
 func (s *DownloadResourceService) reserveDownload(ctx context.Context, resourceID int64, ip string) error {

@@ -11,6 +11,7 @@ import (
 
 	clientip "github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -60,7 +61,12 @@ func (h *VisitorAnalyticsHandler) Track(c *gin.Context) {
 	if len(countryCode) > 8 || strings.EqualFold(countryCode, "XX") {
 		countryCode = ""
 	}
+	var userID int64
+	if subject, ok := servermiddleware.GetAuthSubjectFromContext(c); ok {
+		userID = subject.UserID
+	}
 	err := h.service.Track(c.Request.Context(), service.VisitorTrackInput{
+		UserID:      userID,
 		ChannelCode: req.ChannelCode,
 		VisitorID:   req.VisitorID,
 		SessionID:   req.SessionID,

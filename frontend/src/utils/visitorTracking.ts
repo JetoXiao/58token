@@ -89,9 +89,13 @@ export function installVisitorTracking(router: Router): () => void {
       screen: `${window.screen.width}x${window.screen.height}`,
     }
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const authToken = localStorage.getItem('auth_token')
+    if (authToken) headers.Authorization = `Bearer ${authToken}`
+
     void fetch('/api/v1/analytics/visit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       credentials: 'same-origin',
       keepalive: true,

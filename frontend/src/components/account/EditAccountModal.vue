@@ -68,6 +68,27 @@
           />
           <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
         </div>
+        <div v-if="account.platform === 'openai' || account.platform === 'anthropic'">
+          <label class="input-label">{{ t('admin.accounts.upstreamPricing.groupLabel') }}</label>
+          <div class="flex gap-2">
+            <select v-model="editUpstreamGroupKey" class="input flex-1" :disabled="upstreamGroupsLoading">
+              <option value="">{{ upstreamGroupsLoading ? t('admin.accounts.upstreamPricing.loading') : t('admin.accounts.upstreamPricing.groupHint') }}</option>
+              <option v-for="group in upstreamGroups" :key="group.key" :value="group.key">
+                {{ group.name }} ({{ group.key }}) · {{ group.ratio }}x
+              </option>
+            </select>
+            <button type="button" class="btn-secondary whitespace-nowrap" :disabled="upstreamGroupsLoading" @click="loadUpstreamGroups">
+              {{ t('admin.accounts.upstreamPricing.loadGroups') }}
+            </button>
+          </div>
+          <p class="input-hint">{{ t('admin.accounts.upstreamPricing.groupHint') }}</p>
+        </div>
+        <div v-if="account.platform === 'openai' || account.platform === 'anthropic'">
+          <label class="input-label">{{ t('admin.accounts.upstreamPricing.dashboardTokenLabel') }}</label>
+          <input v-model="editUpstreamDashboardAccessToken" type="password" class="input font-mono" autocomplete="new-password" />
+          <p class="input-hint">{{ t('admin.accounts.upstreamPricing.dashboardTokenEditHint') }}</p>
+          <input v-model="editUpstreamDashboardUserId" type="text" class="input mt-2" :placeholder="t('admin.accounts.upstreamPricing.dashboardUserIdPlaceholder')" />
+        </div>
 
         <!-- Model Restriction Section (不适用于 Antigravity) -->
         <div v-if="account.platform !== 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -2220,6 +2241,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
+import type { UpstreamPricingGroup } from '@/api/admin/accounts'
 import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import type { Account, Proxy, AdminGroup, CheckMixedChannelResponse, OpenAICompactMode, OpenAIResponsesMode } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -2297,6 +2319,39 @@ interface TempUnschedRuleForm {
 const submitting = ref(false)
 const editBaseUrl = ref('https://api.anthropic.com')
 const editApiKey = ref('')
+const editUpstreamGroupKey = ref('')
+const editUpstreamDashboardAccessToken = ref('')
+const editUpstreamDashboardUserId = ref('')
+const upstreamGroups = ref<UpstreamPricingGroup[]>([])
+const upstreamGroupsLoading = ref(false)
+
+async function loadUpstreamGroups() {
+  const baseUrl = editBaseUrl.value.trim()
+  const apiKey = editApiKey.value.trim()
+  const currentCredentials = (props.account?.credentials as Record<string, unknown>) || {}
+  if (!baseUrl || (!apiKey && !props.account?.credentials_status?.has_api_key)) {
+    appStore.showError(t('admin.accounts.apiKeyIsRequired'))
+    return
+  }
+  upstreamGroupsLoading.value = true
+  try {
+    upstreamGroups.value = await adminAPI.accounts.previewUpstreamPricingGroups({
+      account_id: props.account?.id,
+      platform: props.account?.platform,
+      base_url: baseUrl,
+      api_key: apiKey || String(currentCredentials.api_key || ''),
+      upstream_dashboard_access_token: editUpstreamDashboardAccessToken.value.trim() || undefined,
+      upstream_dashboard_user_id: editUpstreamDashboardUserId.value.trim() || undefined
+    })
+    if (upstreamGroups.value.length === 1) {
+      editUpstreamGroupKey.value = upstreamGroups.value[0].key
+    }
+  } catch (error: any) {
+    appStore.showError(error?.response?.data?.detail || error?.response?.data?.message || t('admin.accounts.upstreamPricing.failedShort'))
+  } finally {
+    upstreamGroupsLoading.value = false
+  }
+}
 // Bedrock credentials
 const editBedrockAccessKeyId = ref('')
 const editBedrockSecretAccessKey = ref('')
@@ -2798,6 +2853,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
           ? 'https://generativelanguage.googleapis.com'
           : 'https://api.anthropic.com'
     editBaseUrl.value = (credentials.base_url as string) || platformDefaultUrl
+    editUpstreamGroupKey.value = (credentials.upstream_group_key as string) || ''
+    editUpstreamDashboardAccessToken.value = ''
+    editUpstreamDashboardUserId.value = String(credentials.upstream_dashboard_user_id || '')
+    upstreamGroups.value = []
 
     // Load model mappings and detect mode
     loadModelRestrictionFromMapping(credentials.model_mapping as Record<string, unknown> | undefined)
@@ -3387,6 +3446,20 @@ const handleSubmit = async () => {
       const newCredentials: Record<string, unknown> = {
         ...currentCredentials,
         base_url: newBaseUrl
+      }
+      if (editUpstreamGroupKey.value.trim()) {
+        newCredentials.upstream_group_key = editUpstreamGroupKey.value.trim()
+      } else {
+        delete newCredentials.upstream_group_key
+      }
+
+      if (editUpstreamDashboardAccessToken.value.trim()) {
+        newCredentials.upstream_dashboard_access_token = editUpstreamDashboardAccessToken.value.trim()
+      }
+      if (editUpstreamDashboardUserId.value.trim()) {
+        newCredentials.upstream_dashboard_user_id = editUpstreamDashboardUserId.value.trim()
+      } else {
+        delete newCredentials.upstream_dashboard_user_id
       }
 
       // Handle API key

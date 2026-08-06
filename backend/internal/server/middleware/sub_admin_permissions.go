@@ -50,7 +50,8 @@ func isReadOnlyAdminQueryEndpoint(method, path string) bool {
 		"/admin/dashboard/api-keys-usage",
 		"/admin/accounts/today-stats/batch",
 		"/admin/user-attributes/batch",
-		"/admin/visitor-analytics/ip-lookup":
+		"/admin/visitor-analytics/ip-lookup",
+		"/admin/download-resources/ip-lookup":
 		return true
 	default:
 		return false

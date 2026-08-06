@@ -2112,6 +2112,134 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	response.Success(c, gin.H{"models": models})
 }
 
+// GetUpstreamPricing handles fetching live model and group ratios from New API/Sub2API upstreams.
+// GET /api/v1/admin/accounts/:id/upstream-pricing
+func (h *AccountHandler) GetUpstreamPricing(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	account, err := h.adminService.GetAccount(c.Request.Context(), accountID)
+	if err != nil {
+		response.NotFound(c, "Account not found")
+		return
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "Account test service is not configured")
+		return
+	}
+
+	pricing, err := h.accountTestService.FetchUpstreamPricing(c.Request.Context(), account)
+	if err != nil {
+		var pricingErr *service.UpstreamPricingError
+		if errors.As(err, &pricingErr) {
+			switch pricingErr.Kind {
+			case service.UpstreamPricingErrorConfiguration, service.UpstreamPricingErrorUnsupported:
+				response.BadRequest(c, pricingErr.SafeMessage())
+			default:
+				slog.Warn("fetch_upstream_pricing_failed", "account_id", accountID, "kind", pricingErr.Kind)
+				response.Error(c, http.StatusBadGateway, pricingErr.SafeMessage())
+			}
+			return
+		}
+		slog.Warn("fetch_upstream_pricing_failed", "account_id", accountID)
+		response.Error(c, http.StatusBadGateway, "Failed to fetch upstream pricing")
+		return
+	}
+
+	response.Success(c, pricing)
+}
+
+type upstreamPricingGroupsPreviewRequest struct {
+	AccountID            *int64 `json:"account_id"`
+	Platform             string `json:"platform"`
+	BaseURL              string `json:"base_url"`
+	APIKey               string `json:"api_key"`
+	DashboardAccessToken string `json:"upstream_dashboard_access_token"`
+	DashboardUserID      string `json:"upstream_dashboard_user_id"`
+}
+
+// PreviewUpstreamPricingGroups returns the group choices exposed by an upstream.
+// POST /api/v1/admin/accounts/upstream-pricing/groups
+func (h *AccountHandler) PreviewUpstreamPricingGroups(c *gin.Context) {
+	var req upstreamPricingGroupsPreviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request")
+		return
+	}
+	var account *service.Account
+	var err error
+	if req.AccountID != nil && *req.AccountID > 0 {
+		account, err = h.adminService.GetAccount(c.Request.Context(), *req.AccountID)
+		if err != nil {
+			response.NotFound(c, "Account not found")
+			return
+		}
+		// During edit, the new Base URL/Key have not been persisted yet. Use the
+		// submitted values for the preview while retaining the account's proxy
+		// and other connection settings.
+		if strings.TrimSpace(req.BaseURL) != "" || strings.TrimSpace(req.APIKey) != "" {
+			credentials := make(map[string]any, len(account.Credentials)+2)
+			for key, value := range account.Credentials {
+				credentials[key] = value
+			}
+			if strings.TrimSpace(req.BaseURL) != "" {
+				credentials["base_url"] = strings.TrimSpace(req.BaseURL)
+			}
+			if strings.TrimSpace(req.APIKey) != "" {
+				credentials["api_key"] = strings.TrimSpace(req.APIKey)
+			}
+			if strings.TrimSpace(req.DashboardAccessToken) != "" {
+				credentials["upstream_dashboard_access_token"] = strings.TrimSpace(req.DashboardAccessToken)
+			}
+			if strings.TrimSpace(req.DashboardUserID) != "" {
+				credentials["upstream_dashboard_user_id"] = strings.TrimSpace(req.DashboardUserID)
+			}
+			account.Credentials = credentials
+		}
+	} else {
+		if strings.TrimSpace(req.BaseURL) == "" || strings.TrimSpace(req.APIKey) == "" {
+			response.BadRequest(c, "Base URL and API key are required")
+			return
+		}
+		account = &service.Account{
+			Platform: req.Platform,
+			Type:     service.AccountTypeAPIKey,
+			Credentials: map[string]any{
+				"base_url": req.BaseURL,
+				"api_key":  req.APIKey,
+			},
+		}
+		if strings.TrimSpace(req.DashboardAccessToken) != "" {
+			account.Credentials["upstream_dashboard_access_token"] = strings.TrimSpace(req.DashboardAccessToken)
+		}
+		if strings.TrimSpace(req.DashboardUserID) != "" {
+			account.Credentials["upstream_dashboard_user_id"] = strings.TrimSpace(req.DashboardUserID)
+		}
+	}
+	if h.accountTestService == nil {
+		response.InternalError(c, "Account test service is not configured")
+		return
+	}
+	groups, err := h.accountTestService.FetchUpstreamPricingGroups(c.Request.Context(), account)
+	if err != nil {
+		var pricingErr *service.UpstreamPricingError
+		if errors.As(err, &pricingErr) {
+			if pricingErr.Kind == service.UpstreamPricingErrorConfiguration {
+				response.BadRequest(c, pricingErr.SafeMessage())
+				return
+			}
+			response.Error(c, http.StatusBadGateway, pricingErr.SafeMessage())
+			return
+		}
+		response.Error(c, http.StatusBadGateway, "Failed to fetch upstream groups")
+		return
+	}
+	response.Success(c, gin.H{"groups": groups})
+}
+
 // SetPrivacy handles setting privacy for a single OpenAI/Antigravity OAuth account
 // POST /api/v1/admin/accounts/:id/set-privacy
 func (h *AccountHandler) SetPrivacy(c *gin.Context) {

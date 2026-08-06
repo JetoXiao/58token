@@ -260,6 +260,9 @@
               </div>
             </div>
           </template>
+          <template #cell-upstream_pricing="{ row }">
+            <AccountUpstreamPricingCell :account="row" :state="upstreamPricingStateFor(row)" />
+          </template>
           <template #cell-capacity="{ row }">
             <AccountCapacityCell :account="row" />
           </template>
@@ -517,6 +520,7 @@ import { adminAPI } from '@/api/admin'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
+import { useAccountUpstreamPricing } from '@/composables/useAccountUpstreamPricing'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -532,6 +536,7 @@ import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
+import AccountUpstreamPricingCell from '@/components/admin/account/AccountUpstreamPricingCell.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
@@ -873,6 +878,15 @@ const {
     sort_order: sortState.sort_order
   }
 })
+
+const {
+  stateFor: upstreamPricingStateFor,
+  load: loadUpstreamPricing
+} = useAccountUpstreamPricing()
+
+watch(accounts, (rows) => {
+  void loadUpstreamPricing(rows)
+}, { immediate: true })
 
 const {
   selectedIds: selIds,
@@ -1328,6 +1342,7 @@ const allColumns = computed(() => {
     { key: 'select', label: '', sortable: false },
     { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
     { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
+    { key: 'upstream_pricing', label: t('admin.accounts.upstreamPricing.column'), sortable: false },
     { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
@@ -1701,6 +1716,10 @@ const patchAccountInList = (updatedAccount: Account) => {
 }
 const handleAccountUpdated = (updatedAccount: Account) => {
   patchAccountInList(updatedAccount)
+  // Account credentials (including the upstream dashboard token/user id) may
+  // have changed; refresh this row immediately instead of waiting for the
+  // pricing cache window to expire.
+  void loadUpstreamPricing([updatedAccount], true)
   enterAutoRefreshSilentWindow()
 }
 const formatExportTimestamp = () => {

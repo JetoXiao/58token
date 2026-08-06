@@ -72,7 +72,7 @@
 
       <section class="panel records-panel">
         <div class="panel-heading"><div><h2>{{ t('admin.downloadResources.downloadRecords') }}</h2><p>{{ t('admin.downloadResources.downloadRecordsDescription') }}</p></div><button class="button secondary" type="button" :disabled="loadingRecords" @click="loadRecords"><Icon name="refresh" size="sm" />{{ t('common.refresh') }}</button></div>
-        <div class="table-shell compact"><table><thead><tr><th>{{ t('admin.downloadResources.requestedAt') }}</th><th>{{ t('admin.downloadResources.resource') }}</th><th>IP</th><th>{{ t('admin.downloadResources.referrer') }}</th></tr></thead><tbody><tr v-for="record in records.items" :key="record.id"><td>{{ formatDateTime(record.requested_at) }}</td><td>{{ record.resource_name }} <span class="subline">{{ record.version }}</span></td><td><code>{{ record.ip }}</code></td><td class="truncate" :title="record.referrer">{{ record.referrer || '-' }}</td></tr></tbody></table><div v-if="!loadingRecords && !records.items.length" class="empty-table">{{ t('admin.downloadResources.noRecords') }}</div></div>
+        <div class="table-shell compact"><table><thead><tr><th>{{ t('admin.downloadResources.requestedAt') }}</th><th>{{ t('admin.downloadResources.resource') }}</th><th>{{ t('admin.downloadResources.identity') }}</th><th>{{ t('admin.downloadResources.location') }}</th><th>{{ t('admin.downloadResources.referrer') }}</th></tr></thead><tbody><tr v-for="record in records.items" :key="record.id"><td>{{ formatDateTime(record.requested_at) }}</td><td>{{ record.resource_name }} <span class="subline">{{ record.version }}</span></td><td><div class="identity-ip-cell"><span v-if="record.username || record.email" class="user-cell">{{ record.username || record.email }}</span><div class="ip-cell"><code>{{ record.ip }}</code><button class="inline-lookup" :disabled="lookingUpIP === record.ip" :title="t('admin.downloadResources.lookup')" @click="lookupIP(record.ip)"><Icon name="search" size="xs" /></button></div></div></td><td><div v-if="record.geo_country || record.geo_region || record.geo_city" class="location-cell"><strong>{{ record.geo_country }}</strong><span>{{ [record.geo_region, record.geo_city].filter(Boolean).join(' · ') }}</span></div><button v-else class="lookup-button" :disabled="lookingUpIP === record.ip" @click="lookupIP(record.ip)">{{ lookingUpIP === record.ip ? t('common.loading') : t('admin.downloadResources.lookup') }}</button></td><td class="truncate" :title="record.referrer">{{ record.referrer || '-' }}</td></tr></tbody></table><div v-if="!loadingRecords && !records.items.length" class="empty-table">{{ t('admin.downloadResources.noRecords') }}</div></div>
       </section>
     </div>
 
@@ -127,6 +127,7 @@ const appStore = useAppStore()
 const { copyToClipboard } = useClipboard()
 const resources = ref<AdminDownloadResource[]>([])
 const records = ref<DownloadRecordPage>({ items: [], total: 0, page: 1, page_size: 20, pages: 1 })
+const lookingUpIP = ref('')
 const loading = ref(true); const loadingRecords = ref(false); const savingStorage = ref(false); const testingStorage = ref(false)
 const editorOpen = ref(false); const editing = ref<AdminDownloadResource | null>(null); const uploading = ref(false); const savingResource = ref(false); const formError = ref('')
 const autoMetadataMessage = ref('')
@@ -161,6 +162,17 @@ function formatDateTime(value: string) { const date = new Date(value); return Nu
 function assignStorage(value: DownloadResourceStorageConfig | null) { Object.assign(storage, { endpoint: value?.endpoint || '', region: value?.region || 'auto', bucket: value?.bucket || '', access_key_id: value?.access_key_id || '', secret_access_key: '', prefix: value?.prefix || 'downloads/', force_path_style: value?.force_path_style ?? true }) }
 async function refresh() { loading.value = true; try { resources.value = await downloadResourcesAPI.list(); if (canManage.value) assignStorage(await downloadResourcesAPI.storage()) } finally { loading.value = false } }
 async function loadRecords() { loadingRecords.value = true; try { records.value = await downloadResourcesAPI.listDownloads() } finally { loadingRecords.value = false } }
+async function lookupIP(ip: string) {
+  if (!ip || lookingUpIP.value) return
+  lookingUpIP.value = ip
+  try {
+    const result = await downloadResourcesAPI.lookupIP(ip)
+    for (const record of records.value.items) {
+      if (record.ip === ip) Object.assign(record, { geo_country: result.country, geo_region: result.region, geo_city: result.city })
+    }
+  } catch { appStore.showError(t('admin.downloadResources.lookupFailed')) }
+  finally { lookingUpIP.value = '' }
+}
 async function saveStorage() { savingStorage.value = true; try { const updated = await downloadResourcesAPI.saveStorage({ ...storage }); assignStorage(updated); appStore.showSuccess(t('admin.downloadResources.storageSaved')) } catch (error) { appStore.showError(requestErrorMessage(error, t('admin.downloadResources.saveFailed'))) } finally { savingStorage.value = false } }
 async function testStorage() { testingStorage.value = true; try { await downloadResourcesAPI.testStorage({ ...storage }); appStore.showSuccess(t('admin.downloadResources.testSuccess')) } catch (error) { appStore.showError(requestErrorMessage(error, t('admin.downloadResources.testFailed'))) } finally { testingStorage.value = false } }
 function requestErrorMessage(error: unknown, fallback: string) { return (error as { message?: string })?.message || fallback }
@@ -234,5 +246,7 @@ onBeforeUnmount(cancelUpload)
 .metadata-message { display: flex; align-items: center; gap: 6px; margin: 9px 0 -4px; color: #047857; font-size: 12px; }
 .upload-progress { margin-top: 10px; border: 1px solid #ccfbf1; border-radius: 7px; background: #f8fffe; padding: 11px 12px; }.upload-progress-heading, .upload-progress-heading > div { display: flex; align-items: center; }.upload-progress-heading { justify-content: space-between; gap: 12px; }.upload-progress-heading > div { gap: 8px; }.upload-progress-heading strong { color: #115e59; font-size: 12px; }.upload-progress-heading span { color: #0f766e; font-size: 12px; font-variant-numeric: tabular-nums; }.upload-progress-heading .icon-button { width: 27px; height: 27px; }.upload-progress-track { height: 7px; overflow: hidden; margin-top: 8px; border-radius: 4px; background: #dbe7e5; }.upload-progress-track span { display: block; height: 100%; border-radius: inherit; background: #0d9488; transition: width .15s ease-out; }.upload-progress p { margin: 7px 0 0; color: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }:global(.dark) .upload-progress { border-color: #134e4a; background: rgba(6,78,59,.16); }:global(.dark) .upload-progress-heading strong { color: #99f6e4; }:global(.dark) .upload-progress-heading span { color: #5eead4; }:global(.dark) .upload-progress-track { background: #334155; }
 .form-grid input[readonly] { background: #f8fafc; color: #64748b; }
+.identity-ip-cell { display: grid; gap: 3px; }
+.ip-cell { display: flex; align-items: center; gap: 6px; white-space: nowrap; }.inline-lookup { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid #99f6e4; border-radius: 6px; background: #f0fdfa; color: #0f766e; cursor: pointer; }.inline-lookup:disabled, .lookup-button:disabled { cursor: wait; opacity: .55; }.lookup-button { border: 1px solid #99f6e4; border-radius: 6px; background: #f0fdfa; padding: 5px 8px; color: #0f766e; cursor: pointer; font-size: 11px; }.user-cell { display: block; max-width: 190px; overflow: hidden; color: #334155; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }.anonymous-cell { color: #94a3b8; }.location-cell strong, .location-cell span { display: block; white-space: nowrap; }.location-cell strong { color: #334155; }.location-cell span { margin-top: 2px; color: #94a3b8; font-size: 11px; }
 :global(.dark) .form-grid input[readonly] { background: #111827; color: #94a3b8; }
 </style>

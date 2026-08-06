@@ -30,3 +30,9 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar user downloads entry', () => {
+  it('shows the public downloads page in the console menu without a feature gate', () => {
+    expect(componentSource).toContain("{ path: '/user/downloads', label: t('nav.downloadResources'), icon: FolderIcon }")
+  })
+})

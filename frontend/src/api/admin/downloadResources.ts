@@ -27,6 +27,9 @@ export interface DownloadResourceUploadURL {
 
 export interface DownloadRecord {
   id: number
+  user_id?: number
+  username?: string
+  email?: string
   resource_id: number
   resource_name: string
   version: string
@@ -34,6 +37,9 @@ export interface DownloadRecord {
   user_agent: string
   referrer: string
   requested_at: string
+  geo_country?: string
+  geo_region?: string
+  geo_city?: string
 }
 
 export interface DownloadRecordPage {
@@ -62,6 +68,10 @@ const downloadResourcesAPI = {
   },
   async listDownloads(page = 1, pageSize = 20): Promise<DownloadRecordPage> {
     const { data } = await apiClient.get<DownloadRecordPage>('/admin/download-resources/downloads', { params: { page, page_size: pageSize } })
+    return data
+  },
+  async lookupIP(ip: string): Promise<{ ip: string; country: string; region: string; city: string; country_code: string }> {
+    const { data } = await apiClient.post('/admin/download-resources/ip-lookup', { ip })
     return data
   },
   async storage(): Promise<DownloadResourceStorageConfig | null> {

@@ -39,7 +39,11 @@ func (h *DownloadResourcesHandler) IssueDownload(c *gin.Context) {
 		response.Error(c, http.StatusServiceUnavailable, "Download protection is temporarily unavailable")
 		return
 	}
-	url, err := h.service.IssueDownload(c.Request.Context(), id, ip, c.GetHeader("User-Agent"), c.GetHeader("Referer"))
+	var userID int64
+	if subject, ok := middleware.GetAuthSubjectFromContext(c); ok {
+		userID = subject.UserID
+	}
+	url, err := h.service.IssueDownload(c.Request.Context(), id, userID, ip, c.GetHeader("User-Agent"), c.GetHeader("Referer"))
 	if err != nil {
 		handleDownloadResourceError(c, err)
 		return

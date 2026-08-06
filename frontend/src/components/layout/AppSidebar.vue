@@ -771,6 +771,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true, menuKey: 'redeem', permissionKey: 'redeem' },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate, menuKey: 'affiliate', permissionKey: 'affiliate' },
     { path: '/affiliate/usage', label: t('nav.affiliateUsage'), icon: ChartIcon, hideInSimpleMode: true, menuKey: 'affiliate_usage', permissionKey: 'affiliate_usage' },
+    { path: '/user/downloads', label: t('nav.downloadResources'), icon: FolderIcon },
     { path: '/support-contact', label: t('nav.supportContact'), icon: SupportContactIcon, menuKey: 'support_contact', permissionKey: 'support_contact' },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon, menuKey: 'profile', permissionKey: 'profile' },
     ...customMenuItemsForUser.value.map((item): NavItem => ({

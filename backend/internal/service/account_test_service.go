@@ -15,6 +15,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -70,6 +71,8 @@ type AccountTestService struct {
 	httpUpstream              HTTPUpstream
 	cfg                       *config.Config
 	tlsFPProfileService       *TLSFingerprintProfileService
+	upstreamPricingCacheMu    sync.Mutex
+	upstreamPricingCache      map[string]upstreamPricingCacheEntry
 }
 
 // NewAccountTestService creates a new AccountTestService

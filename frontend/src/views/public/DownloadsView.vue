@@ -1,6 +1,7 @@
 <template>
-  <div class="downloads-page">
+  <div :class="['downloads-page', { 'downloads-page-embedded': embedded }]">
     <MarketingNavbar
+      v-if="!embedded"
       :site-name="siteName"
       :subtitle="t('gateway.common.navSubtitle')"
       :logo="siteLogo"
@@ -119,6 +120,7 @@ import { useAppStore, useAuthStore } from '@/stores'
 import { formatBytes } from '@/utils/format'
 
 const { t, locale } = useI18n()
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const resources = ref<DownloadResource[]>([])
@@ -202,13 +204,15 @@ function initTheme() {
 }
 
 onMounted(async () => {
-  initTheme()
+  if (!embedded) initTheme()
   await Promise.allSettled([appStore.fetchPublicSettings(), loadResources()])
 })
 </script>
 
 <style scoped>
 .downloads-page { min-height: 100vh; background: #f7f8fb; color: #111827; }
+.downloads-page-embedded { min-height: 0; background: transparent; }
+.downloads-page-embedded .downloads-main { width: 100%; padding-top: 0; }
 .downloads-page :deep(.marketing-navbar) { background: linear-gradient(180deg, rgba(236, 253, 245, .72), transparent); }
 .downloads-main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 80px; }
 .downloads-hero { display: flex; align-items: end; justify-content: space-between; gap: 32px; padding: 42px 0 38px; border-bottom: 1px solid #dbe3ed; }
@@ -243,4 +247,5 @@ onMounted(async () => {
 @keyframes spin { to { transform: rotate(360deg); } } @keyframes shimmer { to { background-position: -200% 0; } }
 :global(.dark) .downloads-page { background: #080b11; color: #f8fafc; }:global(.dark) .downloads-page :deep(.marketing-navbar) { background: linear-gradient(180deg, rgba(6, 78, 59, .18), transparent); }:global(.dark) .downloads-hero, :global(.dark) .resource-list, :global(.dark) .resource-row { border-color: #243142; }:global(.dark) .downloads-hero p, :global(.dark) .catalog-heading p, :global(.dark) .resource-copy > p, :global(.dark) .hero-status span { color: #a5b4c6; }:global(.dark) .resource-icon { background: rgba(6, 78, 59, .36); color: #6ee7b7; }:global(.dark) .version-chip { background: #1e293b; color: #cbd5e1; }:global(.dark) .resource-meta dt { color: #64748b; }:global(.dark) .resource-meta dd, :global(.dark) .checksum code { color: #cbd5e1; }:global(.dark) .reload-button, :global(.dark) .theme-button { border-color: #334155; background: #111827; color: #dbeafe; }:global(.dark) .resource-skeleton { background: linear-gradient(100deg, #111827 35%, #1e293b 50%, #111827 65%); background-size: 200% 100%; }
 @media (max-width: 720px) { .downloads-main { width: min(100% - 28px, 1180px); padding-top: 12px; }.downloads-hero { display: block; padding: 30px 0; }.hero-status { max-width: none; margin-top: 24px; border-top: 1px solid #dbe3ed; }.resource-row { grid-template-columns: 42px minmax(0, 1fr); gap: 14px; }.resource-icon { width: 42px; height: 42px; }.download-button { grid-column: 2; width: 100%; }.catalog-heading { align-items: start; }.resource-meta { gap: 7px 14px; }.checksum { max-width: 100%; }:global(.dark) .hero-status { border-color: #243142; } }
+:global(.dark) .downloads-page-embedded { background: transparent; }
 </style>
