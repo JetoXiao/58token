@@ -2139,7 +2139,7 @@ func (h *AccountHandler) GetUpstreamPricing(c *gin.Context) {
 			case service.UpstreamPricingErrorConfiguration, service.UpstreamPricingErrorUnsupported:
 				response.BadRequest(c, pricingErr.SafeMessage())
 			default:
-				slog.Warn("fetch_upstream_pricing_failed", "account_id", accountID, "kind", pricingErr.Kind)
+				slog.Warn("fetch_upstream_pricing_failed", "account_id", accountID, "kind", pricingErr.Kind, "error", pricingErr.Error())
 				response.Error(c, http.StatusBadGateway, pricingErr.SafeMessage())
 			}
 			return
@@ -2231,9 +2231,11 @@ func (h *AccountHandler) PreviewUpstreamPricingGroups(c *gin.Context) {
 				response.BadRequest(c, pricingErr.SafeMessage())
 				return
 			}
+			slog.Warn("preview_upstream_pricing_groups_failed", "account_id", req.AccountID, "kind", pricingErr.Kind, "error", pricingErr.Error())
 			response.Error(c, http.StatusBadGateway, pricingErr.SafeMessage())
 			return
 		}
+		slog.Warn("preview_upstream_pricing_groups_failed", "account_id", req.AccountID, "error", err.Error())
 		response.Error(c, http.StatusBadGateway, "Failed to fetch upstream groups")
 		return
 	}

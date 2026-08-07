@@ -4150,6 +4150,7 @@ export default {
       selectedCount: '{count} selected',
       upstreamPricing: {
         column: 'Upstream Rates',
+        balanceColumn: 'Upstream Balance',
         loading: 'Loading',
         failedShort: 'Failed',
         configureGroup: 'Group not configured',
@@ -4162,6 +4163,11 @@ export default {
         dashboardUserIdPlaceholder: 'User ID for legacy upstreams (optional)',
         baseScope: 'Base ratio',
         effectiveScope: 'Effective ratio',
+        balanceUnavailable: 'Unavailable',
+        balanceUnavailableHint: 'The upstream balance endpoint is disabled, the dashboard token lacks permission, or no dashboard token is configured',
+        balanceQuotaUnit: 'quota',
+        balanceUsed: 'Used',
+        balanceCheckedAt: 'Checked at',
         modelCount: '{count} models',
         modelRange: 'Models {range} · {count}'
       },

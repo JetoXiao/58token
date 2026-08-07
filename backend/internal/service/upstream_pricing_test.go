@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -74,7 +75,7 @@ func TestParseUpstreamPricingSnapshot(t *testing.T) {
 }
 
 func TestParseEffectiveUpstreamGroups(t *testing.T) {
-	 t.Parallel()
+	t.Parallel()
 
 	ratios, names, err := parseEffectiveUpstreamGroups([]byte(`{
 		"success": true,
@@ -96,6 +97,26 @@ func TestParseSub2APIModelPlaza(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0.15, ratios["7"])
 	require.Equal(t, "Claude Pro", names["7"])
+}
+
+func TestParseUpstreamBalance(t *testing.T) {
+	t.Parallel()
+
+	sub2APIBalance, err := parseUpstreamBalance(map[string]any{
+		"data": map[string]any{"balance": json.Number("12.3456")},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 12.3456, sub2APIBalance.Amount)
+	require.Equal(t, "currency", sub2APIBalance.Unit)
+
+	newAPIBalance, err := parseUpstreamBalance(map[string]any{
+		"data": map[string]any{"quota": json.Number("1500000"), "used_quota": json.Number("500000")},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1500000.0, newAPIBalance.Amount)
+	require.Equal(t, "quota", newAPIBalance.Unit)
+	require.NotNil(t, newAPIBalance.UsedAmount)
+	require.Equal(t, 500000.0, *newAPIBalance.UsedAmount)
 }
 
 func TestFetchUpstreamPricingFallsBackToSub2API(t *testing.T) {
@@ -239,11 +260,11 @@ func TestFetchUpstreamPricingUsesDashboardEffectiveRatio(t *testing.T) {
 	upstream := &upstreamPricingSequence{responses: []*http.Response{
 		{
 			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{"success":true,"group_ratio":{"gpt-pro":0.45},"usable_group":{"gpt-pro":"纯pro池，极速可靠"}}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"success":true,"group_ratio":{"gpt-pro":0.45},"usable_group":{"gpt-pro":"纯pro池，极速可靠"}}`)),
 		},
 		{
 			StatusCode: http.StatusOK,
-			Body: io.NopCloser(strings.NewReader(`{"success":true,"data":{"gpt-pro":{"desc":"纯pro池，极速可靠","ratio":0.15}}}`)),
+			Body:       io.NopCloser(strings.NewReader(`{"success":true,"data":{"gpt-pro":{"desc":"纯pro池，极速可靠","ratio":0.15}}}`)),
 		},
 	}}
 	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
@@ -257,6 +278,31 @@ func TestFetchUpstreamPricingUsesDashboardEffectiveRatio(t *testing.T) {
 	require.Equal(t, upstreamPricingRatioScopeEffective, snapshot.RatioScope)
 	require.Equal(t, 0.15, snapshot.GroupRatios["gpt-pro"])
 	require.Equal(t, "Bearer dashboard-token", upstream.requests[1].Header.Get("Authorization"))
+}
+
+func TestFetchUpstreamPricingKeepsPublicRatioWhenDashboardEndpointFails(t *testing.T) {
+	t.Parallel()
+
+	upstream := &upstreamPricingSequence{responses: []*http.Response{
+		{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"success":true,"group_ratio":{"gpt-pro":0.45},"usable_group":{"gpt-pro":"Codex Pro"}}`)),
+		},
+		{
+			StatusCode: http.StatusUnauthorized,
+			Body:       io.NopCloser(strings.NewReader(`{"success":false}`)),
+		},
+	}}
+	svc := &AccountTestService{httpUpstream: upstream, cfg: upstreamModelSyncTestConfig()}
+	account := &Account{ID: 35, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Credentials: map[string]any{
+		"api_key": "model-key", "base_url": "https://same-upstream.example.com/v1", "upstream_group_key": "gpt-pro",
+		"upstream_dashboard_access_token": "expired-dashboard-token",
+	}}
+
+	snapshot, err := svc.FetchUpstreamPricing(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, upstreamPricingRatioScopeBase, snapshot.RatioScope)
+	require.Equal(t, 0.45, snapshot.GroupRatios["gpt-pro"])
 }
 
 func TestFetchUpstreamPricingRequiresConfiguredGroupKey(t *testing.T) {

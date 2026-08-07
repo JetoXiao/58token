@@ -263,6 +263,9 @@
           <template #cell-upstream_pricing="{ row }">
             <AccountUpstreamPricingCell :account="row" :state="upstreamPricingStateFor(row)" />
           </template>
+          <template #cell-upstream_balance="{ row }">
+            <AccountUpstreamBalanceCell :account="row" :state="upstreamPricingStateFor(row)" />
+          </template>
           <template #cell-capacity="{ row }">
             <AccountCapacityCell :account="row" />
           </template>
@@ -537,6 +540,7 @@ import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vu
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import AccountUpstreamPricingCell from '@/components/admin/account/AccountUpstreamPricingCell.vue'
+import AccountUpstreamBalanceCell from '@/components/admin/account/AccountUpstreamBalanceCell.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
@@ -1343,6 +1347,7 @@ const allColumns = computed(() => {
     { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
     { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
     { key: 'upstream_pricing', label: t('admin.accounts.upstreamPricing.column'), sortable: false },
+    { key: 'upstream_balance', label: t('admin.accounts.upstreamPricing.balanceColumn'), sortable: false },
     { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },

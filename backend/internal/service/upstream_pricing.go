@@ -87,6 +87,21 @@ type UpstreamPricingSnapshot struct {
 	GroupRatios    map[string]float64     `json:"group_ratios"`
 	GroupNames     map[string]string      `json:"group_names"`
 	Models         []UpstreamPricingModel `json:"models"`
+	Balance        *UpstreamBalance       `json:"balance,omitempty"`
+}
+
+// UpstreamBalance is an optional account balance returned by an upstream
+// control-panel API. New API exposes quota units while Sub2API exposes a
+// currency balance, so the unit is explicit instead of assuming dollars.
+type UpstreamBalance struct {
+	Amount     float64   `json:"amount"`
+	RawAmount  float64   `json:"raw_amount,omitempty"`
+	UsedAmount *float64  `json:"used_amount,omitempty"`
+	Unit       string    `json:"unit"`
+	Currency   string    `json:"currency,omitempty"`
+	Source     string    `json:"source"`
+	Endpoint   string    `json:"endpoint"`
+	CheckedAt  time.Time `json:"checked_at"`
 }
 
 type UpstreamPricingGroup struct {
@@ -144,6 +159,14 @@ func cloneUpstreamPricingSnapshot(snapshot *UpstreamPricingSnapshot) *UpstreamPr
 		clone.GroupNames[key] = name
 	}
 	clone.Models = append([]UpstreamPricingModel(nil), snapshot.Models...)
+	if snapshot.Balance != nil {
+		balance := *snapshot.Balance
+		if snapshot.Balance.UsedAmount != nil {
+			used := *snapshot.Balance.UsedAmount
+			balance.UsedAmount = &used
+		}
+		clone.Balance = &balance
+	}
 	return &clone
 }
 
@@ -246,15 +269,20 @@ func (s *AccountTestService) fetchUpstreamPricingCatalog(ctx context.Context, ac
 		snapshot.RatioScope = upstreamPricingRatioScopeBase
 		if dashboardToken != "" {
 			effectiveRatios, effectiveNames, effectiveEndpoint, effectiveErr := s.fetchEffectiveUpstreamGroupRatios(requestCtx, normalizedBaseURL, dashboardToken, dashboardUserID, account)
-			if effectiveErr != nil {
-				return nil, effectiveErr
+			if effectiveErr == nil {
+				snapshot.GroupRatios = effectiveRatios
+				for key, name := range effectiveNames {
+					snapshot.GroupNames[key] = name
+				}
+				snapshot.RatioScope = upstreamPricingRatioScopeEffective
+				snapshot.Endpoint = effectiveEndpoint
 			}
-			snapshot.GroupRatios = effectiveRatios
-			for key, name := range effectiveNames {
-				snapshot.GroupNames[key] = name
+			// Effective group APIs are optional across New API/Sub2API forks. A
+			// valid public catalog is still useful, so do not fail the whole row
+			// when only the dashboard-specific endpoint is unavailable.
+			if balance, balanceErr := s.fetchUpstreamBalance(requestCtx, normalizedBaseURL, dashboardToken, dashboardUserID, account); balanceErr == nil {
+				snapshot.Balance = balance
 			}
-			snapshot.RatioScope = upstreamPricingRatioScopeEffective
-			snapshot.Endpoint = effectiveEndpoint
 		}
 		s.cacheUpstreamPricing(cacheKey, snapshot, time.Now().Add(upstreamPricingCacheTTL))
 		return snapshot, nil
@@ -269,10 +297,16 @@ func (s *AccountTestService) fetchUpstreamPricingCatalog(ctx context.Context, ac
 	if dashboardToken != "" {
 		if groupSnapshot, groupErr := s.fetchSub2APIGroupCatalog(ctx, normalizedBaseURL, dashboardToken, account); groupErr == nil {
 			groupSnapshot.CheckedAt = time.Now().UTC()
+			if balance, balanceErr := s.fetchUpstreamBalance(ctx, normalizedBaseURL, dashboardToken, "", account); balanceErr == nil {
+				groupSnapshot.Balance = balance
+			}
 			s.cacheUpstreamPricing(cacheKey, groupSnapshot, time.Now().Add(upstreamPricingCacheTTL))
 			return groupSnapshot, nil
 		} else if plazaSnapshot, plazaErr := s.fetchSub2APIModelPlaza(ctx, normalizedBaseURL, dashboardToken, account); plazaErr == nil {
 			plazaSnapshot.CheckedAt = time.Now().UTC()
+			if balance, balanceErr := s.fetchUpstreamBalance(ctx, normalizedBaseURL, dashboardToken, "", account); balanceErr == nil {
+				plazaSnapshot.Balance = balance
+			}
 			s.cacheUpstreamPricing(cacheKey, plazaSnapshot, time.Now().Add(upstreamPricingCacheTTL))
 			return plazaSnapshot, nil
 		} else {
@@ -302,76 +336,76 @@ func (s *AccountTestService) fetchSub2APIGroupCatalog(ctx context.Context, baseU
 		for _, prefix := range []string{"/api/v1", "/api", ""} {
 			availableEndpoint := root + prefix + "/groups/available"
 			available, requestErr := s.fetchUpstreamJSONObject(ctx, availableEndpoint, dashboardToken, account)
-		if requestErr != nil {
-			lastErr = requestErr
-			continue
-		}
-		items, ok := available["data"].([]any)
-		if !ok {
-			lastErr = errors.New("Sub2API available groups response did not contain data")
-			continue
-		}
-		ratios := make(map[string]float64, len(items))
-		names := make(map[string]string, len(items))
-		for _, item := range items {
-			group, ok := item.(map[string]any)
+			if requestErr != nil {
+				lastErr = requestErr
+				continue
+			}
+			items, ok := available["data"].([]any)
 			if !ok {
+				lastErr = errors.New("Sub2API available groups response did not contain data")
 				continue
 			}
-			id, idOK := numberFromAny(group["id"])
-			ratio, ratioOK := numberFromAny(group["rate_multiplier"])
-			if !idOK || !ratioOK {
-				continue
+			ratios := make(map[string]float64, len(items))
+			names := make(map[string]string, len(items))
+			for _, item := range items {
+				group, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				id, idOK := numberFromAny(group["id"])
+				ratio, ratioOK := numberFromAny(group["rate_multiplier"])
+				if !idOK || !ratioOK {
+					continue
+				}
+				key := strconv.FormatFloat(id, 'f', -1, 64)
+				ratios[key] = ratio
+				names[key] = upstreamPricingFirstString(group["name"], group["description"], key)
 			}
-			key := strconv.FormatFloat(id, 'f', -1, 64)
-			ratios[key] = ratio
-			names[key] = upstreamPricingFirstString(group["name"], group["description"], key)
-		}
 
-		if ratesResponse, ratesErr := s.fetchUpstreamJSONObject(ctx, root+prefix+"/groups/rates", dashboardToken, account); ratesErr == nil {
-			if effectiveRates, ok := ratesResponse["data"].(map[string]any); ok {
-				for key, value := range effectiveRates {
-					if ratio, ratioOK := numberFromAny(value); ratioOK {
-						ratios[key] = ratio
+			if ratesResponse, ratesErr := s.fetchUpstreamJSONObject(ctx, root+prefix+"/groups/rates", dashboardToken, account); ratesErr == nil {
+				if effectiveRates, ok := ratesResponse["data"].(map[string]any); ok {
+					for key, value := range effectiveRates {
+						if ratio, ratioOK := numberFromAny(value); ratioOK {
+							ratios[key] = ratio
+						}
 					}
 				}
 			}
-		}
 
-		// Match the upstream model API key to its bound Sub2API group. This
-		// prevents users from having to guess among all available groups.
-		apiKey := strings.TrimSpace(account.GetCredential("api_key"))
-		if apiKey != "" {
-			if keysResponse, keysErr := s.fetchUpstreamJSONObject(ctx, root+prefix+"/keys", dashboardToken, account); keysErr == nil {
-				if data, ok := keysResponse["data"].(map[string]any); ok {
-			if keyItems, ok := data["items"].([]any); ok {
-						for _, item := range keyItems {
-							entry, ok := item.(map[string]any)
-							if !ok || strings.TrimSpace(upstreamPricingFirstString(entry["key"])) != apiKey {
-								continue
-							}
-							if groupID, groupOK := numberFromAny(entry["group_id"]); groupOK {
-								selected := strconv.FormatFloat(groupID, 'f', -1, 64)
-								for key := range ratios {
-									if key != selected {
-										delete(ratios, key)
-										delete(names, key)
+			// Match the upstream model API key to its bound Sub2API group. This
+			// prevents users from having to guess among all available groups.
+			apiKey := strings.TrimSpace(account.GetCredential("api_key"))
+			if apiKey != "" {
+				if keysResponse, keysErr := s.fetchUpstreamJSONObject(ctx, root+prefix+"/keys", dashboardToken, account); keysErr == nil {
+					if data, ok := keysResponse["data"].(map[string]any); ok {
+						if keyItems, ok := data["items"].([]any); ok {
+							for _, item := range keyItems {
+								entry, ok := item.(map[string]any)
+								if !ok || strings.TrimSpace(upstreamPricingFirstString(entry["key"])) != apiKey {
+									continue
+								}
+								if groupID, groupOK := numberFromAny(entry["group_id"]); groupOK {
+									selected := strconv.FormatFloat(groupID, 'f', -1, 64)
+									for key := range ratios {
+										if key != selected {
+											delete(ratios, key)
+											delete(names, key)
+										}
 									}
 								}
-							}
-							if strings.TrimSpace(upstreamPricingFirstString(entry["key"])) == apiKey {
-								break
+								if strings.TrimSpace(upstreamPricingFirstString(entry["key"])) == apiKey {
+									break
+								}
 							}
 						}
 					}
 				}
 			}
-		}
-		if len(ratios) == 0 {
-			lastErr = errors.New("Sub2API group endpoints did not contain usable groups")
-			continue
-		}
-		return &UpstreamPricingSnapshot{Source: "sub2api", Endpoint: availableEndpoint, GroupRatios: ratios, GroupNames: names, Models: []UpstreamPricingModel{}}, nil
+			if len(ratios) == 0 {
+				lastErr = errors.New("Sub2API group endpoints did not contain usable groups")
+				continue
+			}
+			return &UpstreamPricingSnapshot{Source: "sub2api", Endpoint: availableEndpoint, GroupRatios: ratios, GroupNames: names, Models: []UpstreamPricingModel{}}, nil
 		}
 	}
 	if lastErr == nil {
@@ -407,6 +441,158 @@ func (s *AccountTestService) fetchUpstreamJSONObject(ctx context.Context, endpoi
 		return nil, err
 	}
 	return raw, nil
+}
+
+// fetchUpstreamBalance tries the authenticated profile endpoints used by the
+// two common upstream families. Balance is deliberately best-effort: private
+// forks often disable the profile endpoint while still exposing pricing.
+func (s *AccountTestService) fetchUpstreamBalance(
+	ctx context.Context,
+	baseURL, dashboardToken, dashboardUserID string,
+	account *Account,
+) (*UpstreamBalance, error) {
+	if strings.TrimSpace(dashboardToken) == "" {
+		return nil, errors.New("dashboard access token is required for balance lookup")
+	}
+	candidates, err := buildUpstreamPricingCandidates(baseURL)
+	if err != nil {
+		return nil, err
+	}
+	roots := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidate.Source == "newapi" {
+			roots = append(roots, strings.TrimSuffix(candidate.URL, "/api/pricing"))
+		}
+	}
+	paths := []string{
+		"/api/v1/auth/me", // Sub2API
+		"/api/auth/me",
+		"/auth/me",
+		"/api/user/self", // New API
+		"/api/v1/user/self",
+		"/api/user/me",
+	}
+	var lastErr error
+	seen := make(map[string]struct{})
+	for _, root := range upstreamPricingDedupeStrings(roots) {
+		for _, path := range paths {
+			endpoint := root + path
+			if _, ok := seen[endpoint]; ok {
+				continue
+			}
+			seen[endpoint] = struct{}{}
+			raw, requestErr := s.fetchUpstreamJSONObjectWithUser(ctx, endpoint, dashboardToken, dashboardUserID, account)
+			if requestErr != nil {
+				lastErr = requestErr
+				continue
+			}
+			balance, parseErr := parseUpstreamBalance(raw)
+			if parseErr != nil {
+				lastErr = parseErr
+				continue
+			}
+			if balance.Unit == "quota" {
+				if status, statusErr := s.fetchUpstreamJSONObjectWithUser(ctx, root+"/api/status", dashboardToken, dashboardUserID, account); statusErr == nil {
+					if quotaPerUnit, ok := findUpstreamNumber(status, "quota_per_unit"); ok && quotaPerUnit > 0 {
+						balance.RawAmount = balance.Amount
+						balance.Amount /= quotaPerUnit
+						balance.Unit = "currency"
+						balance.Currency = "USD"
+						if balance.UsedAmount != nil {
+							used := *balance.UsedAmount / quotaPerUnit
+							balance.UsedAmount = &used
+						}
+					}
+				}
+			}
+			balance.Source = "newapi"
+			if strings.Contains(path, "/auth/me") {
+				balance.Source = "sub2api"
+			}
+			balance.Endpoint = endpoint
+			balance.CheckedAt = time.Now().UTC()
+			return balance, nil
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("no upstream balance endpoint candidates were available")
+	}
+	return nil, lastErr
+}
+
+func (s *AccountTestService) fetchUpstreamJSONObjectWithUser(ctx context.Context, endpoint, token, userID string, account *Account) (map[string]any, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "UseAiForMe/1.0")
+	req.Header.Set("Authorization", "Bearer "+token)
+	if strings.TrimSpace(userID) != "" {
+		req.Header.Set("New-Api-User", strings.TrimSpace(userID))
+	}
+	resp, err := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, upstreamPricingBodyLimit+1))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("endpoint %s returned HTTP %d", endpoint, resp.StatusCode)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	var raw map[string]any
+	if err := decoder.Decode(&raw); err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func parseUpstreamBalance(raw map[string]any) (*UpstreamBalance, error) {
+	containers := []any{raw}
+	if data, ok := raw["data"]; ok {
+		containers = append([]any{data}, containers...)
+	}
+	for _, container := range containers {
+		fields, ok := container.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, key := range []string{"balance", "available_balance", "remaining_balance", "wallet_balance", "credit", "credits", "quota", "remaining_quota"} {
+			amount, amountOK := numberFromAny(fields[key])
+			if !amountOK {
+				continue
+			}
+			unit := "currency"
+			if strings.Contains(key, "quota") {
+				unit = "quota"
+			}
+			balance := &UpstreamBalance{Amount: amount, RawAmount: amount, Unit: unit}
+			for _, usedKey := range []string{"used_balance", "used_quota", "used_credits"} {
+				if used, usedOK := numberFromAny(fields[usedKey]); usedOK {
+					balance.UsedAmount = &used
+					break
+				}
+			}
+			balance.Currency = upstreamPricingFirstString(fields["currency"], fields["currency_code"])
+			return balance, nil
+		}
+	}
+	return nil, errors.New("upstream profile response did not contain a balance or quota")
+}
+
+func findUpstreamNumber(raw map[string]any, key string) (float64, bool) {
+	if value, ok := numberFromAny(raw[key]); ok {
+		return value, true
+	}
+	if data, ok := raw["data"].(map[string]any); ok {
+		return numberFromAny(data[key])
+	}
+	return 0, false
 }
 
 func normalizeUpstreamDashboardToken(value string) string {

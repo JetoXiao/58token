@@ -498,6 +498,18 @@ export interface UpstreamPricingSnapshot {
   group_ratios: Record<string, number>
   group_names: Record<string, string>
   models: UpstreamPricingModel[]
+  balance?: UpstreamBalance
+}
+
+export interface UpstreamBalance {
+  amount: number
+  raw_amount?: number
+  used_amount?: number
+  unit: 'currency' | 'quota' | string
+  currency?: string
+  source: 'newapi' | 'sub2api' | string
+  endpoint: string
+  checked_at: string
 }
 
 export interface UpstreamPricingGroup {

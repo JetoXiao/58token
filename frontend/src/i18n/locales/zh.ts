@@ -4224,6 +4224,7 @@ export default {
       selectedCount: '已选 {count}',
       upstreamPricing: {
         column: '上游倍率',
+        balanceColumn: '上游余额',
         loading: '查询中',
         failedShort: '获取失败',
         configureGroup: '待配置上游分组',
@@ -4236,6 +4237,11 @@ export default {
         dashboardUserIdPlaceholder: '旧版上游可填写用户 ID（可选）',
         baseScope: '基础倍率',
         effectiveScope: '实际倍率',
+        balanceUnavailable: '未开放',
+        balanceUnavailableHint: '上游未开放余额接口、控制台令牌无权限或未配置控制台令牌',
+        balanceQuotaUnit: '额度',
+        balanceUsed: '已使用',
+        balanceCheckedAt: '查询时间',
         modelCount: '{count} 个模型',
         modelRange: '模型 {range} · {count} 个'
       },
