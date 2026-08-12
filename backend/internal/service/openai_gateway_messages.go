@@ -354,11 +354,14 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 				Detail:             upstreamDetail,
 			})
 			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
-			return nil, &UpstreamFailoverError{
+			if IsOpenAIOfficialCapacityErrorMessage(upstreamMsg) || IsOpenAIOfficialCapacityErrorBody(respBody) {
+				return nil, newOpenAIOfficialCapacityFailoverError(respBody)
+			}
+			return nil, normalizeOpenAIOfficialCapacityFailoverError(&UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-			}
+			})
 		}
 		// Non-failover error: return Anthropic-formatted error to client
 		return s.handleAnthropicErrorResponse(resp, c, account)
@@ -582,8 +585,12 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 			if !ok {
 				if frame, ok := parser.Finish(); ok {
 					payload := openAICompatPayloadWithEventType(frame.Data, frame.EventType)
+					payloadBytes := []byte(payload)
+					if IsOpenAIOfficialCapacityErrorBody(payloadBytes) {
+						return nil, usage, acc, newOpenAIOfficialCapacityFailoverError(payloadBytes)
+					}
 					var event apicompat.ResponsesStreamEvent
-					if err := json.Unmarshal([]byte(payload), &event); err == nil {
+					if err := json.Unmarshal(payloadBytes, &event); err == nil {
 						acc.ProcessEvent(&event)
 						if isOpenAICompatResponsesTerminalEvent(event.Type) && event.Response != nil {
 							if event.Response.Usage != nil {
@@ -614,9 +621,13 @@ func (s *OpenAIGatewayService) readOpenAICompatBufferedTerminal(
 				continue
 			}
 			payload := openAICompatPayloadWithEventType(frame.Data, frame.EventType)
+			payloadBytes := []byte(payload)
+			if IsOpenAIOfficialCapacityErrorBody(payloadBytes) {
+				return nil, usage, acc, newOpenAIOfficialCapacityFailoverError(payloadBytes)
+			}
 
 			var event apicompat.ResponsesStreamEvent
-			if err := json.Unmarshal([]byte(payload), &event); err != nil {
+			if err := json.Unmarshal(payloadBytes, &event); err != nil {
 				logger.L().Warn(logPrefix+": failed to parse event",
 					zap.Error(err),
 					zap.String("request_id", requestID),
@@ -677,6 +688,7 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 	var firstTokenMs *int
 	firstChunk := true
 	clientDisconnected := false
+	var streamFailoverErr error
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -723,8 +735,14 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 			firstTokenMs = &ms
 		}
 
+		payloadBytes := []byte(payload)
+		if IsOpenAIOfficialCapacityErrorBody(payloadBytes) {
+			streamFailoverErr = newOpenAIOfficialCapacityFailoverError(payloadBytes)
+			return true
+		}
+
 		var event apicompat.ResponsesStreamEvent
-		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		if err := json.Unmarshal(payloadBytes, &event); err != nil {
 			logger.L().Warn("openai messages stream: failed to parse event",
 				zap.Error(err),
 				zap.String("request_id", requestID),
@@ -776,6 +794,9 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 
 	// finalizeStream sends any remaining Anthropic events and returns the result.
 	finalizeStream := func() (*OpenAIForwardResult, error) {
+		if streamFailoverErr != nil {
+			return resultWithUsage(), streamFailoverErr
+		}
 		if finalEvents := apicompat.FinalizeResponsesAnthropicStream(state); len(finalEvents) > 0 && !clientDisconnected {
 			for _, evt := range finalEvents {
 				sse, err := apicompat.ResponsesAnthropicEventToSSE(evt)

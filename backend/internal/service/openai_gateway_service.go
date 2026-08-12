@@ -1122,6 +1122,125 @@ func isOpenAIInstructionsRequiredError(upstreamStatusCode int, upstreamMsg strin
 	return false
 }
 
+const (
+	OpenAIOfficialCapacityErrorCode     = "openai_official_capacity"
+	OpenAIOfficialCapacityErrorType     = "provider_overloaded_error"
+	OpenAIOfficialCapacityErrorProvider = "openai"
+	OpenAIOfficialCapacityErrorSource   = "official_provider"
+)
+
+func OpenAIOfficialCapacityClientMessage() string {
+	return "OpenAI official service is currently overloaded or the selected model is at capacity. This is an OpenAI provider issue, not a platform issue. Please retry later."
+}
+
+func IsOpenAIOfficialCapacityErrorMessage(message string) bool {
+	lower := strings.ToLower(strings.TrimSpace(message))
+	if lower == "" {
+		return false
+	}
+	markers := []string{
+		"our servers are currently overloaded",
+		"server is currently overloaded",
+		"selected model is at capacity",
+		"selected model is currently at capacity",
+		"model is currently at capacity",
+	}
+	for _, marker := range markers {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func IsOpenAIOfficialCapacityErrorBody(body []byte) bool {
+	if len(body) == 0 {
+		return false
+	}
+	for _, path := range []string{"error.code", "response.error.code", "code"} {
+		if strings.EqualFold(strings.TrimSpace(gjson.GetBytes(body, path).String()), OpenAIOfficialCapacityErrorCode) {
+			return true
+		}
+	}
+	for _, path := range []string{"error.message", "response.error.message", "message", "detail"} {
+		if IsOpenAIOfficialCapacityErrorMessage(gjson.GetBytes(body, path).String()) {
+			return true
+		}
+	}
+	if gjson.ValidBytes(body) {
+		return false
+	}
+	return IsOpenAIOfficialCapacityErrorMessage(string(body))
+}
+
+func newOpenAIOfficialCapacityFailoverError(upstreamPayload []byte) *UpstreamFailoverError {
+	errorPayload := gin.H{
+		"type":      OpenAIOfficialCapacityErrorType,
+		"code":      OpenAIOfficialCapacityErrorCode,
+		"message":   OpenAIOfficialCapacityClientMessage(),
+		"provider":  OpenAIOfficialCapacityErrorProvider,
+		"source":    OpenAIOfficialCapacityErrorSource,
+		"retryable": true,
+	}
+	upstreamMessage := ""
+	for _, path := range []string{"error.upstream_message", "response.error.upstream_message"} {
+		if value := strings.TrimSpace(gjson.GetBytes(upstreamPayload, path).String()); value != "" {
+			upstreamMessage = value
+			break
+		}
+	}
+	if upstreamMessage == "" {
+		upstreamMessage = strings.TrimSpace(ExtractUpstreamErrorMessage(upstreamPayload))
+	}
+	if upstreamMessage != "" && upstreamMessage != OpenAIOfficialCapacityClientMessage() {
+		errorPayload["upstream_message"] = upstreamMessage
+	}
+	body, _ := json.Marshal(gin.H{"error": errorPayload})
+	return &UpstreamFailoverError{StatusCode: http.StatusServiceUnavailable, ResponseBody: body}
+}
+
+func normalizeOpenAIOfficialCapacityFailoverError(err *UpstreamFailoverError) *UpstreamFailoverError {
+	if err == nil || !IsOpenAIOfficialCapacityErrorBody(err.ResponseBody) {
+		return err
+	}
+	normalized := newOpenAIOfficialCapacityFailoverError(err.ResponseBody)
+	normalized.ResponseHeaders = err.ResponseHeaders
+	normalized.ForceCacheBilling = err.ForceCacheBilling
+	normalized.RetryableOnSameAccount = err.RetryableOnSameAccount
+	normalized.MaxSameAccountRetries = err.MaxSameAccountRetries
+	return normalized
+}
+
+func decorateOpenAIOfficialCapacityPayload(payload []byte) []byte {
+	if len(payload) == 0 || !gjson.ValidBytes(payload) {
+		return payload
+	}
+	errorPath := "error"
+	if gjson.GetBytes(payload, "response.error").Exists() {
+		errorPath = "response.error"
+	}
+	upstreamMessage := extractOpenAISSEErrorMessage(payload)
+	decorated := payload
+	fields := map[string]any{
+		"type":      OpenAIOfficialCapacityErrorType,
+		"code":      OpenAIOfficialCapacityErrorCode,
+		"message":   OpenAIOfficialCapacityClientMessage(),
+		"provider":  OpenAIOfficialCapacityErrorProvider,
+		"source":    OpenAIOfficialCapacityErrorSource,
+		"retryable": true,
+	}
+	if upstreamMessage != "" {
+		fields["upstream_message"] = upstreamMessage
+	}
+	for key, value := range fields {
+		next, err := sjson.SetBytes(decorated, errorPath+"."+key, value)
+		if err == nil {
+			decorated = next
+		}
+	}
+	return decorated
+}
+
 func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string, upstreamBody []byte) bool {
 	if upstreamStatusCode != http.StatusBadRequest {
 		return false
@@ -1136,6 +1255,9 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 			return true
 		}
 		if strings.Contains(lower, "selected model is at capacity") {
+			return true
+		}
+		if IsOpenAIOfficialCapacityErrorMessage(lower) {
 			return true
 		}
 		return strings.Contains(lower, "you can retry your request") &&
@@ -3088,11 +3210,11 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				})
 
 				s.handleFailoverSideEffects(ctx, resp, account)
-				return nil, &UpstreamFailoverError{
+				return nil, normalizeOpenAIOfficialCapacityFailoverError(&UpstreamFailoverError{
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
 					RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-				}
+				})
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body)
 		}
@@ -3630,6 +3752,11 @@ func (s *OpenAIGatewayService) handleFailoverErrorResponsePassthrough(
 		Detail:               upstreamDetail,
 		UpstreamResponseBody: upstreamDetail,
 	})
+	if IsOpenAIOfficialCapacityErrorMessage(upstreamMsg) || IsOpenAIOfficialCapacityErrorBody(body) {
+		capacityErr := newOpenAIOfficialCapacityFailoverError(body)
+		capacityErr.ResponseHeaders = resp.Header.Clone()
+		return capacityErr
+	}
 	return &UpstreamFailoverError{
 		StatusCode:      resp.StatusCode,
 		ResponseBody:    body,
@@ -3648,6 +3775,11 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 
 	upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(body))
 	upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
+	if IsOpenAIOfficialCapacityErrorMessage(upstreamMsg) || IsOpenAIOfficialCapacityErrorBody(body) {
+		setOpsUpstreamError(c, resp.StatusCode, upstreamMsg, "")
+		_ = s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, body)
+		return newOpenAIOfficialCapacityFailoverError(body)
+	}
 	upstreamDetail := ""
 	if s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
@@ -3815,6 +3947,11 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 	if message == "" {
 		message = "OpenAI stream disconnected before completion"
 	}
+	isOfficialCapacity := IsOpenAIOfficialCapacityErrorMessage(message) || IsOpenAIOfficialCapacityErrorBody(payload)
+	statusCode := http.StatusBadGateway
+	if isOfficialCapacity {
+		statusCode = http.StatusServiceUnavailable
+	}
 	detail := ""
 	if len(payload) > 0 && s != nil && s.cfg != nil && s.cfg.Gateway.LogUpstreamErrorBody {
 		maxBytes := s.cfg.Gateway.LogUpstreamErrorBodyMaxBytes
@@ -3824,10 +3961,10 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 		detail = truncateString(string(payload), maxBytes)
 	}
 	if c != nil {
-		setOpsUpstreamError(c, http.StatusBadGateway, message, detail)
+		setOpsUpstreamError(c, statusCode, message, detail)
 		event := OpsUpstreamErrorEvent{
 			Platform:           PlatformOpenAI,
-			UpstreamStatusCode: http.StatusBadGateway,
+			UpstreamStatusCode: statusCode,
 			UpstreamRequestID:  strings.TrimSpace(upstreamRequestID),
 			Passthrough:        passthrough,
 			Kind:               "failover",
@@ -3840,6 +3977,9 @@ func (s *OpenAIGatewayService) newOpenAIStreamFailoverError(
 			event.AccountName = account.Name
 		}
 		appendOpsUpstreamError(c, event)
+	}
+	if isOfficialCapacity {
+		return newOpenAIOfficialCapacityFailoverError(payload)
 	}
 	body, _ := json.Marshal(gin.H{
 		"error": gin.H{
@@ -3938,6 +4078,12 @@ func (s *OpenAIGatewayService) handleStreamingResponsePassthrough(
 			eventType := strings.TrimSpace(gjson.Get(trimmedData, "type").String())
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
+				if IsOpenAIOfficialCapacityErrorMessage(failedMessage) || IsOpenAIOfficialCapacityErrorBody(dataBytes) {
+					dataBytes = decorateOpenAIOfficialCapacityPayload(dataBytes)
+					trimmedData = string(dataBytes)
+					line = "data: " + trimmedData
+					failedMessage = extractOpenAISSEErrorMessage(dataBytes)
+				}
 				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && openAIStreamFailedEventShouldFailover(dataBytes, failedMessage) {
 					return resultWithUsage(),
 						s.newOpenAIStreamFailoverError(c, account, true, upstreamRequestID, dataBytes, failedMessage)
@@ -4042,6 +4188,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponsePassthrough(
 	if err != nil {
 		return nil, err
 	}
+	if IsOpenAIOfficialCapacityErrorBody(body) {
+		return nil, newOpenAIOfficialCapacityFailoverError(body)
+	}
 
 	// Detect SSE responses from upstream and convert to JSON.
 	// Some upstreams (e.g. other sub2api instances) may return SSE even when
@@ -4114,6 +4263,9 @@ func (s *OpenAIGatewayService) handlePassthroughSSEToJSON(resp *http.Response, c
 		terminalType, terminalPayload, terminalOK := extractOpenAISSETerminalEvent(bodyText)
 		if terminalOK && terminalType == "response.failed" {
 			msg := extractOpenAISSEErrorMessage(terminalPayload)
+			if IsOpenAIOfficialCapacityErrorMessage(msg) || IsOpenAIOfficialCapacityErrorBody(terminalPayload) {
+				return nil, newOpenAIOfficialCapacityFailoverError(terminalPayload)
+			}
 			if msg == "" {
 				msg = "Upstream compact response failed"
 			}
@@ -4806,6 +4958,12 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			forceFlushFailedEvent := false
 			if eventType == "response.failed" {
 				failedMessage = extractOpenAISSEErrorMessage(dataBytes)
+				if IsOpenAIOfficialCapacityErrorMessage(failedMessage) || IsOpenAIOfficialCapacityErrorBody(dataBytes) {
+					dataBytes = decorateOpenAIOfficialCapacityPayload(dataBytes)
+					data = string(dataBytes)
+					line = "data: " + data
+					failedMessage = extractOpenAISSEErrorMessage(dataBytes)
+				}
 				if !openAIStreamClientOutputStarted(c, clientOutputStarted) && openAIStreamFailedEventShouldFailover(dataBytes, failedMessage) {
 					sawFailedEvent = true
 					streamFailoverErr = s.newOpenAIStreamFailoverError(c, account, false, upstreamRequestID, dataBytes, failedMessage)
@@ -5208,6 +5366,9 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if err != nil {
 		return nil, err
 	}
+	if IsOpenAIOfficialCapacityErrorBody(body) {
+		return nil, newOpenAIOfficialCapacityFailoverError(body)
+	}
 
 	// Detect SSE responses for ALL account types via Content-Type header.
 	// Some OpenAI-compatible upstreams (including other sub2api instances)
@@ -5291,6 +5452,9 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		terminalType, terminalPayload, terminalOK := extractOpenAISSETerminalEvent(bodyText)
 		if terminalOK && terminalType == "response.failed" {
 			msg := extractOpenAISSEErrorMessage(terminalPayload)
+			if IsOpenAIOfficialCapacityErrorMessage(msg) || IsOpenAIOfficialCapacityErrorBody(terminalPayload) {
+				return nil, newOpenAIOfficialCapacityFailoverError(terminalPayload)
+			}
 			if msg == "" {
 				msg = "Upstream compact response failed"
 			}

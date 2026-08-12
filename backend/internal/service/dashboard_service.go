@@ -365,6 +365,34 @@ func (s *DashboardService) GetUserSpendingRanking(ctx context.Context, startTime
 	return ranking, nil
 }
 
+func (s *DashboardService) GetDailyBalanceDeductions(ctx context.Context, startTime, endTime time.Time, userLimit int) ([]usagestats.DailyBalanceDeductionPoint, error) {
+	repo, ok := s.usageRepo.(interface {
+		GetDailyBalanceDeductions(context.Context, time.Time, time.Time, int) ([]usagestats.DailyBalanceDeductionPoint, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("usage repository does not support daily balance deductions")
+	}
+	points, err := repo.GetDailyBalanceDeductions(ctx, startTime, endTime, userLimit)
+	if err != nil {
+		return nil, fmt.Errorf("get daily balance deductions: %w", err)
+	}
+	return points, nil
+}
+
+func (s *DashboardService) GetUserUsageHierarchy(ctx context.Context, startTime, endTime time.Time, limit int) ([]usagestats.UserUsageHierarchyItem, error) {
+	repo, ok := s.usageRepo.(interface {
+		GetUserUsageHierarchy(context.Context, time.Time, time.Time, int) ([]usagestats.UserUsageHierarchyItem, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("usage repository does not support user usage hierarchy")
+	}
+	items, err := repo.GetUserUsageHierarchy(ctx, startTime, endTime, limit)
+	if err != nil {
+		return nil, fmt.Errorf("get user usage hierarchy: %w", err)
+	}
+	return items, nil
+}
+
 func (s *DashboardService) GetUserBreakdownStats(ctx context.Context, startTime, endTime time.Time, dim usagestats.UserBreakdownDimension, limit int) ([]usagestats.UserBreakdownItem, error) {
 	stats, err := s.usageRepo.GetUserBreakdownStats(ctx, startTime, endTime, dim, limit)
 	if err != nil {

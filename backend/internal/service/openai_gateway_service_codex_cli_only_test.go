@@ -12,6 +12,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 type stubCodexRestrictionDetector struct {
@@ -389,8 +390,9 @@ func TestOpenAIGatewayService_Forward_ModelCapacityErrorTriggersFailoverAndSameA
 
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusBadRequest, failoverErr.StatusCode)
+	require.Equal(t, http.StatusServiceUnavailable, failoverErr.StatusCode)
 	require.True(t, failoverErr.RetryableOnSameAccount)
-	require.Contains(t, string(failoverErr.ResponseBody), "Selected model is at capacity")
+	require.Equal(t, OpenAIOfficialCapacityErrorCode, gjson.GetBytes(failoverErr.ResponseBody, "error.code").String())
+	require.Contains(t, gjson.GetBytes(failoverErr.ResponseBody, "error.upstream_message").String(), "Selected model is at capacity")
 	require.False(t, c.Writer.Written(), "service 层应返回 failover 错误给上层重试/换号，而不是直接向客户端写响应")
 }

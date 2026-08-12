@@ -110,6 +110,12 @@
                 <p class="text-xl font-bold text-gray-900 dark:text-white">
                   {{ formatTokens(stats.today_tokens) }}
                 </p>
+                <div class="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+                  <span>{{ t('admin.dashboard.input') }} {{ formatTokens(stats.today_input_tokens) }}</span>
+                  <span>{{ t('admin.dashboard.output') }} {{ formatTokens(stats.today_output_tokens) }}</span>
+                  <span>{{ t('admin.dashboard.cacheRead') }} {{ formatTokens(stats.today_cache_read_tokens) }}</span>
+                  <span>{{ t('admin.dashboard.cacheWrite') }} {{ formatTokens(stats.today_cache_creation_tokens) }}</span>
+                </div>
                 <p class="text-xs">
                   <span
                     class="text-green-600 dark:text-green-400"
@@ -268,6 +274,11 @@
             <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
           </div>
 
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <DailyBalanceDeductionChart :points="balanceDeductions" :loading="operationalLoading" />
+            <div class="lg:col-span-2"><UserUsageHierarchy :users="userUsageHierarchy" :loading="operationalLoading" /></div>
+          </div>
+
           <!-- User Usage Trend (Full Width) -->
           <div class="card p-4">
             <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
@@ -305,7 +316,9 @@ import type {
   TrendDataPoint,
   ModelStat,
   UserUsageTrendPoint,
-  UserSpendingRankingItem
+  UserSpendingRankingItem,
+  DailyBalanceDeductionPoint,
+  UserUsageHierarchyItem
 } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -314,6 +327,8 @@ import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
+import DailyBalanceDeductionChart from '@/components/charts/DailyBalanceDeductionChart.vue'
+import UserUsageHierarchy from '@/components/charts/UserUsageHierarchy.vue'
 
 import {
   Chart as ChartJS,
@@ -346,6 +361,7 @@ const chartsLoading = ref(false)
 const userTrendLoading = ref(false)
 const rankingLoading = ref(false)
 const rankingError = ref(false)
+const operationalLoading = ref(false)
 
 // Chart data
 const trendData = ref<TrendDataPoint[]>([])
@@ -355,9 +371,12 @@ const rankingItems = ref<UserSpendingRankingItem[]>([])
 const rankingTotalActualCost = ref(0)
 const rankingTotalRequests = ref(0)
 const rankingTotalTokens = ref(0)
+const balanceDeductions = ref<DailyBalanceDeductionPoint[]>([])
+const userUsageHierarchy = ref<UserUsageHierarchyItem[]>([])
 let chartLoadSeq = 0
 let usersTrendLoadSeq = 0
 let rankingLoadSeq = 0
+let operationalLoadSeq = 0
 const rankingLimit = 12
 
 // Helper function to format date in local timezone
@@ -676,11 +695,33 @@ const loadUserSpendingRanking = async () => {
   }
 }
 
+const loadOperationalInsights = async () => {
+  const currentSeq = ++operationalLoadSeq
+  operationalLoading.value = true
+  try {
+    const [deductions, hierarchy] = await Promise.all([
+      adminAPI.dashboard.getDailyBalanceDeductions({ start_date: startDate.value, end_date: endDate.value, user_limit: 50 }),
+      adminAPI.dashboard.getUserUsageHierarchy({ start_date: startDate.value, end_date: endDate.value, limit: 20 })
+    ])
+    if (currentSeq !== operationalLoadSeq) return
+    balanceDeductions.value = deductions.trend || []
+    userUsageHierarchy.value = hierarchy.users || []
+  } catch (error) {
+    if (currentSeq !== operationalLoadSeq) return
+    console.error('Error loading dashboard operational insights:', error)
+    balanceDeductions.value = []
+    userUsageHierarchy.value = []
+  } finally {
+    if (currentSeq === operationalLoadSeq) operationalLoading.value = false
+  }
+}
+
 const loadDashboardStats = async () => {
   await Promise.all([
     loadDashboardSnapshot(true),
     loadUsersTrend(),
-    loadUserSpendingRanking()
+    loadUserSpendingRanking(),
+    loadOperationalInsights()
   ])
 }
 
@@ -688,7 +729,8 @@ const loadChartData = async () => {
   await Promise.all([
     loadDashboardSnapshot(false),
     loadUsersTrend(),
-    loadUserSpendingRanking()
+    loadUserSpendingRanking(),
+    loadOperationalInsights()
   ])
 }
 

@@ -1151,8 +1151,12 @@ func TestOpenAIStreamingResponseFailedBeforeOutputCapacityErrorReturnsFailover(t
 	require.Error(t, err)
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
-	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
-	require.Contains(t, string(failoverErr.ResponseBody), "Selected model is at capacity")
+	require.Equal(t, http.StatusServiceUnavailable, failoverErr.StatusCode)
+	require.Equal(t, OpenAIOfficialCapacityErrorCode, gjson.GetBytes(failoverErr.ResponseBody, "error.code").String())
+	require.Equal(t, OpenAIOfficialCapacityErrorProvider, gjson.GetBytes(failoverErr.ResponseBody, "error.provider").String())
+	require.Equal(t, OpenAIOfficialCapacityErrorSource, gjson.GetBytes(failoverErr.ResponseBody, "error.source").String())
+	require.True(t, gjson.GetBytes(failoverErr.ResponseBody, "error.retryable").Bool())
+	require.Contains(t, gjson.GetBytes(failoverErr.ResponseBody, "error.upstream_message").String(), "Selected model is at capacity")
 	require.False(t, c.Writer.Written())
 	require.Empty(t, rec.Body.String())
 }
@@ -2428,6 +2432,37 @@ func TestHandleSSEToJSON_ResponseFailedReturnsProtocolError(t *testing.T) {
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Contains(t, rec.Body.String(), "upstream rejected request")
 	require.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+}
+
+func TestHandleSSEToJSON_OfficialCapacityReturnsTypedFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	svc := &OpenAIGatewayService{cfg: &config.Config{}}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+	}
+	body := []byte(strings.Join([]string{
+		`data: {"type":"response.failed","error":{"message":"Our servers are currently overloaded. Please try again later."}}`,
+		`data: [DONE]`,
+	}, "\n"))
+
+	usage, err := svc.handleSSEToJSON(resp, c, body, "gpt-5", "gpt-5")
+	require.Nil(t, usage)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusServiceUnavailable, failoverErr.StatusCode)
+	require.Equal(t, OpenAIOfficialCapacityErrorCode, gjson.GetBytes(failoverErr.ResponseBody, "error.code").String())
+	require.False(t, c.Writer.Written())
+}
+
+func TestIsOpenAIOfficialCapacityErrorMessage(t *testing.T) {
+	require.True(t, IsOpenAIOfficialCapacityErrorMessage("Our servers are currently overloaded"))
+	require.True(t, IsOpenAIOfficialCapacityErrorMessage("Selected model is at capacity"))
+	require.False(t, IsOpenAIOfficialCapacityErrorMessage("Upstream request failed"))
 }
 
 func TestOpenAICompatSSEFrameParserResetsEventTypeAtFrameBoundary(t *testing.T) {

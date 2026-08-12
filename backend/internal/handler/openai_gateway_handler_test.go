@@ -132,6 +132,45 @@ func TestOpenAIHandleStreamingAwareError_NonStreaming(t *testing.T) {
 	assert.Equal(t, "test error", errorObj["message"])
 }
 
+func TestOpenAIHandleFailoverExhausted_OfficialCapacity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+
+	h := &OpenAIGatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode: http.StatusBadRequest,
+		ResponseBody: []byte(`{"error":{"message":"Selected model is at capacity. Please try again."}}`),
+	}, false)
+
+	require.Equal(t, http.StatusServiceUnavailable, w.Code)
+	require.Equal(t, "5", w.Header().Get("Retry-After"))
+	require.Equal(t, service.OpenAIOfficialCapacityErrorType, gjson.GetBytes(w.Body.Bytes(), "error.type").String())
+	require.Equal(t, service.OpenAIOfficialCapacityErrorCode, gjson.GetBytes(w.Body.Bytes(), "error.code").String())
+	require.Equal(t, service.OpenAIOfficialCapacityErrorProvider, gjson.GetBytes(w.Body.Bytes(), "error.provider").String())
+	require.Equal(t, service.OpenAIOfficialCapacityErrorSource, gjson.GetBytes(w.Body.Bytes(), "error.source").String())
+	require.True(t, gjson.GetBytes(w.Body.Bytes(), "error.retryable").Bool())
+}
+
+func TestOpenAIHandleFailoverExhausted_OfficialCapacityStreamingEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+
+	h := &OpenAIGatewayHandler{}
+	h.handleFailoverExhausted(c, &service.UpstreamFailoverError{
+		StatusCode: http.StatusServiceUnavailable,
+		ResponseBody: []byte(`{"error":{"code":"openai_official_capacity","message":"OpenAI official service is overloaded"}}`),
+	}, true)
+
+	require.Contains(t, w.Body.String(), "event: error")
+	require.Contains(t, w.Body.String(), `"code":"openai_official_capacity"`)
+	require.Contains(t, w.Body.String(), `"provider":"openai"`)
+	require.Contains(t, w.Body.String(), `"source":"official_provider"`)
+}
+
 func TestReadRequestBodyWithPrealloc(t *testing.T) {
 	payload := `{"model":"gpt-5","input":"hello"}`
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(payload))

@@ -123,7 +123,9 @@ func (s *GatewayService) ForwardAsResponses(
 	}
 
 	// 11. Send request
+	upstreamStart := time.Now()
 	resp, err := s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, s.tlsFPProfileService.ResolveTLSProfile(account))
+	SetOpsLatencyMs(c, OpsUpstreamLatencyMsKey, time.Since(upstreamStart).Milliseconds())
 	if err != nil {
 		if resp != nil && resp.Body != nil {
 			_ = resp.Body.Close()
@@ -138,8 +140,11 @@ func (s *GatewayService) ForwardAsResponses(
 			Kind:               "request_error",
 			Message:            safeErr,
 		})
-		writeResponsesError(c, http.StatusBadGateway, "server_error", "Upstream request failed")
-		return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+		return nil, &UpstreamFailoverError{
+			StatusCode:             http.StatusBadGateway,
+			ResponseBody:           []byte(safeErr),
+			RetryableOnSameAccount: true,
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -152,7 +157,7 @@ func (s *GatewayService) ForwardAsResponses(
 		upstreamMsg := strings.TrimSpace(extractUpstreamErrorMessage(respBody))
 		upstreamMsg = sanitizeUpstreamErrorMessage(upstreamMsg)
 
-		if s.shouldFailoverUpstreamError(resp.StatusCode) {
+		if shouldFailoverAnthropicCompatResponse(resp.StatusCode, respBody) {
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 				Platform:           account.Platform,
 				AccountID:          account.ID,
@@ -166,7 +171,7 @@ func (s *GatewayService) ForwardAsResponses(
 				s.rateLimitService.HandleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
 			}
 			return nil, &UpstreamFailoverError{
-				StatusCode:   resp.StatusCode,
+				StatusCode:   anthropicCompatFailoverStatus(resp.StatusCode, respBody),
 				ResponseBody: respBody,
 			}
 		}
@@ -180,9 +185,9 @@ func (s *GatewayService) ForwardAsResponses(
 	var result *ForwardResult
 	var handleErr error
 	if clientStream {
-		result, handleErr = s.handleResponsesStreamingResponse(resp, c, originalModel, mappedModel, reasoningEffort, startTime)
+		result, handleErr = s.handleResponsesStreamingResponse(resp, c, account, originalModel, mappedModel, reasoningEffort, startTime)
 	} else {
-		result, handleErr = s.handleResponsesBufferedStreamingResponse(resp, c, originalModel, mappedModel, reasoningEffort, startTime)
+		result, handleErr = s.handleResponsesBufferedStreamingResponse(resp, c, account, originalModel, mappedModel, reasoningEffort, startTime)
 	}
 
 	return result, handleErr
@@ -226,6 +231,7 @@ func mergeAnthropicUsage(dst *ClaudeUsage, src apicompat.AnthropicUsage) {
 func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 	resp *http.Response,
 	c *gin.Context,
+	account *Account,
 	originalModel string,
 	mappedModel string,
 	reasoningEffort *string,
@@ -243,6 +249,7 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 	// Accumulate the final Anthropic response from streaming events
 	var finalResp *apicompat.AnthropicResponse
 	var usage ClaudeUsage
+	sawTerminal := false
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -270,6 +277,12 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 			)
 			continue
 		}
+		if event.Type == "" {
+			event.Type = eventType
+		}
+		if event.Type == "error" {
+			return nil, s.anthropicResponsesStreamError(c, account, resp, &event, []byte(payload), false)
+		}
 
 		// message_start carries the initial response structure
 		if event.Type == "message_start" && event.Message != nil {
@@ -285,6 +298,10 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 			if event.Delta != nil && event.Delta.StopReason != "" && finalResp != nil {
 				finalResp.StopReason = event.Delta.StopReason
 			}
+		}
+		if event.Type == "message_stop" {
+			sawTerminal = true
+			break
 		}
 
 		// Accumulate content blocks
@@ -315,9 +332,8 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 		}
 	}
 
-	if finalResp == nil {
-		writeResponsesError(c, http.StatusBadGateway, "server_error", "Upstream stream ended without a response")
-		return nil, fmt.Errorf("upstream stream ended without response")
+	if finalResp == nil || !sawTerminal {
+		return nil, newAnthropicCompatStreamDisconnectError(requestID)
 	}
 
 	// Update usage from accumulated delta
@@ -360,6 +376,7 @@ func (s *GatewayService) handleResponsesBufferedStreamingResponse(
 func (s *GatewayService) handleResponsesStreamingResponse(
 	resp *http.Response,
 	c *gin.Context,
+	account *Account,
 	originalModel string,
 	mappedModel string,
 	reasoningEffort *string,
@@ -374,13 +391,12 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
-	c.Writer.WriteHeader(http.StatusOK)
-
 	state := apicompat.NewAnthropicEventToResponsesState()
 	state.Model = originalModel
 	var usage ClaudeUsage
 	var firstTokenMs *int
-	firstChunk := true
+	responseStarted := false
+	sawTerminal := false
 
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
@@ -402,14 +418,26 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 		}
 	}
 
+	startResponse := func() {
+		if responseStarted {
+			return
+		}
+		responseStarted = true
+		c.Writer.WriteHeader(http.StatusOK)
+	}
+
+	writeFailedEvent := func(errType, message string) {
+		startResponse()
+		evt := apicompat.AnthropicErrorToResponsesEvent(errType, message, state)
+		if sse, err := apicompat.ResponsesEventToSSE(evt); err == nil {
+			out := string(reverseToolNamesIfPresent(c, []byte(sse)))
+			_, _ = fmt.Fprint(c.Writer, out)
+			c.Writer.Flush()
+		}
+	}
+
 	// processEvent handles a single parsed Anthropic SSE event.
 	processEvent := func(event *apicompat.AnthropicStreamEvent) bool {
-		if firstChunk {
-			firstChunk = false
-			ms := int(time.Since(startTime).Milliseconds())
-			firstTokenMs = &ms
-		}
-
 		// Extract usage from message_delta
 		if event.Type == "message_delta" && event.Usage != nil {
 			mergeAnthropicUsage(&usage, *event.Usage)
@@ -421,6 +449,13 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 
 		// Convert to Responses events
 		events := apicompat.AnthropicEventToResponsesEvents(event, state)
+		if len(events) > 0 {
+			startResponse()
+			if firstTokenMs == nil {
+				ms := int(time.Since(startTime).Milliseconds())
+				firstTokenMs = &ms
+			}
+		}
 		for _, evt := range events {
 			sse, err := apicompat.ResponsesEventToSSE(evt)
 			if err != nil {
@@ -441,22 +476,10 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 		if len(events) > 0 {
 			c.Writer.Flush()
 		}
-		return false
-	}
-
-	finalizeStream := func() (*ForwardResult, error) {
-		if finalEvents := apicompat.FinalizeAnthropicResponsesStream(state); len(finalEvents) > 0 {
-			for _, evt := range finalEvents {
-				sse, err := apicompat.ResponsesEventToSSE(evt)
-				if err != nil {
-					continue
-				}
-				out := string(reverseToolNamesIfPresent(c, []byte(sse)))
-				fmt.Fprint(c.Writer, out) //nolint:errcheck
-			}
-			c.Writer.Flush()
+		if event.Type == "message_stop" {
+			sawTerminal = true
 		}
-		return resultWithUsage(), nil
+		return sawTerminal
 	}
 
 	// Read Anthropic SSE events
@@ -486,6 +509,17 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 			)
 			continue
 		}
+		if event.Type == "" {
+			event.Type = eventType
+		}
+		if event.Type == "error" {
+			err := s.anthropicResponsesStreamError(c, account, resp, &event, []byte(payload), responseStarted)
+			if responseStarted {
+				writeFailedEvent(anthropicCompatStreamErrorType(&event), anthropicCompatStreamErrorMessage(&event))
+				return resultWithUsage(), err
+			}
+			return nil, err
+		}
 
 		if processEvent(&event) {
 			return resultWithUsage(), nil
@@ -501,7 +535,142 @@ func (s *GatewayService) handleResponsesStreamingResponse(
 		}
 	}
 
-	return finalizeStream()
+	if !sawTerminal {
+		err := newAnthropicCompatStreamDisconnectError(requestID)
+		if !responseStarted {
+			return nil, err
+		}
+		s.TempUnscheduleRetryableError(c.Request.Context(), account.ID, err)
+		writeFailedEvent("stream_read_error", "Upstream stream ended before completion")
+		return resultWithUsage(), err
+	}
+
+	return resultWithUsage(), nil
+}
+
+func anthropicCompatStreamErrorType(event *apicompat.AnthropicStreamEvent) string {
+	if event == nil || event.Error == nil {
+		return "upstream_error"
+	}
+	if value := strings.TrimSpace(event.Error.Type); value != "" {
+		return value
+	}
+	if value := strings.TrimSpace(event.Error.Code); value != "" {
+		return value
+	}
+	return "upstream_error"
+}
+
+func anthropicCompatStreamErrorMessage(event *apicompat.AnthropicStreamEvent) string {
+	if event == nil || event.Error == nil {
+		return "Upstream stream failed"
+	}
+	message := strings.TrimSpace(event.Error.Message)
+	if message == "" {
+		return "Upstream stream failed"
+	}
+	return sanitizeUpstreamErrorMessage(message)
+}
+
+func anthropicCompatStreamErrorStatus(event *apicompat.AnthropicStreamEvent) int {
+	switch strings.ToLower(anthropicCompatStreamErrorType(event)) {
+	case "rate_limit_error", "rate_limit_exceeded":
+		return http.StatusTooManyRequests
+	case "authentication_error", "unauthorized":
+		return http.StatusUnauthorized
+	case "permission_error", "forbidden":
+		return http.StatusForbidden
+	case "invalid_request_error", "bad_request":
+		return http.StatusBadRequest
+	case "overloaded_error", "service_unavailable", "upstream_unavailable", "api_error":
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusBadGateway
+	}
+}
+
+func (s *GatewayService) anthropicResponsesStreamError(
+	c *gin.Context,
+	account *Account,
+	resp *http.Response,
+	event *apicompat.AnthropicStreamEvent,
+	payload []byte,
+	responseStarted bool,
+) error {
+	statusCode := anthropicCompatStreamErrorStatus(event)
+	message := anthropicCompatStreamErrorMessage(event)
+	setOpsUpstreamError(c, statusCode, message, truncateString(string(payload), 4096))
+	appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
+		Platform:           account.Platform,
+		AccountID:          account.ID,
+		AccountName:        account.Name,
+		UpstreamStatusCode: statusCode,
+		UpstreamRequestID:  resp.Header.Get("x-request-id"),
+		Kind:               "stream_error",
+		Message:            message,
+		Detail:             truncateString(string(payload), 4096),
+	})
+	if s.rateLimitService != nil {
+		s.rateLimitService.HandleUpstreamError(c.Request.Context(), account, statusCode, resp.Header, payload)
+	}
+
+	if s.shouldFailoverUpstreamError(statusCode) {
+		failoverErr := &UpstreamFailoverError{StatusCode: statusCode, ResponseBody: payload}
+		if responseStarted {
+			s.TempUnscheduleRetryableError(c.Request.Context(), account.ID, failoverErr)
+		}
+		return failoverErr
+	}
+	return fmt.Errorf("anthropic upstream stream error: %s", message)
+}
+
+func newAnthropicCompatStreamDisconnectError(requestID string) *UpstreamFailoverError {
+	body, _ := json.Marshal(gin.H{
+		"error": gin.H{
+			"type":    "stream_read_error",
+			"message": "Upstream stream ended before completion",
+		},
+		"request_id": requestID,
+	})
+	return &UpstreamFailoverError{
+		StatusCode:             http.StatusBadGateway,
+		ResponseBody:           body,
+		RetryableOnSameAccount: true,
+	}
+}
+
+func shouldFailoverAnthropicCompatResponse(statusCode int, body []byte) bool {
+	if statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden ||
+		statusCode == http.StatusTooManyRequests || statusCode == 529 || statusCode >= 500 {
+		return true
+	}
+	return isRetryableAnthropicCompatErrorBody(body)
+}
+
+func anthropicCompatFailoverStatus(statusCode int, body []byte) int {
+	if statusCode >= 500 || statusCode == http.StatusTooManyRequests || statusCode == 529 {
+		return statusCode
+	}
+	if isRetryableAnthropicCompatErrorBody(body) {
+		return http.StatusServiceUnavailable
+	}
+	return statusCode
+}
+
+func isRetryableAnthropicCompatErrorBody(body []byte) bool {
+	lower := strings.ToLower(string(body))
+	for _, marker := range []string{
+		"service_unavailable",
+		"upstream_unavailable",
+		"overloaded_error",
+		"temporarily unavailable",
+		"stream_read_error",
+	} {
+		if strings.Contains(lower, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 // appendRawJSON appends a JSON fragment string to existing raw JSON.

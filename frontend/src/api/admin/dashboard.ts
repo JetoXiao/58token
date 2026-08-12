@@ -13,6 +13,8 @@ import type {
   UserUsageTrendPoint,
   UserSpendingRankingResponse,
   UserBreakdownItem,
+  DailyBalanceDeductionPoint,
+  UserUsageHierarchyItem,
   UsageRequestType
 } from '@/types'
 
@@ -266,6 +268,46 @@ export async function getUserSpendingRanking(
   return data
 }
 
+export interface DailyBalanceDeductionsParams extends Pick<TrendParams, 'start_date' | 'end_date'> {
+  user_limit?: number
+}
+
+export interface DailyBalanceDeductionsResponse {
+  trend: DailyBalanceDeductionPoint[]
+  start_date: string
+  end_date: string
+}
+
+export async function getDailyBalanceDeductions(
+  params?: DailyBalanceDeductionsParams
+): Promise<DailyBalanceDeductionsResponse> {
+  const { data } = await apiClient.get<DailyBalanceDeductionsResponse>(
+    '/admin/dashboard/balance-deductions',
+    { params }
+  )
+  return data
+}
+
+export interface UserUsageHierarchyParams extends Pick<TrendParams, 'start_date' | 'end_date'> {
+  limit?: number
+}
+
+export interface UserUsageHierarchyResponse {
+  users: UserUsageHierarchyItem[]
+  start_date: string
+  end_date: string
+}
+
+export async function getUserUsageHierarchy(
+  params?: UserUsageHierarchyParams
+): Promise<UserUsageHierarchyResponse> {
+  const { data } = await apiClient.get<UserUsageHierarchyResponse>(
+    '/admin/dashboard/user-usage-hierarchy',
+    { params }
+  )
+  return data
+}
+
 export interface PlatformUsage {
   platform: string
   today_actual_cost: number
@@ -332,6 +374,8 @@ export const dashboardAPI = {
   getApiKeyUsageTrend,
   getUserUsageTrend,
   getUserSpendingRanking,
+  getDailyBalanceDeductions,
+  getUserUsageHierarchy,
   getBatchUsersUsage,
   getBatchApiKeysUsage
 }

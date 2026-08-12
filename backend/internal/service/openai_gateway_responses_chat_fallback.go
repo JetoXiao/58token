@@ -199,11 +199,14 @@ func (s *OpenAIGatewayService) forwardResponsesViaRawChatCompletions(
 				Detail:             upstreamDetail,
 			})
 			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
-			return nil, &UpstreamFailoverError{
+			if IsOpenAIOfficialCapacityErrorMessage(upstreamMsg) || IsOpenAIOfficialCapacityErrorBody(respBody) {
+				return nil, newOpenAIOfficialCapacityFailoverError(respBody)
+			}
+			return nil, normalizeOpenAIOfficialCapacityFailoverError(&UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-			}
+			})
 		}
 		return s.handleErrorResponse(ctx, resp, c, account, chatBody)
 	}
@@ -236,6 +239,9 @@ func (s *OpenAIGatewayService) bufferChatCompletionsAsResponses(
 			})
 		}
 		return nil, fmt.Errorf("read upstream body: %w", err)
+	}
+	if IsOpenAIOfficialCapacityErrorBody(respBody) {
+		return nil, newOpenAIOfficialCapacityFailoverError(respBody)
 	}
 
 	var ccResp apicompat.ChatCompletionsResponse
@@ -305,6 +311,7 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 	var firstTokenMs *int
 	clientDisconnected := false
 	sawDone := false
+	var streamFailoverErr error
 
 	writeEvents := func(events []apicompat.ResponsesStreamEvent) {
 		if clientDisconnected || len(events) == 0 {
@@ -353,6 +360,24 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			sawDone = true
 			break
 		}
+		payloadBytes := []byte(payload)
+		if IsOpenAIOfficialCapacityErrorBody(payloadBytes) {
+			if !headersWritten && !c.Writer.Written() {
+				streamFailoverErr = newOpenAIOfficialCapacityFailoverError(payloadBytes)
+				break
+			}
+			writeStreamHeaders()
+			errorPayload := fmt.Sprintf(`{"type":"error","sequence_number":0,"error":{"type":%q,"code":%q,"message":%q,"provider":%q,"source":%q,"retryable":true}}`,
+				OpenAIOfficialCapacityErrorType,
+				OpenAIOfficialCapacityErrorCode,
+				OpenAIOfficialCapacityClientMessage(),
+				OpenAIOfficialCapacityErrorProvider,
+				OpenAIOfficialCapacityErrorSource,
+			)
+			_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", errorPayload)
+			c.Writer.Flush()
+			break
+		}
 
 		if u := extractCCStreamUsage(payload); u != nil {
 			usage = *u
@@ -392,6 +417,14 @@ func (s *OpenAIGatewayService) streamChatCompletionsAsResponses(
 			Duration:        time.Since(startTime),
 			FirstTokenMs:    firstTokenMs,
 		}, fmt.Errorf("stream usage incomplete: %w", err)
+	}
+	if streamFailoverErr != nil {
+		return &OpenAIForwardResult{
+			RequestID: requestID,
+			Usage:     usage,
+			Model:     originalModel,
+			Stream:    true,
+		}, streamFailoverErr
 	}
 
 	writeEvents(apicompat.FinalizeChatCompletionsResponsesStream(state))

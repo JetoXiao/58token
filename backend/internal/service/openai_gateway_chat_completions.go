@@ -292,11 +292,14 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 				Detail:             upstreamDetail,
 			})
 			s.handleOpenAIAccountUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
-			return nil, &UpstreamFailoverError{
+			if IsOpenAIOfficialCapacityErrorMessage(upstreamMsg) || IsOpenAIOfficialCapacityErrorBody(respBody) {
+				return nil, newOpenAIOfficialCapacityFailoverError(respBody)
+			}
+			return nil, normalizeOpenAIOfficialCapacityFailoverError(&UpstreamFailoverError{
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-			}
+			})
 		}
 		return s.handleChatCompletionsErrorResponse(resp, c, account)
 	}
@@ -465,6 +468,7 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 	firstChunk := true
 	clientDisconnected := false
 	clientOutputStarted := false
+	var streamFailoverErr error
 	pendingSSE := make([]string, 0, 4)
 	refusalDetector := newOpenAIChatSilentRefusalDetector(requestBodyLen)
 
@@ -510,8 +514,14 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 			firstTokenMs = &ms
 		}
 
+		payloadBytes := []byte(payload)
+		if IsOpenAIOfficialCapacityErrorBody(payloadBytes) {
+			streamFailoverErr = newOpenAIOfficialCapacityFailoverError(payloadBytes)
+			return true
+		}
+
 		var event apicompat.ResponsesStreamEvent
-		if err := json.Unmarshal([]byte(payload), &event); err != nil {
+		if err := json.Unmarshal(payloadBytes, &event); err != nil {
 			logger.L().Warn("openai chat_completions stream: failed to parse event",
 				zap.Error(err),
 				zap.String("request_id", requestID),
@@ -579,6 +589,9 @@ func (s *OpenAIGatewayService) handleChatStreamingResponse(
 	}
 
 	finalizeStream := func() (*OpenAIForwardResult, error) {
+		if streamFailoverErr != nil {
+			return resultWithUsage(), streamFailoverErr
+		}
 		if finalChunks := apicompat.FinalizeResponsesChatStream(state); len(finalChunks) > 0 && !clientDisconnected {
 			for _, chunk := range finalChunks {
 				refusalDetector.ObserveChatChunk(chunk)

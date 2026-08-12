@@ -476,6 +476,8 @@ type BatchUsersUsageRequest struct {
 }
 
 var dashboardUsersRankingCache = newSnapshotCache(5 * time.Minute)
+var dashboardBalanceDeductionsCache = newSnapshotCache(1 * time.Minute)
+var dashboardUserUsageHierarchyCache = newSnapshotCache(1 * time.Minute)
 var dashboardBatchUsersUsageCache = newSnapshotCache(30 * time.Second)
 var dashboardBatchAPIKeysUsageCache = newSnapshotCache(30 * time.Second)
 
@@ -527,6 +529,68 @@ func (h *DashboardHandler) GetUserSpendingRanking(c *gin.Context) {
 		"end_date":          endTime.Add(-24 * time.Hour).Format("2006-01-02"),
 	}
 	dashboardUsersRankingCache.Set(cacheKey, payload)
+	c.Header("X-Snapshot-Cache", "miss")
+	response.Success(c, payload)
+}
+
+// GetDailyBalanceDeductions handles daily wallet-balance deductions.
+// GET /api/v1/admin/dashboard/balance-deductions
+func (h *DashboardHandler) GetDailyBalanceDeductions(c *gin.Context) {
+	startTime, endTime := parseTimeRange(c)
+	userLimit := parseRankingLimit(c.DefaultQuery("user_limit", "50"))
+	keyRaw, _ := json.Marshal(struct {
+		Start     string `json:"start"`
+		End       string `json:"end"`
+		UserLimit int    `json:"user_limit"`
+	}{startTime.UTC().Format(time.RFC3339), endTime.UTC().Format(time.RFC3339), userLimit})
+	cacheKey := string(keyRaw)
+	if cached, ok := dashboardBalanceDeductionsCache.Get(cacheKey); ok {
+		c.Header("X-Snapshot-Cache", "hit")
+		response.Success(c, cached.Payload)
+		return
+	}
+	trend, err := h.dashboardService.GetDailyBalanceDeductions(c.Request.Context(), startTime, endTime, userLimit)
+	if err != nil {
+		response.Error(c, 500, "Failed to get daily balance deductions")
+		return
+	}
+	payload := gin.H{
+		"trend":      trend,
+		"start_date": startTime.Format("2006-01-02"),
+		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+	}
+	dashboardBalanceDeductionsCache.Set(cacheKey, payload)
+	c.Header("X-Snapshot-Cache", "miss")
+	response.Success(c, payload)
+}
+
+// GetUserUsageHierarchy handles ranked user -> group -> model usage details.
+// GET /api/v1/admin/dashboard/user-usage-hierarchy
+func (h *DashboardHandler) GetUserUsageHierarchy(c *gin.Context) {
+	startTime, endTime := parseTimeRange(c)
+	limit := parseRankingLimit(c.DefaultQuery("limit", "20"))
+	keyRaw, _ := json.Marshal(struct {
+		Start string `json:"start"`
+		End   string `json:"end"`
+		Limit int    `json:"limit"`
+	}{startTime.UTC().Format(time.RFC3339), endTime.UTC().Format(time.RFC3339), limit})
+	cacheKey := string(keyRaw)
+	if cached, ok := dashboardUserUsageHierarchyCache.Get(cacheKey); ok {
+		c.Header("X-Snapshot-Cache", "hit")
+		response.Success(c, cached.Payload)
+		return
+	}
+	users, err := h.dashboardService.GetUserUsageHierarchy(c.Request.Context(), startTime, endTime, limit)
+	if err != nil {
+		response.Error(c, 500, "Failed to get user usage hierarchy")
+		return
+	}
+	payload := gin.H{
+		"users":      users,
+		"start_date": startTime.Format("2006-01-02"),
+		"end_date":   endTime.Add(-24 * time.Hour).Format("2006-01-02"),
+	}
+	dashboardUserUsageHierarchyCache.Set(cacheKey, payload)
 	c.Header("X-Snapshot-Cache", "miss")
 	response.Success(c, payload)
 }

@@ -162,6 +162,66 @@ type UserSpendingRankingResponse struct {
 	TotalTokens     int64                     `json:"total_tokens"`
 }
 
+// DailyBalanceDeductionUser represents one user's wallet-balance deduction for a day.
+type DailyBalanceDeductionUser struct {
+	UserID     int64   `json:"user_id"`
+	Email      string  `json:"email"`
+	Username   string  `json:"username"`
+	ActualCost float64 `json:"actual_cost"`
+	Requests   int64   `json:"requests"`
+}
+
+// DailyBalanceDeductionPoint represents platform and per-user wallet deductions for a day.
+// Subscription usage is intentionally excluded: only billing_type=balance is counted.
+type DailyBalanceDeductionPoint struct {
+	Date            string                      `json:"date"`
+	TotalActualCost float64                     `json:"total_actual_cost"`
+	Requests        int64                       `json:"requests"`
+	ActiveUsers     int64                       `json:"active_users"`
+	Users           []DailyBalanceDeductionUser `json:"users"`
+}
+
+// UserModelUsageItem represents a model row nested under a user/group usage summary.
+type UserModelUsageItem struct {
+	Model               string  `json:"model"`
+	Requests            int64   `json:"requests"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	TotalTokens         int64   `json:"total_tokens"`
+	ActualCost          float64 `json:"actual_cost"`
+}
+
+// UserGroupUsageItem represents a group row nested under a user usage summary.
+type UserGroupUsageItem struct {
+	GroupID             int64                `json:"group_id"`
+	GroupName           string               `json:"group_name"`
+	Requests            int64                `json:"requests"`
+	InputTokens         int64                `json:"input_tokens"`
+	OutputTokens        int64                `json:"output_tokens"`
+	CacheCreationTokens int64                `json:"cache_creation_tokens"`
+	CacheReadTokens     int64                `json:"cache_read_tokens"`
+	TotalTokens         int64                `json:"total_tokens"`
+	ActualCost          float64              `json:"actual_cost"`
+	Models              []UserModelUsageItem `json:"models"`
+}
+
+// UserUsageHierarchyItem represents a user ranked by usage with expandable groups/models.
+type UserUsageHierarchyItem struct {
+	UserID              int64                `json:"user_id"`
+	Email               string               `json:"email"`
+	Username            string               `json:"username"`
+	Requests            int64                `json:"requests"`
+	InputTokens         int64                `json:"input_tokens"`
+	OutputTokens        int64                `json:"output_tokens"`
+	CacheCreationTokens int64                `json:"cache_creation_tokens"`
+	CacheReadTokens     int64                `json:"cache_read_tokens"`
+	TotalTokens         int64                `json:"total_tokens"`
+	ActualCost          float64              `json:"actual_cost"`
+	Groups              []UserGroupUsageItem `json:"groups"`
+}
+
 // UserBreakdownItem represents per-user usage breakdown within a dimension (group, model, endpoint).
 type UserBreakdownItem struct {
 	UserID      int64   `json:"user_id"`

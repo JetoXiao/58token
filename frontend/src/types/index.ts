@@ -1597,6 +1597,60 @@ export interface DashboardStats {
   tpm: number // 近5分钟平均每分钟Token数
 }
 
+export interface DailyBalanceDeductionUser {
+  user_id: number
+  email: string
+  username: string
+  actual_cost: number
+  requests: number
+}
+
+export interface DailyBalanceDeductionPoint {
+  date: string
+  total_actual_cost: number
+  requests: number
+  active_users: number
+  users: DailyBalanceDeductionUser[]
+}
+
+export interface UserModelUsageItem {
+  model: string
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  actual_cost: number
+}
+
+export interface UserGroupUsageItem {
+  group_id: number
+  group_name: string
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  actual_cost: number
+  models: UserModelUsageItem[]
+}
+
+export interface UserUsageHierarchyItem {
+  user_id: number
+  email: string
+  username: string
+  requests: number
+  input_tokens: number
+  output_tokens: number
+  cache_creation_tokens: number
+  cache_read_tokens: number
+  total_tokens: number
+  actual_cost: number
+  groups: UserGroupUsageItem[]
+}
+
 export interface UsageStatsResponse {
   period?: string
   total_requests: number

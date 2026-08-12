@@ -2257,6 +2257,11 @@ type UserUsageTrendPoint = usagestats.UserUsageTrendPoint
 // UserSpendingRankingItem represents a user spending ranking row.
 type UserSpendingRankingItem = usagestats.UserSpendingRankingItem
 type UserSpendingRankingResponse = usagestats.UserSpendingRankingResponse
+type DailyBalanceDeductionPoint = usagestats.DailyBalanceDeductionPoint
+type DailyBalanceDeductionUser = usagestats.DailyBalanceDeductionUser
+type UserModelUsageItem = usagestats.UserModelUsageItem
+type UserGroupUsageItem = usagestats.UserGroupUsageItem
+type UserUsageHierarchyItem = usagestats.UserUsageHierarchyItem
 
 // APIKeyUsageTrendPoint represents API key usage trend data point
 type APIKeyUsageTrendPoint = usagestats.APIKeyUsageTrendPoint
@@ -2452,6 +2457,183 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 		TotalRequests:   totalRequests,
 		TotalTokens:     totalTokens,
 	}, nil
+}
+
+// GetDailyBalanceDeductions returns daily balance-wallet deductions and the
+// largest contributing users for each day. Subscription-backed usage is
+// intentionally excluded because it does not deduct the user's balance.
+func (r *usageLogRepository) GetDailyBalanceDeductions(ctx context.Context, startTime, endTime time.Time, userLimit int) (result []DailyBalanceDeductionPoint, err error) {
+	if userLimit <= 0 {
+		userLimit = 8
+	}
+	if userLimit > 50 {
+		userLimit = 50
+	}
+
+	query := `
+		WITH per_user AS (
+			SELECT
+				TO_CHAR(u.created_at AT TIME ZONE $4, 'YYYY-MM-DD') AS day,
+				u.user_id,
+				COALESCE(us.email, '') AS email,
+				COALESCE(us.username, '') AS username,
+				COALESCE(SUM(u.actual_cost), 0) AS actual_cost,
+				COUNT(*) AS requests
+			FROM usage_logs u
+			LEFT JOIN users us ON u.user_id = us.id
+			WHERE u.created_at >= $1 AND u.created_at < $2
+			  AND u.billing_type = $3
+			GROUP BY TO_CHAR(u.created_at AT TIME ZONE $4, 'YYYY-MM-DD'), u.user_id, us.email, us.username
+		), ranked AS (
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY day ORDER BY actual_cost DESC, requests DESC, user_id ASC) AS row_num
+			FROM per_user
+		), daily AS (
+			SELECT day, COALESCE(SUM(actual_cost), 0) AS total_actual_cost,
+				   COALESCE(SUM(requests), 0) AS requests,
+				   COUNT(*) AS active_users
+			FROM per_user GROUP BY day
+		), top_users AS (
+			SELECT day, COALESCE(json_agg(json_build_object(
+				'user_id', user_id, 'email', email, 'username', username,
+				'actual_cost', actual_cost, 'requests', requests
+			) ORDER BY actual_cost DESC, requests DESC, user_id ASC) FILTER (WHERE row_num <= $5), '[]'::json) AS users
+			FROM ranked GROUP BY day
+		)
+		SELECT d.day, d.total_actual_cost, d.requests, d.active_users, COALESCE(t.users, '[]'::json)
+		FROM daily d LEFT JOIN top_users t ON t.day = d.day ORDER BY d.day ASC
+	`
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, service.BillingTypeBalance, resolveUsageStatsTimezone(), userLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			result = nil
+		}
+	}()
+
+	result = make([]DailyBalanceDeductionPoint, 0)
+	for rows.Next() {
+		var row DailyBalanceDeductionPoint
+		var day string
+		var usersJSON []byte
+		if err = rows.Scan(&day, &row.TotalActualCost, &row.Requests, &row.ActiveUsers, &usersJSON); err != nil {
+			return nil, err
+		}
+		row.Date = day
+		if len(usersJSON) > 0 {
+			if err = json.Unmarshal(usersJSON, &row.Users); err != nil {
+				return nil, err
+			}
+		}
+		if row.Users == nil {
+			row.Users = make([]DailyBalanceDeductionUser, 0)
+		}
+		result = append(result, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// GetUserUsageHierarchy returns usage ranked by user, with group and model
+// details nested below each user for the dashboard's expandable view.
+func (r *usageLogRepository) GetUserUsageHierarchy(ctx context.Context, startTime, endTime time.Time, limit int) (result []UserUsageHierarchyItem, err error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	query := `
+		WITH model_usage AS (
+			SELECT
+				u.user_id,
+				COALESCE(u.group_id, 0) AS group_id,
+				COALESCE(g.name, '未分组') AS group_name,
+				COALESCE(NULLIF(u.requested_model, ''), NULLIF(u.model, ''), '未知模型') AS model,
+				COUNT(*) AS requests,
+				COALESCE(SUM(u.input_tokens), 0) AS input_tokens,
+				COALESCE(SUM(u.output_tokens), 0) AS output_tokens,
+				COALESCE(SUM(u.cache_creation_tokens), 0) AS cache_creation_tokens,
+				COALESCE(SUM(u.cache_read_tokens), 0) AS cache_read_tokens,
+				COALESCE(SUM(u.input_tokens + u.output_tokens + u.cache_creation_tokens + u.cache_read_tokens), 0) AS total_tokens,
+				COALESCE(SUM(u.actual_cost), 0) AS actual_cost
+			FROM usage_logs u
+			LEFT JOIN groups g ON g.id = u.group_id
+			WHERE u.created_at >= $1 AND u.created_at < $2
+			GROUP BY u.user_id, COALESCE(u.group_id, 0), g.name,
+				COALESCE(NULLIF(u.requested_model, ''), NULLIF(u.model, ''), '未知模型')
+		), group_usage AS (
+			SELECT user_id, group_id, group_name,
+				   SUM(requests) AS requests, SUM(input_tokens) AS input_tokens,
+				   SUM(output_tokens) AS output_tokens, SUM(cache_creation_tokens) AS cache_creation_tokens,
+				   SUM(cache_read_tokens) AS cache_read_tokens, SUM(total_tokens) AS total_tokens,
+				   SUM(actual_cost) AS actual_cost,
+				   json_agg(json_build_object(
+					   'model', model, 'requests', requests, 'input_tokens', input_tokens,
+					   'output_tokens', output_tokens, 'cache_creation_tokens', cache_creation_tokens,
+					   'cache_read_tokens', cache_read_tokens, 'total_tokens', total_tokens,
+					   'actual_cost', actual_cost
+				   ) ORDER BY total_tokens DESC, model ASC) AS models
+			FROM model_usage GROUP BY user_id, group_id, group_name
+		), user_usage AS (
+			SELECT user_id,
+				   SUM(requests) AS requests, SUM(input_tokens) AS input_tokens,
+				   SUM(output_tokens) AS output_tokens, SUM(cache_creation_tokens) AS cache_creation_tokens,
+				   SUM(cache_read_tokens) AS cache_read_tokens, SUM(total_tokens) AS total_tokens,
+				   SUM(actual_cost) AS actual_cost,
+				   json_agg(json_build_object(
+					   'group_id', group_id, 'group_name', group_name, 'requests', requests,
+					   'input_tokens', input_tokens, 'output_tokens', output_tokens,
+					   'cache_creation_tokens', cache_creation_tokens, 'cache_read_tokens', cache_read_tokens,
+					   'total_tokens', total_tokens, 'actual_cost', actual_cost, 'models', models
+				   ) ORDER BY total_tokens DESC, group_name ASC) AS groups
+			FROM group_usage GROUP BY user_id
+		), ranked AS (
+			SELECT uu.*, COALESCE(us.email, '') AS email, COALESCE(us.username, '') AS username
+			FROM user_usage uu LEFT JOIN users us ON us.id = uu.user_id
+			ORDER BY uu.total_tokens DESC, uu.actual_cost DESC, uu.user_id ASC LIMIT $3
+		)
+		SELECT user_id, email, username, requests, input_tokens, output_tokens,
+			   cache_creation_tokens, cache_read_tokens, total_tokens, actual_cost, groups
+		FROM ranked ORDER BY total_tokens DESC, actual_cost DESC, user_id ASC
+	`
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			result = nil
+		}
+	}()
+
+	result = make([]UserUsageHierarchyItem, 0)
+	for rows.Next() {
+		var row UserUsageHierarchyItem
+		var groupsJSON []byte
+		if err = rows.Scan(&row.UserID, &row.Email, &row.Username, &row.Requests, &row.InputTokens, &row.OutputTokens, &row.CacheCreationTokens, &row.CacheReadTokens, &row.TotalTokens, &row.ActualCost, &groupsJSON); err != nil {
+			return nil, err
+		}
+		if len(groupsJSON) > 0 {
+			if err = json.Unmarshal(groupsJSON, &row.Groups); err != nil {
+				return nil, err
+			}
+		}
+		if row.Groups == nil {
+			row.Groups = make([]UserGroupUsageItem, 0)
+		}
+		result = append(result, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // UserDashboardStats 用户仪表盘统计

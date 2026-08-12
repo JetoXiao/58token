@@ -994,6 +994,11 @@ func (h *OpenAIGatewayHandler) anthropicStreamingAwareError(c *gin.Context, stat
 
 // handleAnthropicFailoverExhausted maps upstream failover errors to Anthropic format.
 func (h *OpenAIGatewayHandler) handleAnthropicFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, streamStarted bool) {
+	if service.IsOpenAIOfficialCapacityErrorBody(failoverErr.ResponseBody) {
+		service.SetOpsUpstreamError(c, failoverErr.StatusCode, service.OpenAIOfficialCapacityClientMessage(), "")
+		h.handleOpenAIOfficialCapacityError(c, streamStarted, true)
+		return
+	}
 	status, errType, errMsg := h.mapUpstreamError(failoverErr.StatusCode)
 	h.anthropicStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
@@ -1803,6 +1808,11 @@ func (h *OpenAIGatewayHandler) handleConcurrencyError(c *gin.Context, err error,
 func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *service.UpstreamFailoverError, streamStarted bool) {
 	statusCode := failoverErr.StatusCode
 	responseBody := failoverErr.ResponseBody
+	if service.IsOpenAIOfficialCapacityErrorBody(responseBody) {
+		service.SetOpsUpstreamError(c, statusCode, service.OpenAIOfficialCapacityClientMessage(), "")
+		h.handleOpenAIOfficialCapacityError(c, streamStarted, false)
+		return
+	}
 	if service.IsOpenAISilentRefusalErrorBody(responseBody) {
 		service.SetOpsUpstreamError(c, statusCode, service.OpenAISilentRefusalClientMessage(), "")
 		h.handleStreamingAwareError(c, http.StatusBadGateway, "upstream_error", service.OpenAISilentRefusalClientMessage(), streamStarted)
@@ -1840,6 +1850,45 @@ func (h *OpenAIGatewayHandler) handleFailoverExhausted(c *gin.Context, failoverE
 	// 使用默认的错误映射
 	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
+}
+
+func openAIOfficialCapacityErrorPayload() gin.H {
+	return gin.H{
+		"type":      service.OpenAIOfficialCapacityErrorType,
+		"code":      service.OpenAIOfficialCapacityErrorCode,
+		"message":   service.OpenAIOfficialCapacityClientMessage(),
+		"provider":  service.OpenAIOfficialCapacityErrorProvider,
+		"source":    service.OpenAIOfficialCapacityErrorSource,
+		"retryable": true,
+	}
+}
+
+func (h *OpenAIGatewayHandler) handleOpenAIOfficialCapacityError(c *gin.Context, streamStarted bool, anthropicFormat bool) {
+	if !streamStarted {
+		c.Header("Retry-After", "5")
+	}
+	errorPayload := openAIOfficialCapacityErrorPayload()
+	if streamStarted {
+		flusher, ok := c.Writer.(http.Flusher)
+		if !ok {
+			return
+		}
+		payload := gin.H{"error": errorPayload}
+		if anthropicFormat {
+			payload["type"] = "error"
+		}
+		encoded, _ := json.Marshal(payload)
+		if _, err := fmt.Fprintf(c.Writer, "event: error\ndata: %s\n\n", encoded); err != nil {
+			_ = c.Error(err)
+		}
+		flusher.Flush()
+		return
+	}
+	if anthropicFormat {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"type": "error", "error": errorPayload})
+		return
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{"error": errorPayload})
 }
 
 // handleFailoverExhaustedSimple 简化版本，用于没有响应体的情况

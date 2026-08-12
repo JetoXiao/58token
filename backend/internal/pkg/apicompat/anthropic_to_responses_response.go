@@ -214,6 +214,44 @@ func ResponsesEventToSSE(evt ResponsesStreamEvent) (string, error) {
 	return fmt.Sprintf("event: %s\ndata: %s\n\n", evt.Type, data), nil
 }
 
+// AnthropicErrorToResponsesEvent converts an Anthropic SSE error into the
+// terminal event expected by Responses clients after a stream has started.
+func AnthropicErrorToResponsesEvent(
+	errType string,
+	message string,
+	state *AnthropicEventToResponsesState,
+) ResponsesStreamEvent {
+	if state.ResponseID == "" {
+		state.ResponseID = generateResponsesID()
+	}
+	if errType == "" {
+		errType = "upstream_error"
+	}
+	if message == "" {
+		message = "Upstream stream failed"
+	}
+
+	seq := state.SequenceNumber
+	state.SequenceNumber++
+	state.CompletedSent = true
+
+	return ResponsesStreamEvent{
+		Type:           "response.failed",
+		SequenceNumber: seq,
+		Response: &ResponsesResponse{
+			ID:     state.ResponseID,
+			Object: "response",
+			Model:  state.Model,
+			Status: "failed",
+			Output: []ResponsesOutput{},
+			Error: &ResponsesError{
+				Code:    errType,
+				Message: message,
+			},
+		},
+	}
+}
+
 // --- internal handlers ---
 
 func anthToResHandleMessageStart(evt *AnthropicStreamEvent, state *AnthropicEventToResponsesState) []ResponsesStreamEvent {

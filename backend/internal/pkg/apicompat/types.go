@@ -148,6 +148,9 @@ type AnthropicUsage struct {
 type AnthropicStreamEvent struct {
 	Type string `json:"type"`
 
+	// error
+	Error *AnthropicStreamError `json:"error,omitempty"`
+
 	// message_start
 	Message *AnthropicResponse `json:"message,omitempty"`
 
@@ -160,6 +163,15 @@ type AnthropicStreamEvent struct {
 
 	// message_delta
 	Usage *AnthropicUsage `json:"usage,omitempty"`
+}
+
+// AnthropicStreamError is carried by an SSE error event. Anthropic-compatible
+// upstreams commonly return these errors with HTTP 200, so callers must inspect
+// the stream rather than relying on the response status alone.
+type AnthropicStreamError struct {
+	Type    string `json:"type,omitempty"`
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // AnthropicDelta carries incremental content in streaming events.
