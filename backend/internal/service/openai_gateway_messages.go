@@ -361,6 +361,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+				RequestScoped:          isOpenAIItemIDCompatibilityError(resp.StatusCode, upstreamMsg, respBody),
 			})
 		}
 		// Non-failover error: return Anthropic-formatted error to client

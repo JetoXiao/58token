@@ -242,6 +242,19 @@ func TestIsOpenAITransientProcessingError(t *testing.T) {
 	))
 }
 
+func TestIsOpenAIItemIDCompatibilityError(t *testing.T) {
+	body := []byte(`{"error":{"message":"Invalid 'input[42].id': 'item_abc'. Expected an ID that begins with 'rs', 'msg', or 'fc'.","type":"invalid_request_error","param":"input[42].id","code":"invalid_value"}}`)
+	require.True(t, isOpenAIItemIDCompatibilityError(http.StatusBadRequest, "", body))
+	require.True(t, (&OpenAIGatewayService{}).shouldFailoverOpenAIUpstreamResponse(http.StatusBadRequest, "", body))
+
+	require.False(t, isOpenAIItemIDCompatibilityError(
+		http.StatusBadRequest,
+		"Invalid 'input[0].content': expected a string.",
+		[]byte(`{"error":{"message":"Invalid request body"}}`),
+	))
+	require.False(t, isOpenAIItemIDCompatibilityError(http.StatusInternalServerError, string(body), body))
+}
+
 func TestOpenAIGatewayService_Forward_LogsInstructionsRequiredDetails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	logSink, restore := captureStructuredLog(t)
@@ -342,6 +355,37 @@ func TestOpenAIGatewayService_Forward_TransientProcessingErrorTriggersFailover(t
 	require.Equal(t, http.StatusBadRequest, failoverErr.StatusCode)
 	require.Contains(t, string(failoverErr.ResponseBody), "An error occurred while processing your request")
 	require.False(t, c.Writer.Written(), "service 层应返回 failover 错误给上层换号，而不是直接向客户端写响应")
+}
+
+func TestOpenAIGatewayService_Forward_ItemIDCompatibilityErrorTriggersRequestScopedFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusBadRequest,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body: io.NopCloser(strings.NewReader(
+			`{"error":{"message":"Invalid 'input[17].id': 'item_abc'. Expected an ID that begins with 'rs', 'msg', or 'fc'.","type":"invalid_request_error","param":"input[17].id","code":"invalid_value"}}`,
+		)),
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	account := &Account{
+		ID: 1002, Name: "incompatible responses upstream", Platform: PlatformOpenAI,
+		Type: AccountTypeAPIKey, Concurrency: 1, Credentials: map[string]any{"api_key": "sk-test"},
+		Status: StatusActive, Schedulable: true, RateMultiplier: f64p(1),
+	}
+	body := []byte(`{"model":"gpt-5.6-sol","stream":false,"input":[{"id":"item_abc","type":"message"}]}`)
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+	require.Error(t, err)
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.True(t, failoverErr.RequestScoped)
+	require.Equal(t, http.StatusBadRequest, failoverErr.StatusCode)
+	require.False(t, c.Writer.Written())
 }
 
 func TestOpenAIGatewayService_Forward_ModelCapacityErrorTriggersFailoverAndSameAccountRetry(t *testing.T) {

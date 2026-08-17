@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 )
 
 const (
@@ -15,6 +19,9 @@ const (
 	openAIAccountFailureBreakerThreshold  = 3
 	openAIAccountFailureBreakerWindow     = 2 * time.Minute
 	openAIAccountFailureBreakerCooldown   = openAIStopSchedulingBridgeCooldown
+	openAIModelFailureBreakerThreshold    = 3
+	openAIModelFailureBreakerWindow       = 2 * time.Minute
+	openAIModelFailureBreakerCooldown     = 2 * time.Minute
 	openAIOAuth429StormWindow             = 10 * time.Second
 	openAIOAuth429StormThreshold          = 20
 	openAIOAuth429StormMaxAccountSwitches = 1
@@ -27,6 +34,12 @@ type openAIAccountConsecutiveFailureState struct {
 	lastFailureAt  time.Time
 	lastStatusCode int
 	lastReason     string
+}
+
+type openAIAccountModelFailureState struct {
+	mu             sync.Mutex
+	requestTimes   map[string]time.Time
+	lastStatusCode int
 }
 
 func openAIAccountStateContext(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -69,7 +82,34 @@ func (s *OpenAIGatewayService) RecordOpenAIAccountFailover(account *Account, fai
 	if s == nil || failoverErr == nil {
 		return false
 	}
+	if failoverErr.RequestScoped {
+		return false
+	}
 	return s.recordOpenAIAccountConsecutiveFailure(account, failoverErr.StatusCode, "failover")
+}
+
+// RecordOpenAIAccountFailoverForModel records a model-scoped breaker and keeps
+// the account-wide breaker only for authentication/payment failures. Distinct
+// request IDs are counted so a single client retry loop cannot quarantine a
+// model/channel pair by itself.
+func (s *OpenAIGatewayService) RecordOpenAIAccountFailoverForModel(ctx context.Context, account *Account, requestedModel string, failoverErr *UpstreamFailoverError) bool {
+	if s == nil || failoverErr == nil || failoverErr.RequestScoped {
+		return false
+	}
+	if normalizeOpenAIAccountRuntimeModel(requestedModel) == "" {
+		return s.RecordOpenAIAccountFailover(account, failoverErr)
+	}
+	accountBlocked := false
+	// Authentication/payment failures describe the whole account. Capacity,
+	// transport, 429 and 5xx failures stay model-scoped; their side-effect
+	// handlers already apply an account-wide block when the upstream explicitly
+	// indicates one is necessary.
+	switch failoverErr.StatusCode {
+	case http.StatusUnauthorized, http.StatusPaymentRequired, http.StatusForbidden:
+		accountBlocked = s.RecordOpenAIAccountFailover(account, failoverErr)
+	}
+	modelBlocked := s.recordOpenAIAccountModelFailure(ctx, account, requestedModel, failoverErr.StatusCode)
+	return accountBlocked || modelBlocked
 }
 
 // RecordOpenAIAccountStreamTransportFailure counts an upstream SSE connection
@@ -78,6 +118,148 @@ func (s *OpenAIGatewayService) RecordOpenAIAccountFailover(account *Account, fai
 // make an account unavailable.
 func (s *OpenAIGatewayService) RecordOpenAIAccountStreamTransportFailure(account *Account) bool {
 	return s.recordOpenAIAccountConsecutiveFailure(account, http.StatusBadGateway, "stream_transport")
+}
+
+func (s *OpenAIGatewayService) RecordOpenAIAccountStreamTransportFailureForModel(ctx context.Context, account *Account, requestedModel string) bool {
+	if normalizeOpenAIAccountRuntimeModel(requestedModel) == "" {
+		return s.RecordOpenAIAccountStreamTransportFailure(account)
+	}
+	return s.recordOpenAIAccountModelFailure(ctx, account, requestedModel, http.StatusBadGateway)
+}
+
+func openAIModelFailureRequestKey(ctx context.Context, now time.Time) string {
+	if ctx != nil {
+		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
+			return "client:" + strings.TrimSpace(clientRequestID)
+		}
+		if requestID, _ := ctx.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
+			return "local:" + strings.TrimSpace(requestID)
+		}
+	}
+	return fmt.Sprintf("anonymous:%d", now.UnixNano())
+}
+
+func (s *OpenAIGatewayService) recordOpenAIAccountModelFailure(ctx context.Context, account *Account, requestedModel string, statusCode int) bool {
+	model := normalizeOpenAIAccountRuntimeModel(requestedModel)
+	if s == nil || !isOpenAIAccount(account) || account.ID <= 0 || model == "" {
+		return false
+	}
+	if s.isOpenAIAccountModelRuntimeBlocked(account, model) {
+		return true
+	}
+
+	now := time.Now()
+	key := openAIAccountModelRuntimeKey{accountID: account.ID, model: model}
+	value, _ := s.openaiAccountModelFailureStates.LoadOrStore(key, &openAIAccountModelFailureState{})
+	state, ok := value.(*openAIAccountModelFailureState)
+	if !ok || state == nil {
+		state = &openAIAccountModelFailureState{}
+		s.openaiAccountModelFailureStates.Store(key, state)
+	}
+
+	requestKey := openAIModelFailureRequestKey(ctx, now)
+	state.mu.Lock()
+	if state.requestTimes == nil {
+		state.requestTimes = make(map[string]time.Time, openAIModelFailureBreakerThreshold)
+	}
+	for existingKey, failedAt := range state.requestTimes {
+		if now.Sub(failedAt) > openAIModelFailureBreakerWindow {
+			delete(state.requestTimes, existingKey)
+		}
+	}
+	state.requestTimes[requestKey] = now
+	state.lastStatusCode = statusCode
+	count := len(state.requestTimes)
+	shouldBlock := count >= openAIModelFailureBreakerThreshold
+	state.mu.Unlock()
+
+	if !shouldBlock {
+		return false
+	}
+
+	until := now.Add(openAIModelFailureBreakerCooldown)
+	s.openaiAccountModelFailureStates.Delete(key)
+	s.blockOpenAIAccountModelScheduling(account.ID, model, until)
+	slog.Warn("openai_account_model_failures_blocked",
+		"account_id", account.ID,
+		"model", model,
+		"status_code", statusCode,
+		"distinct_requests", count,
+		"cooldown_until", until.Format(time.RFC3339),
+	)
+	return true
+}
+
+func (s *OpenAIGatewayService) blockOpenAIAccountModelScheduling(accountID int64, model string, until time.Time) {
+	model = normalizeOpenAIAccountRuntimeModel(model)
+	if s == nil || accountID <= 0 || model == "" {
+		return
+	}
+	key := openAIAccountModelRuntimeKey{accountID: accountID, model: model}
+	for {
+		current, loaded := s.openaiAccountModelRuntimeBlockUntil.Load(key)
+		if !loaded {
+			actual, stored := s.openaiAccountModelRuntimeBlockUntil.LoadOrStore(key, until)
+			if !stored {
+				return
+			}
+			current = actual
+		}
+		currentUntil, ok := current.(time.Time)
+		if ok && currentUntil.After(until) {
+			return
+		}
+		if s.openaiAccountModelRuntimeBlockUntil.CompareAndSwap(key, current, until) {
+			return
+		}
+	}
+}
+
+func (s *OpenAIGatewayService) clearOpenAIAccountModelFailures(accountID int64, model string) {
+	model = normalizeOpenAIAccountRuntimeModel(model)
+	if s == nil || accountID <= 0 || model == "" {
+		return
+	}
+	key := openAIAccountModelRuntimeKey{accountID: accountID, model: model}
+	s.openaiAccountModelFailureStates.Delete(key)
+	s.openaiAccountModelRuntimeBlockUntil.Delete(key)
+}
+
+func (s *OpenAIGatewayService) primeOpenAIAccountModelHalfOpen(key openAIAccountModelRuntimeKey, now time.Time) {
+	if s == nil {
+		return
+	}
+	state := &openAIAccountModelFailureState{requestTimes: make(map[string]time.Time, openAIModelFailureBreakerThreshold)}
+	for i := 1; i < openAIModelFailureBreakerThreshold; i++ {
+		state.requestTimes[fmt.Sprintf("half-open:%d", i)] = now
+	}
+	s.openaiAccountModelFailureStates.Store(key, state)
+}
+
+func (s *OpenAIGatewayService) isOpenAIAccountModelRuntimeBlocked(account *Account, requestedModel string) bool {
+	model := normalizeOpenAIAccountRuntimeModel(requestedModel)
+	if s == nil || !isOpenAIAccount(account) || model == "" {
+		return false
+	}
+	key := openAIAccountModelRuntimeKey{accountID: account.ID, model: model}
+	value, ok := s.openaiAccountModelRuntimeBlockUntil.Load(key)
+	if !ok {
+		return false
+	}
+	cooldownUntil, ok := value.(time.Time)
+	if !ok || cooldownUntil.IsZero() {
+		s.openaiAccountModelRuntimeBlockUntil.Delete(key)
+		return false
+	}
+	if time.Now().Before(cooldownUntil) {
+		return true
+	}
+	// Cooldown expiry is the half-open probe: real traffic may try this pair
+	// again. Prime the failure window so one failed probe immediately reopens
+	// the circuit, while a successful probe clears it through result reporting.
+	s.openaiAccountModelRuntimeBlockUntil.Delete(key)
+	s.primeOpenAIAccountModelHalfOpen(key, time.Now())
+	return false
 }
 
 func (s *OpenAIGatewayService) recordOpenAIAccountConsecutiveFailure(account *Account, statusCode int, reason string) bool {

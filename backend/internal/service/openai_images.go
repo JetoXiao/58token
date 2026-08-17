@@ -643,6 +643,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && isPoolModeRetryableStatus(resp.StatusCode),
+				RequestScoped:          isOpenAIItemIDCompatibilityError(resp.StatusCode, upstreamMsg, respBody),
 			})
 		}
 		return s.handleErrorResponse(upstreamCtx, resp, c, account, forwardBody)

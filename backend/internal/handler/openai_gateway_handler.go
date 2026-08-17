@@ -397,8 +397,10 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
-					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
-					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
+					if !failoverErr.RequestScoped {
+						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
+					}
+					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
 					// 短暂上游错误可按错误策略在同一账号快速重试一次。
 					if !runtimeBlocked && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -442,9 +444,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					)
 					continue
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
 				if service.IsOpenAIStreamTransportFailure(err) {
-					h.gatewayService.RecordOpenAIAccountStreamTransportFailure(account)
+					h.gatewayService.RecordOpenAIAccountStreamTransportFailureForModel(c.Request.Context(), account, reqModel)
 					h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 					reqLog.Warn("openai.stream_transport_interrupted",
 						zap.Int64("account_id", account.ID),
@@ -832,8 +834,10 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
-					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
+					if !failoverErr.RequestScoped {
+						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, currentRoutingModel, false, nil)
+					}
+					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, currentRoutingModel, failoverErr)
 					// 池模式：同账号重试
 					if !runtimeBlocked && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -877,9 +881,9 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 					)
 					continue
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, currentRoutingModel, false, nil)
 				if service.IsOpenAIStreamTransportFailure(err) {
-					h.gatewayService.RecordOpenAIAccountStreamTransportFailure(account)
+					h.gatewayService.RecordOpenAIAccountStreamTransportFailureForModel(c.Request.Context(), account, currentRoutingModel)
 					h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 					reqLog.Warn("openai_messages.stream_transport_interrupted",
 						zap.Int64("account_id", account.ID),
@@ -1519,7 +1523,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	}
 
 	if err := h.gatewayService.ProxyResponsesWebSocketFromClient(ctx, c, wsConn, account, token, wsFirstMessage, hooks); err != nil {
-		h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+		h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
 		closeStatus, closeReason := summarizeWSCloseErrorForLog(err)
 		reqLog.Warn("openai.websocket_proxy_failed",
 			zap.Int64("account_id", account.ID),

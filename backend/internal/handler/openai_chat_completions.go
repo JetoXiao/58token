@@ -234,8 +234,10 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
-					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
-					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
+					if !failoverErr.RequestScoped {
+						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
+					}
+					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
 					// Pool mode: retry on the same account
 					if !runtimeBlocked && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
@@ -279,9 +281,9 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					)
 					continue
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
 				if service.IsOpenAIStreamTransportFailure(err) {
-					h.gatewayService.RecordOpenAIAccountStreamTransportFailure(account)
+					h.gatewayService.RecordOpenAIAccountStreamTransportFailureForModel(c.Request.Context(), account, reqModel)
 					h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 					reqLog.Warn("openai_chat_completions.stream_transport_interrupted",
 						zap.Int64("account_id", account.ID),

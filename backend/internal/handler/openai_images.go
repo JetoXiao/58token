@@ -237,9 +237,11 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
-					h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
-					h.gatewayService.RecordOpenAIAccountFailover(account, failoverErr)
-					if failoverErr.RetryableOnSameAccount {
+					if !failoverErr.RequestScoped {
+						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, parsed.Model, false, nil)
+					}
+					runtimeBlocked := h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, parsed.Model, failoverErr)
+					if !runtimeBlocked && failoverErr.RetryableOnSameAccount {
 						retryLimit := account.GetPoolModeRetryCount()
 						if sameAccountRetryCount[account.ID] < retryLimit {
 							sameAccountRetryCount[account.ID]++
@@ -277,7 +279,7 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 					)
 					continue
 				}
-				h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
+				h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, parsed.Model, false, nil)
 				wroteFallback := h.ensureForwardErrorResponse(c, streamStarted)
 				fields := []zap.Field{
 					zap.Int64("account_id", account.ID),

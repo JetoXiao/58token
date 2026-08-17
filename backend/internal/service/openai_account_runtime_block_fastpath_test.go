@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/stretchr/testify/require"
 )
 
@@ -139,6 +140,67 @@ func TestOpenAIConsecutiveFailureBreaker_ResetsAfterWindow(t *testing.T) {
 	require.False(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
 	require.True(t, svc.RecordOpenAIAccountFailover(account, failoverErr))
 	require.True(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
+func TestOpenAIModelFailureBreaker_BlocksOnlyFailedModelAfterDistinctRequests(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 501, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadGateway}
+	requestContext := func(id string) context.Context {
+		return context.WithValue(context.Background(), ctxkey.ClientRequestID, id)
+	}
+
+	// Repeated retries from one client request count once.
+	for i := 0; i < 3; i++ {
+		require.False(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("same-request"), account, "gpt-5.6-sol", failoverErr))
+	}
+	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-sol"))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+
+	require.False(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("request-2"), account, "gpt-5.6-sol", failoverErr))
+	require.True(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("request-3"), account, "gpt-5.6-sol", failoverErr))
+	require.True(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-sol"))
+	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-terra"))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account), "model failures must not block other models on the account")
+}
+
+func TestOpenAIModelFailureBreaker_RequestScopedErrorDoesNotPoisonCircuit(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 502, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadRequest, RequestScoped: true}
+
+	for i := 0; i < 5; i++ {
+		ctx := context.WithValue(context.Background(), ctxkey.RequestID, string(rune('a'+i)))
+		require.False(t, svc.RecordOpenAIAccountFailoverForModel(ctx, account, "gpt-5.6-sol", failoverErr))
+	}
+
+	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-sol"))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
+func TestOpenAIModelFailureBreaker_SuccessClearsBlockAndSelectionRecovers(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 503, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}
+	svc.blockOpenAIAccountModelScheduling(account.ID, "gpt-5.6-sol", time.Now().Add(time.Minute))
+
+	require.Nil(t, svc.resolveFreshSchedulableOpenAIAccount(context.Background(), account, "gpt-5.6-sol", false))
+	require.Same(t, account, svc.resolveFreshSchedulableOpenAIAccount(context.Background(), account, "gpt-5.6-terra", false))
+
+	svc.ReportOpenAIAccountScheduleResultForModel(account.ID, "gpt-5.6-sol", true, nil)
+	require.Same(t, account, svc.resolveFreshSchedulableOpenAIAccount(context.Background(), account, "gpt-5.6-sol", false))
+}
+
+func TestOpenAIModelFailureBreaker_FailedHalfOpenProbeReopensImmediately(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 504, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	model := "gpt-5.6-sol"
+	key := openAIAccountModelRuntimeKey{accountID: account.ID, model: normalizeOpenAIAccountRuntimeModel(model)}
+	svc.openaiAccountModelRuntimeBlockUntil.Store(key, time.Now().Add(-time.Second))
+
+	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, model), "expired cooldown should allow one probe")
+	ctx := context.WithValue(context.Background(), ctxkey.RequestID, "half-open-probe")
+	require.True(t, svc.RecordOpenAIAccountFailoverForModel(ctx, account, model, &UpstreamFailoverError{StatusCode: http.StatusBadGateway}))
+	require.True(t, svc.isOpenAIAccountModelRuntimeBlocked(account, model))
 }
 
 func TestShouldStopOpenAIOAuth429Failover_OnlyDuringStorm(t *testing.T) {

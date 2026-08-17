@@ -295,7 +295,11 @@ func (s *openAIAccountRuntimeStats) reportForModel(accountID int64, model string
 	}
 	updateEWMAAtomic(&stat.errorRateEWMABits, errorSample, alpha)
 	updateOpenAIAccountTTFT(stat, firstTokenMs, alpha)
-	updateOpenAIAccountTTFT(s.loadOrCreateModel(accountID, model), firstTokenMs, alpha)
+	modelStat := s.loadOrCreateModel(accountID, model)
+	if modelStat != nil {
+		updateEWMAAtomic(&modelStat.errorRateEWMABits, errorSample, alpha)
+		updateOpenAIAccountTTFT(modelStat, firstTokenMs, alpha)
+	}
 }
 
 func (s *openAIAccountRuntimeStats) ttftSnapshot(accountID int64) (ttft float64, sampleCount int64, ok bool) {
@@ -358,9 +362,20 @@ func (s *openAIAccountRuntimeStats) snapshot(accountID int64) (errorRate float64
 }
 
 func (s *openAIAccountRuntimeStats) snapshotForModel(accountID int64, model string) (errorRate float64, ttft float64, hasTTFT bool) {
-	errorRate, _, _ = s.snapshot(accountID)
-	ttft, _, hasTTFT = s.ttftSnapshotForModel(accountID, model)
-	return errorRate, ttft, hasTTFT
+	model = normalizeOpenAIAccountRuntimeModel(model)
+	if s != nil && accountID > 0 && model != "" {
+		if value, ok := s.models.Load(openAIAccountModelRuntimeKey{accountID: accountID, model: model}); ok {
+			if stat, _ := value.(*openAIAccountRuntimeStat); stat != nil {
+				errorRate = clamp01(math.Float64frombits(stat.errorRateEWMABits.Load()))
+				ttftValue := math.Float64frombits(stat.ttftEWMABits.Load())
+				if !math.IsNaN(ttftValue) {
+					return errorRate, ttftValue, true
+				}
+				return errorRate, 0, false
+			}
+		}
+	}
+	return s.snapshot(accountID)
 }
 
 func (s *openAIAccountRuntimeStats) size() int {
@@ -1341,6 +1356,9 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatible(ctx context.C
 	if s != nil && s.service != nil && s.service.isOpenAIAccountRuntimeBlocked(account) {
 		return false
 	}
+	if s != nil && s.service != nil && s.service.isOpenAIAccountModelRuntimeBlocked(account, req.RequestedModel) {
+		return false
+	}
 	if req.RequestedModel != "" && !account.IsModelSupported(req.RequestedModel) {
 		return false
 	}
@@ -1641,6 +1659,9 @@ func (s *OpenAIGatewayService) countLegacyOpenAISchedulerCandidates(
 		if s.isOpenAIAccountRuntimeBlocked(account) {
 			continue
 		}
+		if s.isOpenAIAccountModelRuntimeBlocked(account, requestedModel) {
+			continue
+		}
 		if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, requireCompact) {
 			continue
 		}
@@ -1718,6 +1739,7 @@ func (s *OpenAIGatewayService) ReportOpenAIAccountScheduleResultForModel(account
 	}
 	if success {
 		s.clearOpenAIAccountConsecutiveFailures(accountID)
+		s.clearOpenAIAccountModelFailures(accountID, requestedModel)
 	}
 	stats := s.getOpenAIAccountRuntimeStats()
 	stats.reportForModel(accountID, requestedModel, success, firstTokenMs)

@@ -362,6 +362,8 @@ type OpenAIGatewayService struct {
 	openaiWSFallbackUntil               sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountRuntimeBlockUntil      sync.Map // key: int64(accountID), value: time.Time
 	openaiAccountConsecutiveFailures    sync.Map // key: int64(accountID), value: *openAIAccountConsecutiveFailureState
+	openaiAccountModelRuntimeBlockUntil sync.Map // key: openAIAccountModelRuntimeKey, value: time.Time
+	openaiAccountModelFailureStates     sync.Map // key: openAIAccountModelRuntimeKey, value: *openAIAccountModelFailureState
 	openaiOAuth429WindowStartUnixNano   atomic.Int64
 	openaiOAuth429WindowCount           atomic.Int64
 	openaiWSRetryMetrics                openAIWSRetryMetrics
@@ -1277,6 +1279,30 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 	return match(string(upstreamBody))
 }
 
+// isOpenAIItemIDCompatibilityError detects Responses API continuation items
+// that are valid for one upstream implementation but rejected by another.
+// This is request-scoped: the current request should switch accounts, while the
+// account must remain available for other requests and models.
+func isOpenAIItemIDCompatibilityError(upstreamStatusCode int, upstreamMsg string, upstreamBody []byte) bool {
+	if upstreamStatusCode != http.StatusBadRequest {
+		return false
+	}
+
+	match := func(text string) bool {
+		lower := strings.ToLower(strings.TrimSpace(text))
+		return strings.Contains(lower, "invalid 'input[") &&
+			strings.Contains(lower, "].id'") &&
+			strings.Contains(lower, "expected an id that begins with")
+	}
+	if match(upstreamMsg) {
+		return true
+	}
+	if len(upstreamBody) == 0 {
+		return false
+	}
+	return match(gjson.GetBytes(upstreamBody, "error.message").String()) || match(string(upstreamBody))
+}
+
 // ExtractSessionID extracts the raw session ID from headers or body without hashing.
 // Used by ForwardAsAnthropic to pass as prompt_cache_key for upstream cache.
 func (s *OpenAIGatewayService) ExtractSessionID(c *gin.Context, body []byte) string {
@@ -1681,7 +1707,9 @@ func (s *OpenAIGatewayService) tryStickySessionHit(
 			if _, excluded := excludedIDs[candidate.ID]; excluded {
 				return false
 			}
-			if !isOpenAIAccountEligibleForRequest(candidate, requestedModel, requireCompact) || s.isOpenAIAccountRuntimeBlocked(candidate) {
+			if !isOpenAIAccountEligibleForRequest(candidate, requestedModel, requireCompact) ||
+				s.isOpenAIAccountRuntimeBlocked(candidate) ||
+				s.isOpenAIAccountModelRuntimeBlocked(candidate, requestedModel) {
 				return false
 			}
 			if groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
@@ -1926,7 +1954,8 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(
 						bypassSticky := allowStickyTTFTBypass && s.shouldEvaluateOpenAIStickyTTFT(accountID, requestedModel) &&
 							s.shouldBypassOpenAIStickyAccount(accountID, requestedModel, accounts, func(candidate *Account) bool {
 								if isExcluded(candidate.ID) || !isOpenAIAccountEligibleForRequest(candidate, requestedModel, requireCompact) ||
-									s.isOpenAIAccountRuntimeBlocked(candidate) {
+									s.isOpenAIAccountRuntimeBlocked(candidate) ||
+									s.isOpenAIAccountModelRuntimeBlocked(candidate, requestedModel) {
 									return false
 								}
 								if needsUpstreamCheck && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, candidate, requestedModel, requireCompact) {
@@ -1989,6 +2018,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(
 			continue
 		}
 		if s.isOpenAIAccountRuntimeBlocked(acc) {
+			continue
+		}
+		if s.isOpenAIAccountModelRuntimeBlocked(acc, requestedModel) {
 			continue
 		}
 		if requestedModel != "" && !acc.IsModelSupported(requestedModel) {
@@ -2261,11 +2293,17 @@ func (s *OpenAIGatewayService) resolveFreshSchedulableOpenAIAccount(ctx context.
 	if s.isOpenAIAccountRuntimeBlocked(fresh) {
 		return nil
 	}
+	if s.isOpenAIAccountModelRuntimeBlocked(fresh, requestedModel) {
+		return nil
+	}
 	return fresh
 }
 
 func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Context, account *Account, requestedModel string, requireCompact bool) *Account {
 	if account == nil {
+		return nil
+	}
+	if s.isOpenAIAccountModelRuntimeBlocked(account, requestedModel) {
 		return nil
 	}
 	if s.schedulerSnapshot == nil || s.accountRepo == nil {
@@ -2283,6 +2321,9 @@ func (s *OpenAIGatewayService) recheckSelectedOpenAIAccountFromDB(ctx context.Co
 		return nil
 	}
 	if s.isOpenAIAccountRuntimeBlocked(latest) {
+		return nil
+	}
+	if s.isOpenAIAccountModelRuntimeBlocked(latest, requestedModel) {
 		return nil
 	}
 	return latest
@@ -2395,7 +2436,8 @@ func (s *OpenAIGatewayService) shouldFailoverOpenAIUpstreamResponse(statusCode i
 	if s.shouldFailoverUpstreamError(statusCode) {
 		return true
 	}
-	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody)
+	return isOpenAITransientProcessingError(statusCode, upstreamMsg, upstreamBody) ||
+		isOpenAIItemIDCompatibilityError(statusCode, upstreamMsg, upstreamBody)
 }
 
 func (s *OpenAIGatewayService) handleFailoverSideEffects(ctx context.Context, resp *http.Response, account *Account) {
@@ -3214,6 +3256,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
 					RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
+					RequestScoped:          isOpenAIItemIDCompatibilityError(resp.StatusCode, upstreamMsg, respBody),
 				})
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body)

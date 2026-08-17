@@ -518,6 +518,7 @@ type UpstreamFailoverError struct {
 	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
 	MaxSameAccountRetries  int         // 大于 0 时覆盖账号默认的同账号重试次数
+	RequestScoped          bool        // 请求内容与当前上游不兼容；仅切换当前请求，不计入账号/模型熔断
 }
 
 func (e *UpstreamFailoverError) Error() string {

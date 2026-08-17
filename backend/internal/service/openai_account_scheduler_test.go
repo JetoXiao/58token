@@ -1636,6 +1636,19 @@ func TestDefaultOpenAIAccountScheduler_IsAccountTransportCompatible_Branches(t *
 	require.True(t, scheduler.isAccountTransportCompatible(account, OpenAIUpstreamTransportResponsesWebsocketV2))
 }
 
+func TestOpenAIAccountRuntimeStats_TracksErrorRatePerModel(t *testing.T) {
+	stats := newOpenAIAccountRuntimeStats()
+	stats.reportForModel(9901, "gpt-5.6-sol", false, nil)
+	stats.reportForModel(9901, "gpt-5.6-sol", false, nil)
+	stats.reportForModel(9901, "gpt-5.6-terra", true, nil)
+
+	solErrorRate, _, _ := stats.snapshotForModel(9901, "gpt-5.6-sol")
+	terraErrorRate, _, _ := stats.snapshotForModel(9901, "gpt-5.6-terra")
+
+	require.InDelta(t, 0.36, solErrorRate, 0.0001)
+	require.InDelta(t, 0.0, terraErrorRate, 0.0001)
+}
+
 func int64PtrForTest(v int64) *int64 {
 	return &v
 }
