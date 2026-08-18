@@ -461,6 +461,10 @@ func shouldClearStickySession(account *Account, requestedModel string) bool {
 	return false
 }
 
+func (s *GatewayService) shouldClearStickySessionForModel(account *Account, requestedModel string) bool {
+	return shouldClearStickySession(account, requestedModel) || s.isAnthropicAccountModelRuntimeBlocked(account, requestedModel)
+}
+
 type AccountWaitPlan struct {
 	AccountID      int64
 	MaxConcurrency int
@@ -518,7 +522,8 @@ type UpstreamFailoverError struct {
 	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
 	MaxSameAccountRetries  int         // 大于 0 时覆盖账号默认的同账号重试次数
-	RequestScoped          bool        // 请求内容与当前上游不兼容；仅切换当前请求，不计入账号/模型熔断
+	RequestScoped          bool        // 请求内容与当前上游不兼容；默认仅切换当前请求，ModelScoped=true 时仍计入模型熔断
+	ModelScoped            bool        // 即使请求内容相关，也确认反映账号+模型兼容性，应计入模型熔断
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -577,6 +582,7 @@ type GatewayService struct {
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
+	anthropicModelRuntime anthropicAccountModelRuntimeState
 }
 
 // NewGatewayService creates a new GatewayService
@@ -748,6 +754,16 @@ func (s *GatewayService) BindStickySession(ctx context.Context, groupID *int64, 
 		return nil
 	}
 	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
+}
+
+// ClearStickySession removes an account affinity after an upstream failure.
+// Keeping a failed account bound would make every later request start on the
+// same channel before the runtime model breaker can take effect.
+func (s *GatewayService) ClearStickySession(ctx context.Context, groupID *int64, sessionHash string) error {
+	if sessionHash == "" || s.cache == nil {
+		return nil
+	}
+	return s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 }
 
 // GetCachedSessionAccountID retrieves the account ID bound to a sticky session.
@@ -1818,7 +1834,7 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			account, ok := accountByID[accountID]
 			if ok {
 				// 检查账户是否需要清理粘性会话绑定
-				clearSticky := shouldClearStickySession(account, requestedModel)
+				clearSticky := s.shouldClearStickySessionForModel(account, requestedModel)
 				if clearSticky {
 					slog.Debug("sticky.layer1_5_no_routing_clear",
 						"account_id", accountID,
@@ -2359,7 +2375,13 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 	if account == nil {
 		return false
 	}
-	return account.IsSchedulableForModelWithContext(ctx, requestedModel)
+	if !account.IsSchedulableForModelWithContext(ctx, requestedModel) {
+		return false
+	}
+	// Anthropic failures are isolated by account + requested model. This keeps
+	// a broken Claude channel out of the failing model while leaving its other
+	// models eligible for scheduling.
+	return !s.isAnthropicAccountModelRuntimeBlocked(account, requestedModel)
 }
 
 // isAccountInGroup checks if the account belongs to the specified group.
@@ -3025,7 +3047,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 					account, err := s.getSchedulableAccount(ctx, accountID)
 					// 检查账号分组归属和平台匹配（确保粘性会话不会跨分组或跨平台）
 					if err == nil {
-						clearSticky := shouldClearStickySession(account, requestedModel)
+						clearSticky := s.shouldClearStickySessionForModel(account, requestedModel)
 						if clearSticky {
 							_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 						}
@@ -3144,7 +3166,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 				account, err := s.getSchedulableAccount(ctx, accountID)
 				// 检查账号分组归属和平台匹配（确保粘性会话不会跨分组或跨平台）
 				if err == nil {
-					clearSticky := shouldClearStickySession(account, requestedModel)
+					clearSticky := s.shouldClearStickySessionForModel(account, requestedModel)
 					if clearSticky {
 						_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 					}
@@ -3283,7 +3305,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 					account, err := s.getSchedulableAccount(ctx, accountID)
 					// 检查账号分组归属和有效性：原生平台直接匹配，antigravity 需要启用混合调度
 					if err == nil {
-						clearSticky := shouldClearStickySession(account, requestedModel)
+						clearSticky := s.shouldClearStickySessionForModel(account, requestedModel)
 						if clearSticky {
 							_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 						}
@@ -3404,7 +3426,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 				account, err := s.getSchedulableAccount(ctx, accountID)
 				// 检查账号分组归属和有效性：原生平台直接匹配，antigravity 需要启用混合调度
 				if err == nil {
-					clearSticky := shouldClearStickySession(account, requestedModel)
+					clearSticky := s.shouldClearStickySessionForModel(account, requestedModel)
 					if clearSticky {
 						_ = s.cache.DeleteSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 					}

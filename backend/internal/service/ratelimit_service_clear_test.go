@@ -22,6 +22,8 @@ type rateLimitClearRepoStub struct {
 	clearAntigravityCalls     int
 	clearModelRateLimitCalls  int
 	clearTempUnschedCalls     int
+	setSchedulableCalls       int
+	setSchedulableValue       bool
 	clearErrorErr             error
 	clearRateLimitErr         error
 	clearAntigravityErr       error
@@ -60,6 +62,12 @@ func (r *rateLimitClearRepoStub) ClearModelRateLimits(ctx context.Context, id in
 func (r *rateLimitClearRepoStub) ClearTempUnschedulable(ctx context.Context, id int64) error {
 	r.clearTempUnschedCalls++
 	return r.clearTempUnschedulableErr
+}
+
+func (r *rateLimitClearRepoStub) SetSchedulable(ctx context.Context, id int64, schedulable bool) error {
+	r.setSchedulableCalls++
+	r.setSchedulableValue = schedulable
+	return nil
 }
 
 type tempUnschedCacheRecorder struct {
@@ -228,6 +236,7 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearsErrorAndRateLi
 	require.NotNil(t, result)
 	require.True(t, result.ClearedError)
 	require.True(t, result.ClearedRateLimit)
+	require.True(t, result.Reenabled)
 
 	require.Equal(t, 1, repo.getByIDCalls)
 	require.Equal(t, 1, repo.clearErrorCalls)
@@ -235,6 +244,8 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearsErrorAndRateLi
 	require.Equal(t, 1, repo.clearAntigravityCalls)
 	require.Equal(t, 1, repo.clearModelRateLimitCalls)
 	require.Equal(t, 1, repo.clearTempUnschedCalls)
+	require.Equal(t, 1, repo.setSchedulableCalls)
+	require.True(t, repo.setSchedulableValue)
 	require.Equal(t, []int64{42}, cache.deletedIDs)
 	require.Equal(t, []int64{42}, blocker.clearedIDs)
 }
@@ -264,6 +275,24 @@ func TestRateLimitService_RecoverAccountAfterSuccessfulTest_NoRecoverableStateIs
 	require.Equal(t, 0, repo.clearModelRateLimitCalls)
 	require.Equal(t, 0, repo.clearTempUnschedCalls)
 	require.Empty(t, cache.deletedIDs)
+}
+
+func TestRateLimitService_RecoverAccountAfterSuccessfulTest_DoesNotOverrideManualDisable(t *testing.T) {
+	repo := &rateLimitClearRepoStub{
+		getByIDAccount: &Account{
+			ID:          8,
+			Status:      StatusActive,
+			Schedulable: false,
+			Extra:       map[string]any{},
+		},
+	}
+	svc := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+
+	result, err := svc.RecoverAccountAfterSuccessfulTest(context.Background(), 8)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.False(t, result.Reenabled)
+	require.Zero(t, repo.setSchedulableCalls)
 }
 
 func TestRateLimitService_RecoverAccountAfterSuccessfulTest_ClearErrorFailed(t *testing.T) {

@@ -41,13 +41,14 @@ const (
 
 // FailoverState 跨循环迭代共享的 failover 状态
 type FailoverState struct {
-	SwitchCount           int
-	MaxSwitches           int
-	FailedAccountIDs      map[int64]struct{}
-	SameAccountRetryCount map[int64]int
-	LastFailoverErr       *service.UpstreamFailoverError
-	ForceCacheBilling     bool
-	hasBoundSession       bool
+	SwitchCount               int
+	MaxSwitches               int
+	FailedAccountIDs          map[int64]struct{}
+	SameAccountRetryCount     map[int64]int
+	LastFailoverErr           *service.UpstreamFailoverError
+	ForceCacheBilling         bool
+	allowSingleAccountBackoff bool
+	hasBoundSession           bool
 }
 
 // NewFailoverState 创建 failover 状态
@@ -58,6 +59,17 @@ func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
 		SameAccountRetryCount: make(map[int64]int),
 		hasBoundSession:       hasBoundSession,
 	}
+}
+
+// SetSingleAccountBackoffAllowed enables the special 503 backoff that is only
+// safe for an explicitly verified single-account Antigravity group. Multi-
+// account groups must never clear FailedAccountIDs after an upstream failure,
+// otherwise the same broken account can be selected again indefinitely.
+func (s *FailoverState) SetSingleAccountBackoffAllowed(allowed bool) {
+	if s == nil {
+		return
+	}
+	s.allowSingleAccountBackoff = allowed
 }
 
 // HandleFailoverError 处理 UpstreamFailoverError，返回下一步动作。
@@ -125,14 +137,14 @@ func (s *FailoverState) HandleFailoverError(
 }
 
 // HandleSelectionExhausted 处理选号失败（所有候选账号都在排除列表中）时的退避重试决策。
-// 针对 Antigravity 单账号分组的 503 (MODEL_CAPACITY_EXHAUSTED) 场景：
+// 仅针对已确认的 Antigravity 单账号分组的 503 (MODEL_CAPACITY_EXHAUSTED) 场景：
 // 清除排除列表、等待退避后重新选号。
 //
 // 返回 FailoverContinue 时，调用方应设置 SingleAccountRetry context 并 continue。
 // 返回 FailoverExhausted 时，调用方应返回错误响应。
 // 返回 FailoverCanceled 时，调用方应直接 return。
 func (s *FailoverState) HandleSelectionExhausted(ctx context.Context) FailoverAction {
-	if s.LastFailoverErr != nil &&
+	if s.allowSingleAccountBackoff && s.LastFailoverErr != nil &&
 		s.LastFailoverErr.StatusCode == http.StatusServiceUnavailable &&
 		s.SwitchCount <= s.MaxSwitches {
 

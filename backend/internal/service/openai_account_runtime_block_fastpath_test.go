@@ -178,6 +178,22 @@ func TestOpenAIModelFailureBreaker_RequestScopedErrorDoesNotPoisonCircuit(t *tes
 	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 
+func TestOpenAIModelFailureBreaker_ModelScopedRequestErrorBlocksOnlyModel(t *testing.T) {
+	svc := &OpenAIGatewayService{}
+	account := &Account{ID: 505, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive, Schedulable: true}
+	failoverErr := &UpstreamFailoverError{StatusCode: http.StatusBadRequest, RequestScoped: true, ModelScoped: true}
+	requestContext := func(id string) context.Context {
+		return context.WithValue(context.Background(), ctxkey.ClientRequestID, id)
+	}
+
+	require.False(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("item-1"), account, "gpt-5.6-sol", failoverErr))
+	require.False(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("item-2"), account, "gpt-5.6-sol", failoverErr))
+	require.True(t, svc.RecordOpenAIAccountFailoverForModel(requestContext("item-3"), account, "gpt-5.6-sol", failoverErr))
+	require.True(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-sol"))
+	require.False(t, svc.isOpenAIAccountModelRuntimeBlocked(account, "gpt-5.6-terra"))
+	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
+}
+
 func TestOpenAIModelFailureBreaker_SuccessClearsBlockAndSelectionRecovers(t *testing.T) {
 	svc := &OpenAIGatewayService{}
 	account := &Account{ID: 503, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Status: StatusActive, Schedulable: true}

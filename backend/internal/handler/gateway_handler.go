@@ -333,10 +333,12 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	if platform == service.PlatformGemini {
 		fs := NewFailoverState(h.maxAccountSwitchesGemini, hasBoundSession)
+		singleAccountBackoffAllowed := h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID)
+		fs.SetSingleAccountBackoffAllowed(singleAccountBackoffAllowed)
 
 		// 单账号分组提前设置 SingleAccountRetry 标记，让 Service 层首次 503 就不设模型限流标记。
 		// 避免单账号分组收到 503 (MODEL_CAPACITY_EXHAUSTED) 时设 29s 限流，导致后续请求连续快速失败。
-		if h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID) {
+		if singleAccountBackoffAllowed {
 			ctx := service.WithSingleAccountRetry(c.Request.Context(), true, h.metadataBridgeEnabled())
 			c.Request = c.Request.WithContext(ctx)
 		}
@@ -591,6 +593,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	for {
 		fs := NewFailoverState(h.maxAccountSwitches, hasBoundSession)
+		if platform == service.PlatformAntigravity {
+			fs.SetSingleAccountBackoffAllowed(h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID))
+		}
 		retryWithFallback := false
 
 		for {
@@ -882,6 +887,17 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
+					if account.Platform == service.PlatformAnthropic {
+						h.gatewayService.RecordAnthropicAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						if sessionKey != "" {
+							if clearErr := h.gatewayService.ClearStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey); clearErr != nil {
+								reqLog.Warn("gateway.clear_sticky_session_after_failover_failed", zap.Int64("account_id", account.ID), zap.Error(clearErr))
+							}
+							// Allow the successful alternate account to become the new
+							// affinity target instead of preserving the failed one.
+							sessionBoundAccountID = 0
+						}
+					}
 					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
 					switch action {
 					case FailoverContinue:
@@ -913,6 +929,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				}
 				reqLog.Error("gateway.forward_failed", forwardFailedFields...)
 				return
+			}
+			if account.Platform == service.PlatformAnthropic {
+				h.gatewayService.ReportAnthropicAccountScheduleResultForModel(account.ID, reqModel, true)
 			}
 			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner && !fallbackUsed)
 			if !fallbackUsed {

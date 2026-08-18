@@ -187,6 +187,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	fs := NewFailoverState(h.maxAccountSwitches, false)
 	if groupPlatform == service.PlatformGemini {
 		fs = NewFailoverState(h.maxAccountSwitchesGemini, false)
+		fs.SetSingleAccountBackoffAllowed(h.gatewayService.IsSingleAntigravityAccountGroup(c.Request.Context(), apiKey.GroupID))
 	}
 
 	for {
@@ -290,6 +291,14 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 					h.handleCCFailoverExhausted(c, failoverErr, true)
 					return
 				}
+				if account.Platform == service.PlatformAnthropic {
+					h.gatewayService.RecordAnthropicAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+					if selectionSessionHash != "" {
+						if clearErr := h.gatewayService.ClearStickySession(c.Request.Context(), apiKey.GroupID, selectionSessionHash); clearErr != nil {
+							reqLog.Warn("gateway.cc.clear_sticky_session_after_failover_failed", zap.Int64("account_id", account.ID), zap.Error(clearErr))
+						}
+					}
+				}
 				action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
 				switch action {
 				case FailoverContinue:
@@ -308,6 +317,7 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 			)
 			return
 		}
+		h.gatewayService.ReportAnthropicAccountScheduleResultForModel(account.ID, reqModel, true)
 		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
 		cacheInflightFinished = true
 

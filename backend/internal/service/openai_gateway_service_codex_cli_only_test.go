@@ -384,6 +384,7 @@ func TestOpenAIGatewayService_Forward_ItemIDCompatibilityErrorTriggersRequestSco
 	var failoverErr *UpstreamFailoverError
 	require.ErrorAs(t, err, &failoverErr)
 	require.True(t, failoverErr.RequestScoped)
+	require.True(t, failoverErr.ModelScoped)
 	require.Equal(t, http.StatusBadRequest, failoverErr.StatusCode)
 	require.False(t, c.Writer.Written())
 }

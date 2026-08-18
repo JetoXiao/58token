@@ -1210,6 +1210,8 @@ func normalizeOpenAIOfficialCapacityFailoverError(err *UpstreamFailoverError) *U
 	normalized.ForceCacheBilling = err.ForceCacheBilling
 	normalized.RetryableOnSameAccount = err.RetryableOnSameAccount
 	normalized.MaxSameAccountRetries = err.MaxSameAccountRetries
+	normalized.RequestScoped = err.RequestScoped
+	normalized.ModelScoped = err.ModelScoped
 	return normalized
 }
 
@@ -1281,8 +1283,9 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 
 // isOpenAIItemIDCompatibilityError detects Responses API continuation items
 // that are valid for one upstream implementation but rejected by another.
-// This is request-scoped: the current request should switch accounts, while the
-// account must remain available for other requests and models.
+// The current request must switch accounts. Repeated occurrences are also
+// model-scoped because they identify an upstream implementation that cannot
+// continue this model's response-item format; other models remain available.
 func isOpenAIItemIDCompatibilityError(upstreamStatusCode int, upstreamMsg string, upstreamBody []byte) bool {
 	if upstreamStatusCode != http.StatusBadRequest {
 		return false
@@ -3252,11 +3255,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				})
 
 				s.handleFailoverSideEffects(ctx, resp, account)
+				itemIDCompatibility := isOpenAIItemIDCompatibilityError(resp.StatusCode, upstreamMsg, respBody)
 				return nil, normalizeOpenAIOfficialCapacityFailoverError(&UpstreamFailoverError{
 					StatusCode:             resp.StatusCode,
 					ResponseBody:           respBody,
 					RetryableOnSameAccount: account.IsPoolMode() && (isPoolModeRetryableStatus(resp.StatusCode) || isOpenAITransientProcessingError(resp.StatusCode, upstreamMsg, respBody)),
-					RequestScoped:          isOpenAIItemIDCompatibilityError(resp.StatusCode, upstreamMsg, respBody),
+					RequestScoped:          itemIDCompatibility,
+					ModelScoped:            itemIDCompatibility,
 				})
 			}
 			return s.handleErrorResponse(ctx, resp, c, account, body)

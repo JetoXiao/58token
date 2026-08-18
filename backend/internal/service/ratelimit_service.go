@@ -42,11 +42,16 @@ type AccountRuntimeBlocker interface {
 type SuccessfulTestRecoveryResult struct {
 	ClearedError     bool
 	ClearedRateLimit bool
+	Reenabled        bool
 }
 
 // AccountRecoveryOptions 控制账号恢复时的附加行为。
 type AccountRecoveryOptions struct {
 	InvalidateToken bool
+	// ReenableSchedulable allows an explicitly configured successful probe to
+	// reopen an account that was disabled together with an error status. Manual
+	// schedulable=false on an otherwise active account is never overridden.
+	ReenableSchedulable bool
 }
 
 type geminiUsageCacheEntry struct {
@@ -1476,6 +1481,7 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 	}
 
 	result := &SuccessfulTestRecoveryResult{}
+	shouldReenable := account.Status == StatusError && options.ReenableSchedulable && !account.Schedulable
 	if account.Status == StatusError {
 		if err := s.accountRepo.ClearError(ctx, accountID); err != nil {
 			return nil, err
@@ -1494,6 +1500,13 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 		}
 		result.ClearedRateLimit = true
 	}
+	if shouldReenable {
+		if err := s.accountRepo.SetSchedulable(ctx, accountID, true); err != nil {
+			return nil, err
+		}
+		result.Reenabled = true
+		slog.Info("account_probe_reenabled", "account_id", accountID)
+	}
 	if result.ClearedError || result.ClearedRateLimit {
 		s.ResetOpenAI403Counter(ctx, accountID)
 		if result.ClearedError && !result.ClearedRateLimit {
@@ -1507,7 +1520,7 @@ func (s *RateLimitService) RecoverAccountState(ctx context.Context, accountID in
 // RecoverAccountAfterSuccessfulTest 将一次成功测试视为正常请求，
 // 按需恢复 error / rate-limit / overload / temp-unsched / model-rate-limit 等运行时状态。
 func (s *RateLimitService) RecoverAccountAfterSuccessfulTest(ctx context.Context, accountID int64) (*SuccessfulTestRecoveryResult, error) {
-	return s.RecoverAccountState(ctx, accountID, AccountRecoveryOptions{})
+	return s.RecoverAccountState(ctx, accountID, AccountRecoveryOptions{ReenableSchedulable: true})
 }
 
 func (s *RateLimitService) ClearTempUnschedulable(ctx context.Context, accountID int64) error {

@@ -676,6 +676,7 @@ func TestHandleSelectionExhausted(t *testing.T) {
 
 	t.Run("503且未耗尽_等待后返回Continue并清除失败列表", func(t *testing.T) {
 		fs := NewFailoverState(3, false)
+		fs.SetSingleAccountBackoffAllowed(true)
 		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
 		fs.FailedAccountIDs[100] = struct{}{}
 		fs.SwitchCount = 1
@@ -705,6 +706,7 @@ func TestHandleSelectionExhausted(t *testing.T) {
 
 	t.Run("503但context已取消_返回Canceled", func(t *testing.T) {
 		fs := NewFailoverState(3, false)
+		fs.SetSingleAccountBackoffAllowed(true)
 		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -720,10 +722,22 @@ func TestHandleSelectionExhausted(t *testing.T) {
 
 	t.Run("503且SwitchCount等于MaxSwitches_仍可重试", func(t *testing.T) {
 		fs := NewFailoverState(2, false)
+		fs.SetSingleAccountBackoffAllowed(true)
 		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
 		fs.SwitchCount = 2 // == MaxSwitches，条件是 <=，仍可重试
 
 		action := fs.HandleSelectionExhausted(context.Background())
 		require.Equal(t, FailoverContinue, action)
+	})
+
+	t.Run("多账号503不清除失败列表", func(t *testing.T) {
+		fs := NewFailoverState(3, false)
+		fs.LastFailoverErr = newTestFailoverErr(503, false, false)
+		fs.FailedAccountIDs[100] = struct{}{}
+
+		action := fs.HandleSelectionExhausted(context.Background())
+
+		require.Equal(t, FailoverExhausted, action)
+		require.Contains(t, fs.FailedAccountIDs, int64(100))
 	})
 }

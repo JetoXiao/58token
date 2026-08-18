@@ -93,7 +93,7 @@ func (s *OpenAIGatewayService) RecordOpenAIAccountFailover(account *Account, fai
 // request IDs are counted so a single client retry loop cannot quarantine a
 // model/channel pair by itself.
 func (s *OpenAIGatewayService) RecordOpenAIAccountFailoverForModel(ctx context.Context, account *Account, requestedModel string, failoverErr *UpstreamFailoverError) bool {
-	if s == nil || failoverErr == nil || failoverErr.RequestScoped {
+	if s == nil || failoverErr == nil || (failoverErr.RequestScoped && !failoverErr.ModelScoped) {
 		return false
 	}
 	if normalizeOpenAIAccountRuntimeModel(requestedModel) == "" {
