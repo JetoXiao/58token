@@ -371,6 +371,13 @@ type OpenAIGatewayService struct {
 	codexSnapshotThrottle               *accountWriteThrottle
 	openaiCompatSessionResponses        sync.Map
 	openaiCompatAnthropicDigestSessions sync.Map
+	runtimeModelProbe                   *RuntimeModelProbeService
+}
+
+func (s *OpenAIGatewayService) SetRuntimeModelProbeService(probe *RuntimeModelProbeService) {
+	if s != nil {
+		s.runtimeModelProbe = probe
+	}
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService

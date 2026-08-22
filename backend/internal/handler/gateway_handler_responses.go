@@ -259,9 +259,21 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			if errors.As(err, &failoverErr) {
 				// Can't failover if streaming content already sent
 				if c.Writer.Size() != writerSizeBeforeForward {
+					h.gatewayService.RecordAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+					if account.Platform == service.PlatformAnthropic {
+						// 流已经开始后不能切换账号，但仍要隔离失败的
+						// Anthropic 账号+模型并清理粘性绑定。
+						h.gatewayService.RecordAnthropicAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						if sessionHash != "" {
+							if clearErr := h.gatewayService.ClearStickySession(c.Request.Context(), apiKey.GroupID, sessionHash); clearErr != nil {
+								reqLog.Warn("gateway.responses.clear_sticky_session_after_stream_failover_failed", zap.Int64("account_id", account.ID), zap.Error(clearErr))
+							}
+						}
+					}
 					h.handleResponsesFailoverExhausted(c, failoverErr, true)
 					return
 				}
+				h.gatewayService.RecordAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
 				if account.Platform == service.PlatformAnthropic {
 					h.gatewayService.RecordAnthropicAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
 					if sessionHash != "" {
@@ -288,7 +300,11 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			)
 			return
 		}
-		h.gatewayService.ReportAnthropicAccountScheduleResultForModel(account.ID, reqModel, true)
+		if account.Platform == service.PlatformAnthropic {
+			h.gatewayService.ReportAnthropicAccountScheduleResultForModel(account.ID, reqModel, true)
+		} else {
+			h.gatewayService.ReportAccountModelScheduleResult(account.ID, account.Platform, reqModel, true)
+		}
 		finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner)
 		cacheInflightFinished = true
 

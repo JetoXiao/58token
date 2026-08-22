@@ -583,6 +583,14 @@ type GatewayService struct {
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	anthropicModelRuntime anthropicAccountModelRuntimeState
+	accountModelRuntime   genericAccountModelRuntimeState
+	runtimeModelProbe     *RuntimeModelProbeService
+}
+
+func (s *GatewayService) SetRuntimeModelProbeService(probe *RuntimeModelProbeService) {
+	if s != nil {
+		s.runtimeModelProbe = probe
+	}
 }
 
 // NewGatewayService creates a new GatewayService
@@ -2381,7 +2389,7 @@ func (s *GatewayService) isAccountSchedulableForModelSelection(ctx context.Conte
 	// Anthropic failures are isolated by account + requested model. This keeps
 	// a broken Claude channel out of the failing model while leaving its other
 	// models eligible for scheduling.
-	return !s.isAnthropicAccountModelRuntimeBlocked(account, requestedModel)
+	return !s.isAnthropicAccountModelRuntimeBlocked(account, requestedModel) && !s.isAccountModelRuntimeBlocked(account, requestedModel)
 }
 
 // isAccountInGroup checks if the account belongs to the specified group.

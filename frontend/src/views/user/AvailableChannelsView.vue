@@ -225,6 +225,7 @@ import Icon from '@/components/icons/Icon.vue'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { BRAND_LOGO_URL } from '@/constants/brand'
+import { normalizeMarketplaceModelName } from '@/utils/marketplaceModel'
 import type { PaymentConfig } from '@/types/payment'
 
 type CurrencyMode = 'usd' | 'cny'
@@ -305,7 +306,7 @@ const FALLBACK_PRICING: PricingResponse = { success: true, pricing_version: 'fal
 const DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS: Record<string, number> = {}
 const MARKETPLACE_MODEL_DESCRIPTION_KEYS: Record<string, string> = {
   'claude-fable-5': 'claudeFable5',
-  'claude-opus-4.8': 'claudeOpus48'
+  'claude-opus-4-8': 'claudeOpus48'
 }
 const MARKETPLACE_CAPABILITY_KEYS: Record<string, string> = {
   Reasoning: 'reasoning',
@@ -462,7 +463,8 @@ const viewItems = computed(() => [
 ])
 
 const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.value.filter(isVisibleMarketplaceItem).flatMap((definition) => {
-  const pricingAliases = modelPricingAliases(definition.model_name, definition.pricing_aliases)
+  const modelName = normalizeMarketplaceModelName(definition.model_name)
+  const pricingAliases = modelPricingAliases(modelName, definition.pricing_aliases)
   const pricingModel = rawPricing.value.data?.find((item) => pricingAliases.includes(item.model_name.toLowerCase()))
   const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
   const description = localizedModelDescription(definition, pricingModel)
@@ -472,7 +474,7 @@ const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.va
   return definition.groups.map((group) => {
     const groupMultiplier = groupMultiplierFor(group)
     return {
-      modelName: definition.model_name,
+      modelName,
       pricingAliases,
       vendorName: definition.vendor_name,
       group,
@@ -589,7 +591,7 @@ function parseCapabilities(tags: string[], endpoints: string[]): string[] {
 }
 
 function localizedModelDescription(definition: MarketplaceItemResponse, pricingModel?: PricingModel): string {
-  const modelName = definition.model_name.toLowerCase()
+  const modelName = normalizeMarketplaceModelName(definition.model_name).toLowerCase()
   const exactKey = MARKETPLACE_MODEL_DESCRIPTION_KEYS[modelName]
   if (exactKey && te(`availableChannels.modelDescriptions.${exactKey}`)) {
     return t(`availableChannels.modelDescriptions.${exactKey}`)

@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	// Compatibility defaults; quiet models use a wider runtime policy.
 	anthropicAccountModelFailureBreakerThreshold = 3
 	anthropicAccountModelFailureBreakerWindow    = 2 * time.Minute
 	anthropicAccountModelFailureBreakerCooldown  = 2 * time.Minute
@@ -73,6 +74,7 @@ func (s *GatewayService) RecordAnthropicAccountFailoverForModel(ctx context.Cont
 	}
 
 	now := time.Now()
+	policy := runtimeBreakerPolicyFor(PlatformAnthropic, model)
 	key := anthropicAccountModelRuntimeKey{accountID: account.ID, model: model}
 	value, _ := s.anthropicModelRuntime.failureState.LoadOrStore(key, &anthropicAccountModelFailureState{})
 	state, ok := value.(*anthropicAccountModelFailureState)
@@ -83,10 +85,10 @@ func (s *GatewayService) RecordAnthropicAccountFailoverForModel(ctx context.Cont
 
 	state.mu.Lock()
 	if state.requestTimes == nil {
-		state.requestTimes = make(map[string]time.Time, anthropicAccountModelFailureBreakerThreshold)
+		state.requestTimes = make(map[string]time.Time, policy.Threshold)
 	}
 	for requestKey, failedAt := range state.requestTimes {
-		if now.Sub(failedAt) > anthropicAccountModelFailureBreakerWindow {
+		if now.Sub(failedAt) > policy.Window {
 			delete(state.requestTimes, requestKey)
 		}
 	}
@@ -94,13 +96,16 @@ func (s *GatewayService) RecordAnthropicAccountFailoverForModel(ctx context.Cont
 	count := len(state.requestTimes)
 	state.mu.Unlock()
 
-	if count < anthropicAccountModelFailureBreakerThreshold {
+	if count < policy.Threshold {
 		return false
 	}
 
-	until := now.Add(anthropicAccountModelFailureBreakerCooldown)
+	until := now.Add(policy.Cooldown)
 	s.anthropicModelRuntime.failureState.Delete(key)
 	s.blockAnthropicAccountModelScheduling(account.ID, model, until)
+	if s.runtimeModelProbe != nil {
+		s.runtimeModelProbe.Schedule(account.ID, model, policy.Cooldown)
+	}
 	slog.Warn("anthropic_account_model_failures_blocked",
 		"account_id", account.ID,
 		"model", model,
@@ -155,8 +160,9 @@ func (s *GatewayService) primeAnthropicAccountModelHalfOpen(key anthropicAccount
 	if s == nil {
 		return
 	}
-	state := &anthropicAccountModelFailureState{requestTimes: make(map[string]time.Time, anthropicAccountModelFailureBreakerThreshold)}
-	for i := 1; i < anthropicAccountModelFailureBreakerThreshold; i++ {
+	policy := runtimeBreakerPolicyFor(PlatformAnthropic, key.model)
+	state := &anthropicAccountModelFailureState{requestTimes: make(map[string]time.Time, policy.Threshold)}
+	for i := 1; i < policy.Threshold; i++ {
 		state.requestTimes[fmt.Sprintf("half-open:%d", i)] = now
 	}
 	s.anthropicModelRuntime.failureState.Store(key, state)

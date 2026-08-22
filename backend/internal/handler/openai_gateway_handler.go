@@ -355,11 +355,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 		if channelMapping.Mapped {
 			forwardBody = h.gatewayService.ReplaceModelInBody(body, channelMapping.MappedModel)
 		}
-		writerSizeBeforeForward := c.Writer.Size()
 		var cacheCaptureFinalize func() (*service.ResponseCacheEntry, string)
 		if shouldCaptureResponseForCache(cacheDecision) {
 			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 		}
+		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -394,6 +394,11 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
 					if c.Writer.Size() != writerSizeBeforeForward {
+						if !failoverErr.RequestScoped {
+							h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
+						}
+						h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}
@@ -800,6 +805,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		if shouldCaptureResponseForCache(cacheDecision) {
 			_, cacheCaptureFinalize = captureResponseForCache(c, h.responseCache.MaxCaptureBytes())
 		}
+		writerSizeBeforeForward := c.Writer.Size()
 		result, err := func() (*service.OpenAIForwardResult, error) {
 			defer func() {
 				if accountReleaseFunc != nil {
@@ -834,6 +840,18 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					// Responses/Anthropic-compatible OpenAI gateway path: once SSE
+					// bytes were sent we cannot splice a second account, but we must
+					// still trip the account+model breaker and clear affinity.
+					if c.Writer.Size() != writerSizeBeforeForward {
+						if !failoverErr.RequestScoped {
+							h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, currentRoutingModel, false, nil)
+						}
+						h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, currentRoutingModel, failoverErr)
+						h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
+						h.handleAnthropicFailoverExhausted(c, failoverErr, true)
+						return
+					}
 					if !failoverErr.RequestScoped {
 						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, currentRoutingModel, false, nil)
 					}

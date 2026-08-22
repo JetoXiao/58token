@@ -138,6 +138,11 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 	sessionHash := h.gatewayService.GenerateExplicitSessionHash(c, body)
 
 	maxAccountSwitches := h.maxAccountSwitches
+	// Image2 generation is explicitly allowed to wait for channel recovery.
+	// Try every compatible account in this group before returning an error.
+	if strings.EqualFold(strings.TrimSpace(parsed.Model), "gpt-image-2") {
+		maxAccountSwitches = 1 << 30
+	}
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	sameAccountRetryCount := make(map[int64]int)
@@ -237,6 +242,20 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 				}
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					// Image2 is user-tolerant: keep switching through every
+					// compatible channel until one succeeds.
+					if strings.EqualFold(strings.TrimSpace(parsed.Model), "gpt-image-2") {
+						if !failoverErr.RequestScoped {
+							h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, parsed.Model, false, nil)
+						}
+						h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, parsed.Model, failoverErr)
+						h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
+						failedAccountIDs[account.ID] = struct{}{}
+						lastFailoverErr = failoverErr
+						switchCount++
+						reqLog.Warn("openai.images.image2_failover_switching", zap.Int64("account_id", account.ID), zap.Int("switch_count", switchCount), zap.Error(failoverErr))
+						continue
+					}
 					if !failoverErr.RequestScoped {
 						h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, parsed.Model, false, nil)
 					}

@@ -230,7 +230,14 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 			} else {
 				var failoverErr *service.UpstreamFailoverError
 				if errors.As(err, &failoverErr) {
+					// Do not splice a second stream after bytes were sent, but still
+					// quarantine the failed account/model for subsequent requests.
 					if c.Writer.Size() != writerSizeBeforeForward {
+						if !failoverErr.RequestScoped {
+							h.gatewayService.ReportOpenAIAccountScheduleResultForModel(account.ID, reqModel, false, nil)
+						}
+						h.gatewayService.RecordOpenAIAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						h.gatewayService.ClearOpenAIStickySession(c.Request.Context(), apiKey.GroupID, sessionHash)
 						h.handleFailoverExhausted(c, failoverErr, true)
 						return
 					}

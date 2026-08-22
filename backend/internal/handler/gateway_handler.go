@@ -484,9 +484,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
 					if c.Writer.Size() != writerSizeBeforeForward {
+						// 当前请求不能拼接切换，但必须隔离失败账号，避免后续
+						// 请求继续命中同一条异常渠道。
+						h.gatewayService.RecordAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						h.gatewayService.ClearStickySession(c.Request.Context(), apiKey.GroupID, sessionKey)
 						h.handleFailoverExhausted(c, failoverErr, service.PlatformGemini, true)
 						return
 					}
+					h.gatewayService.RecordAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
 					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, failoverErr)
 					switch action {
 					case FailoverContinue:
@@ -884,6 +889,19 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
 					if c.Writer.Size() != writerSizeBeforeForward {
+						// 即使当前请求不能拼接切换，也必须把失败记录到
+						// 账号+模型熔断器，并清理粘性绑定，避免后续请求继续
+						// 命中同一个已经返回 502/503 的 Anthropic 渠道。
+						h.gatewayService.RecordAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+						if account.Platform == service.PlatformAnthropic {
+							h.gatewayService.RecordAnthropicAccountFailoverForModel(c.Request.Context(), account, reqModel, failoverErr)
+							if sessionKey != "" {
+								if clearErr := h.gatewayService.ClearStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey); clearErr != nil {
+									reqLog.Warn("gateway.clear_sticky_session_after_stream_failover_failed", zap.Int64("account_id", account.ID), zap.Error(clearErr))
+								}
+								sessionBoundAccountID = 0
+							}
+						}
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
@@ -932,6 +950,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			}
 			if account.Platform == service.PlatformAnthropic {
 				h.gatewayService.ReportAnthropicAccountScheduleResultForModel(account.ID, reqModel, true)
+			} else {
+				h.gatewayService.ReportAccountModelScheduleResult(account.ID, account.Platform, reqModel, true)
 			}
 			finishResponseCacheAfterForward(c, h.responseCache, cacheDecision, cacheEntry, cacheCaptureReason, cacheInflightOwner && !fallbackUsed)
 			if !fallbackUsed {

@@ -149,6 +149,7 @@ func (s *OpenAIGatewayService) recordOpenAIAccountModelFailure(ctx context.Conte
 	}
 
 	now := time.Now()
+	policy := runtimeBreakerPolicyFor(PlatformOpenAI, model)
 	key := openAIAccountModelRuntimeKey{accountID: account.ID, model: model}
 	value, _ := s.openaiAccountModelFailureStates.LoadOrStore(key, &openAIAccountModelFailureState{})
 	state, ok := value.(*openAIAccountModelFailureState)
@@ -160,26 +161,29 @@ func (s *OpenAIGatewayService) recordOpenAIAccountModelFailure(ctx context.Conte
 	requestKey := openAIModelFailureRequestKey(ctx, now)
 	state.mu.Lock()
 	if state.requestTimes == nil {
-		state.requestTimes = make(map[string]time.Time, openAIModelFailureBreakerThreshold)
+		state.requestTimes = make(map[string]time.Time, policy.Threshold)
 	}
 	for existingKey, failedAt := range state.requestTimes {
-		if now.Sub(failedAt) > openAIModelFailureBreakerWindow {
+		if now.Sub(failedAt) > policy.Window {
 			delete(state.requestTimes, existingKey)
 		}
 	}
 	state.requestTimes[requestKey] = now
 	state.lastStatusCode = statusCode
 	count := len(state.requestTimes)
-	shouldBlock := count >= openAIModelFailureBreakerThreshold
+	shouldBlock := count >= policy.Threshold
 	state.mu.Unlock()
 
 	if !shouldBlock {
 		return false
 	}
 
-	until := now.Add(openAIModelFailureBreakerCooldown)
+	until := now.Add(policy.Cooldown)
 	s.openaiAccountModelFailureStates.Delete(key)
 	s.blockOpenAIAccountModelScheduling(account.ID, model, until)
+	if s.runtimeModelProbe != nil {
+		s.runtimeModelProbe.Schedule(account.ID, model, policy.Cooldown)
+	}
 	slog.Warn("openai_account_model_failures_blocked",
 		"account_id", account.ID,
 		"model", model,
@@ -229,8 +233,9 @@ func (s *OpenAIGatewayService) primeOpenAIAccountModelHalfOpen(key openAIAccount
 	if s == nil {
 		return
 	}
-	state := &openAIAccountModelFailureState{requestTimes: make(map[string]time.Time, openAIModelFailureBreakerThreshold)}
-	for i := 1; i < openAIModelFailureBreakerThreshold; i++ {
+	policy := runtimeBreakerPolicyFor(PlatformOpenAI, key.model)
+	state := &openAIAccountModelFailureState{requestTimes: make(map[string]time.Time, policy.Threshold)}
+	for i := 1; i < policy.Threshold; i++ {
 		state.requestTimes[fmt.Sprintf("half-open:%d", i)] = now
 	}
 	s.openaiAccountModelFailureStates.Store(key, state)
