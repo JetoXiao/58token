@@ -5,7 +5,7 @@
     >
       <router-link to="/home" class="flex min-w-0 items-center gap-3">
         <span class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-gray-200/80 bg-white/80 dark:border-white/10 dark:bg-white/10">
-          <img :src="logo || BRAND_LOGO_URL" alt="" class="h-full w-full object-contain" />
+          <img :src="siteLogo" alt="" class="h-full w-full object-contain" />
         </span>
         <span class="hidden min-w-0 sm:block">
           <span class="block truncate text-sm font-semibold tracking-tight text-gray-950 dark:text-white">{{ siteName }}</span>
@@ -132,6 +132,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useAppStore } from '@/stores'
 import { BRAND_LOGO_URL } from '@/constants/brand'
 import { normalizeMarketingNavItems } from '@/utils/marketingNav'
 
@@ -153,9 +154,11 @@ const props = defineProps<{
   visibleItems?: string[]
 }>()
 
+const appStore = useAppStore()
 const visibleNavItems = computed(() =>
   normalizeMarketingNavItems(props.visibleItems),
 )
+const siteLogo = computed(() => props.logo || appStore.siteLogo || BRAND_LOGO_URL)
 const showModels = computed(() => visibleNavItems.value.includes('models'))
 const showDocs = computed(() => visibleNavItems.value.includes('docs'))
 const showPartner = computed(() => visibleNavItems.value.includes('partner'))

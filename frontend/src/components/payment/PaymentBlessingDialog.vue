@@ -24,7 +24,7 @@
           <div class="relative px-6 pb-7 pt-9 text-center sm:px-10 sm:pb-9 sm:pt-10">
             <div class="relative mx-auto flex h-16 w-16 items-center justify-center">
               <div class="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-600">
-                <img :src="BRAND_LOGO_URL" alt="" class="h-full w-full object-contain" />
+                <img :src="siteLogo" alt="" class="h-full w-full object-contain" />
               </div>
               <span class="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-sm dark:border-dark-900">
                 <Icon name="check" size="xs" :stroke-width="2.8" />
@@ -68,6 +68,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import { useAppStore } from '@/stores'
 import { BRAND_LOGO_URL } from '@/constants/brand'
 import { randomPaymentBlessing } from './paymentBlessings'
 
@@ -84,12 +85,14 @@ const emit = defineEmits<{
 
 const i18n = useI18n()
 const { t } = i18n
+const appStore = useAppStore()
 const blessing = ref('')
 const instanceId = Math.random().toString(36).slice(2, 9)
 const titleId = `payment-blessing-title-${instanceId}`
 const descriptionId = `payment-blessing-description-${instanceId}`
 let previousBodyOverflow = ''
 let isScrollLocked = false
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 
 const currentLocale = computed(() => {
   const locale = i18n.locale as unknown

@@ -22,7 +22,7 @@ describe('UseKeyModal', () => {
       props: {
         show: true,
         apiKey: 'sk-claude',
-        baseUrl: 'https://useaifor.me',
+        baseUrl: 'https://58token.vip',
         platform: 'anthropic'
       },
       global: {
@@ -56,7 +56,7 @@ describe('UseKeyModal', () => {
       },
       env: {
         ANTHROPIC_AUTH_TOKEN: 'sk-claude',
-        ANTHROPIC_BASE_URL: 'https://useaifor.me',
+        ANTHROPIC_BASE_URL: 'https://58token.vip',
         ANTHROPIC_DEFAULT_HAIKU_MODEL: 'claude-opus-4-8',
         ANTHROPIC_DEFAULT_OPUS_MODEL: 'claude-opus-4-8',
         ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-opus-4-8',
@@ -74,7 +74,7 @@ describe('UseKeyModal', () => {
       props: {
         show: true,
         apiKey: 'sk-codex',
-        baseUrl: 'https://useaifor.me',
+        baseUrl: 'https://58token.vip',
         platform: 'openai'
       },
       global: {
@@ -97,7 +97,7 @@ describe('UseKeyModal', () => {
     expect(configToml).toContain('model = "gpt-5.5"')
     expect(configToml).toContain('review_model = "gpt-5.4"')
     expect(configToml).toContain('model_reasoning_effort = "medium"')
-    expect(configToml).toContain('base_url = "https://useaifor.me"')
+    expect(configToml).toContain('base_url = "https://58token.vip"')
     expect(configToml).toContain('wire_api = "responses"')
     expect(configToml).toContain('requires_openai_auth = true')
     expect(configToml).not.toContain('responses_websockets_v2')
@@ -111,7 +111,7 @@ describe('UseKeyModal', () => {
       props: {
         show: true,
         apiKey: 'sk-codex',
-        baseUrl: 'https://useaifor.me',
+        baseUrl: 'https://58token.vip',
         platform: 'openai'
       },
       global: {
@@ -261,7 +261,7 @@ describe('UseKeyModal', () => {
       props: {
         show: true,
         apiKey: 'sk-claude',
-        baseUrl: 'https://useaifor.me',
+        baseUrl: 'https://58token.vip',
         platform: 'anthropic'
       },
       global: {
@@ -290,7 +290,7 @@ describe('UseKeyModal', () => {
     expect(config.small_model).toBe('anthropic/claude-opus-4-8')
     expect(config.provider.anthropic.npm).toBe('@ai-sdk/anthropic')
     expect(config.provider.anthropic.options).toMatchObject({
-      baseURL: 'https://useaifor.me/v1',
+      baseURL: 'https://58token.vip/v1',
       apiKey: 'sk-claude',
       timeout: 3000000,
       headerTimeout: 3000000,

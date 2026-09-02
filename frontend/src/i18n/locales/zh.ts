@@ -1641,7 +1641,7 @@ export default {
         title: 'Codex CLI',
         badge: 'OpenAI 兼容',
         description: '用于 Codex CLI 的 Responses 自定义 provider 配置。这里的 provider Base URL 应该填写不带 /v1 的网关域名。',
-        baseUrlNote: '当 wire_api 为 "responses" 时，base_url 保持 https://useaifor.me，不要追加 /v1。API Key 放到 ~/.codex/auth.json 的 OPENAI_API_KEY 字段。',
+        baseUrlNote: '当 wire_api 为 "responses" 时，base_url 保持 https://58token.vip，不要追加 /v1。API Key 放到 ~/.codex/auth.json 的 OPENAI_API_KEY 字段。',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
           { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
@@ -1658,7 +1658,7 @@ export default {
         title: 'Claude Code',
         badge: 'Anthropic 兼容',
         description: '用于 Claude Code 或 Anthropic SDK 风格的客户端。Base URL 应该填写不带 /v1 的网关域名。',
-        baseUrlNote: 'Claude Code 会自己请求 Anthropic Messages API 路径，所以 ANTHROPIC_BASE_URL 应该是 https://useaifor.me，不是 https://useaifor.me/v1。',
+        baseUrlNote: 'Claude Code 会自己请求 Anthropic Messages API 路径，所以 ANTHROPIC_BASE_URL 应该是 https://58token.vip，不是 https://58token.vip/v1。',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.claude\\settings.json', command: 'notepad %USERPROFILE%\\.claude\\settings.json' },
           { system: 'macOS', path: '~/.claude/settings.json', command: 'open -a TextEdit ~/.claude/settings.json' },
@@ -1692,7 +1692,7 @@ export default {
         title: 'Node.js 环境安装教程',
         badge: 'OpenAI SDK',
         description: '适合后端服务、定时任务和本地脚本。Node.js 使用 OpenAI SDK 时 Base URL 必须带 /v1。',
-        baseUrlNote: 'Node.js OpenAI SDK 会在 baseURL 后继续拼接 /chat/completions，所以请复制 https://useaifor.me/v1。',
+        baseUrlNote: 'Node.js OpenAI SDK 会在 baseURL 后继续拼接 /chat/completions，所以请复制 https://58token.vip/v1。',
         osRows: [
           { system: 'Windows', path: 'PowerShell / Node.js LTS', command: 'winget install OpenJS.NodeJS.LTS' },
           { system: 'macOS', path: 'Homebrew / Node.js LTS', command: 'brew install node' },
@@ -1727,12 +1727,12 @@ export default {
       openClaw: {
         title: 'OpenClaw 配置教程',
         badge: 'OpenAI 兼容',
-        description: 'OpenClaw 按 OpenAI 兼容客户端处理，Base URL 使用 https://useaifor.me/v1。',
+        description: 'OpenClaw 按 OpenAI 兼容客户端处理，Base URL 使用 https://58token.vip/v1。',
         baseUrlNote: '如果 OpenClaw 的最终请求地址已经包含 /v1/chat/completions，就不要在界面里重复追加 /v1。',
         osRows: [
-          { system: 'Windows', path: '应用设置或 .env', command: 'setx OPENAI_BASE_URL https://useaifor.me/v1' },
-          { system: 'macOS', path: '~/.zshrc 或应用设置', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' },
-          { system: 'Linux', path: '~/.bashrc 或应用设置', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' }
+          { system: 'Windows', path: '应用设置或 .env', command: 'setx OPENAI_BASE_URL https://58token.vip/v1' },
+          { system: 'macOS', path: '~/.zshrc 或应用设置', command: 'export OPENAI_BASE_URL=https://58token.vip/v1' },
+          { system: 'Linux', path: '~/.bashrc 或应用设置', command: 'export OPENAI_BASE_URL=https://58token.vip/v1' }
         ],
         blocks: {
           envTitle: '环境变量方式',
@@ -1745,7 +1745,7 @@ export default {
         title: 'Hermes 配置教程',
         badge: 'OpenAI / Claude',
         description: 'Hermes 根据 provider 类型选择地址：OpenAI 兼容模式使用 /v1，Claude/Anthropic 兼容模式使用网关域名。',
-        baseUrlNote: '如果 Hermes 只提供一个 OpenAI Compatible 入口，就使用 https://useaifor.me/v1；如果提供 Anthropic Compatible 入口，就使用 https://useaifor.me。',
+        baseUrlNote: '如果 Hermes 只提供一个 OpenAI Compatible 入口，就使用 https://58token.vip/v1；如果提供 Anthropic Compatible 入口，就使用 https://58token.vip。',
         osRows: [
           { system: 'Windows', path: 'Provider 配置页', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
           { system: 'macOS', path: 'Provider 配置页', command: '选择 OpenAI Compatible 或 Anthropic Compatible' },
@@ -1762,7 +1762,7 @@ export default {
         title: 'API 脚本接入教程',
         badge: 'curl / CI',
         description: '脚本、CI、自动化任务通常直接请求完整接口 URL，因此示例里会把 /v1 和具体端点都写出来。',
-        baseUrlNote: '直接 curl 时不要只填 Base URL，要使用完整 URL，例如 https://useaifor.me/v1/chat/completions 或 https://useaifor.me/v1/messages。',
+        baseUrlNote: '直接 curl 时不要只填 Base URL，要使用完整 URL，例如 https://58token.vip/v1/chat/completions 或 https://58token.vip/v1/messages。',
         osRows: [
           { system: 'Windows', path: 'PowerShell', command: '$env:USE_AIFORME_API_KEY="sk-your-api-key"' },
           { system: 'macOS', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' },
@@ -1863,11 +1863,11 @@ export default {
       items: [
         {
           title: '什么时候需要加 /v1？',
-          description: '看客户端最终请求路径：如果客户端自己请求 /v1/chat/completions 或 /v1/messages，配置时只填 https://useaifor.me；如果客户端只请求 /chat/completions 或 /messages，Base URL 需要写成 https://useaifor.me/v1。'
+          description: '看客户端最终请求路径：如果客户端自己请求 /v1/chat/completions 或 /v1/messages，配置时只填 https://58token.vip；如果客户端只请求 /chat/completions 或 /messages，Base URL 需要写成 https://58token.vip/v1。'
         },
         {
           title: 'Codex、Claude Code、Gemini CLI 分别该填哪个 Base URL？',
-          description: 'Codex Desktop 填 https://useaifor.me；Codex CLI 的 Responses provider 填 https://useaifor.me；Claude Code 的 ANTHROPIC_BASE_URL 填 https://useaifor.me；Gemini CLI 原生模式填 https://useaifor.me，OpenAI 兼容包装模式填 https://useaifor.me/v1。'
+          description: 'Codex Desktop 填 https://58token.vip；Codex CLI 的 Responses provider 填 https://58token.vip；Claude Code 的 ANTHROPIC_BASE_URL 填 https://58token.vip；Gemini CLI 原生模式填 https://58token.vip，OpenAI 兼容包装模式填 https://58token.vip/v1。'
         },
         {
           title: '401 或 API 密钥无效',

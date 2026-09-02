@@ -15,7 +15,7 @@
       title="返回首页"
     >
       <span class="sidebar-logo" aria-hidden="true">
-        <img :src="BRAND_LOGO_URL" alt="" class="h-full w-full object-cover" />
+        <img :src="siteLogo" alt="" class="h-full w-full object-contain" />
       </span>
       <div class="sidebar-brand" :class="{ 'sidebar-brand-collapsed': sidebarCollapsed }" :aria-hidden="sidebarCollapsed ? 'true' : 'false'">
         <span class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white">
@@ -297,6 +297,7 @@ const expandedGroups = ref<Set<string>>(new Set())
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '让AI为我所用')
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 
 // SVG Icon Components
 const DashboardIcon = {

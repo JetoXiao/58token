@@ -430,7 +430,7 @@ const appStore = useAppStore()
 // ==================== Site Settings (same as HomeView) ====================
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 

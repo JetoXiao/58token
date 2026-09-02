@@ -47,7 +47,7 @@
               </label>
               <label class="block">
                 <span class="input-label">Base URL</span>
-                <input v-model="draft.base_url" class="input mt-1" placeholder="https://useaifor.me" />
+                <input v-model="draft.base_url" class="input mt-1" placeholder="https://58token.vip" />
               </label>
               <label class="block lg:col-span-2">
                 <span class="input-label">{{ localText('描述', 'Description') }}</span>

@@ -413,7 +413,7 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)
@@ -429,10 +429,10 @@ const tocColumnRef = ref<HTMLElement | null>(null)
 const tocPanelRef = ref<HTMLElement | null>(null)
 const tocPanelStyle = ref<Record<string, string>>({})
 const normalizeOrigin = (value: string) => value.replace(/\/+$/, '')
-const origin = computed(() => (typeof window === 'undefined' ? 'https://useaifor.me' : window.location.origin))
+const origin = computed(() => (typeof window === 'undefined' ? 'https://58token.vip' : window.location.origin))
 const gatewayOrigin = computed(() => {
   if (origin.value.includes('localhost') || origin.value.includes('127.0.0.1')) {
-    return 'https://useaifor.me'
+    return 'https://58token.vip'
   }
   return normalizeOrigin(origin.value)
 })

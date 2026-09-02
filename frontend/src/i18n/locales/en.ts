@@ -1637,7 +1637,7 @@ export default {
         title: 'Codex CLI',
         badge: 'OpenAI-compatible',
         description: 'Use this for Codex CLI custom provider configuration with the Responses API. The provider Base URL should be the gateway origin without /v1.',
-        baseUrlNote: 'When wire_api is "responses", keep base_url as https://useaifor.me without /v1. Put the API key in ~/.codex/auth.json as OPENAI_API_KEY.',
+        baseUrlNote: 'When wire_api is "responses", keep base_url as https://58token.vip without /v1. Put the API key in ~/.codex/auth.json as OPENAI_API_KEY.',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.codex\\config.toml', command: 'mkdir %USERPROFILE%\\.codex' },
           { system: 'macOS', path: '~/.codex/config.toml', command: 'mkdir -p ~/.codex' },
@@ -1654,7 +1654,7 @@ export default {
         title: 'Claude Code',
         badge: 'Anthropic-compatible',
         description: 'Use this for Claude Code or Anthropic SDK style clients. The base URL should be the gateway origin without /v1.',
-        baseUrlNote: 'Claude Code calls the Anthropic Messages API path itself, so ANTHROPIC_BASE_URL should be https://useaifor.me, not https://useaifor.me/v1.',
+        baseUrlNote: 'Claude Code calls the Anthropic Messages API path itself, so ANTHROPIC_BASE_URL should be https://58token.vip, not https://58token.vip/v1.',
         osRows: [
           { system: 'Windows', path: '%USERPROFILE%\\.claude\\settings.json', command: 'notepad %USERPROFILE%\\.claude\\settings.json' },
           { system: 'macOS', path: '~/.claude/settings.json', command: 'open -a TextEdit ~/.claude/settings.json' },
@@ -1688,7 +1688,7 @@ export default {
         title: 'Node.js Environment Setup',
         badge: 'OpenAI SDK',
         description: 'Use this for backend services, scheduled jobs, and local scripts. Node.js with the OpenAI SDK should use a Base URL that includes /v1.',
-        baseUrlNote: 'The Node.js OpenAI SDK appends /chat/completions after baseURL, so copy https://useaifor.me/v1.',
+        baseUrlNote: 'The Node.js OpenAI SDK appends /chat/completions after baseURL, so copy https://58token.vip/v1.',
         osRows: [
           { system: 'Windows', path: 'PowerShell / Node.js LTS', command: 'winget install OpenJS.NodeJS.LTS' },
           { system: 'macOS', path: 'Homebrew / Node.js LTS', command: 'brew install node' },
@@ -1723,12 +1723,12 @@ export default {
       openClaw: {
         title: 'OpenClaw Setup',
         badge: 'OpenAI-compatible',
-        description: 'Treat OpenClaw as an OpenAI-compatible client. Use https://useaifor.me/v1 as the Base URL.',
+        description: 'Treat OpenClaw as an OpenAI-compatible client. Use https://58token.vip/v1 as the Base URL.',
         baseUrlNote: 'If OpenClaw already produces final URLs containing /v1/chat/completions, do not append /v1 twice in the UI.',
         osRows: [
-          { system: 'Windows', path: 'App settings or .env', command: 'setx OPENAI_BASE_URL https://useaifor.me/v1' },
-          { system: 'macOS', path: '~/.zshrc or app settings', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' },
-          { system: 'Linux', path: '~/.bashrc or app settings', command: 'export OPENAI_BASE_URL=https://useaifor.me/v1' }
+          { system: 'Windows', path: 'App settings or .env', command: 'setx OPENAI_BASE_URL https://58token.vip/v1' },
+          { system: 'macOS', path: '~/.zshrc or app settings', command: 'export OPENAI_BASE_URL=https://58token.vip/v1' },
+          { system: 'Linux', path: '~/.bashrc or app settings', command: 'export OPENAI_BASE_URL=https://58token.vip/v1' }
         ],
         blocks: {
           envTitle: 'Environment variable setup',
@@ -1741,7 +1741,7 @@ export default {
         title: 'Hermes Setup',
         badge: 'OpenAI / Claude',
         description: 'Hermes should follow provider type: OpenAI-compatible mode uses /v1, while Claude/Anthropic-compatible mode uses only the gateway origin.',
-        baseUrlNote: 'If Hermes only offers an OpenAI Compatible provider, use https://useaifor.me/v1. If it offers an Anthropic Compatible provider, use https://useaifor.me.',
+        baseUrlNote: 'If Hermes only offers an OpenAI Compatible provider, use https://58token.vip/v1. If it offers an Anthropic Compatible provider, use https://58token.vip.',
         osRows: [
           { system: 'Windows', path: 'Provider settings', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
           { system: 'macOS', path: 'Provider settings', command: 'Choose OpenAI Compatible or Anthropic Compatible' },
@@ -1758,7 +1758,7 @@ export default {
         title: 'API Script Setup',
         badge: 'curl / CI',
         description: 'Scripts, CI jobs, and automation usually call full request URLs, so examples include both /v1 and the endpoint path.',
-        baseUrlNote: 'For direct curl usage, do not stop at the Base URL. Use the full URL, such as https://useaifor.me/v1/chat/completions or https://useaifor.me/v1/messages.',
+        baseUrlNote: 'For direct curl usage, do not stop at the Base URL. Use the full URL, such as https://58token.vip/v1/chat/completions or https://58token.vip/v1/messages.',
         osRows: [
           { system: 'Windows', path: 'PowerShell', command: '$env:USE_AIFORME_API_KEY="sk-your-api-key"' },
           { system: 'macOS', path: 'Terminal', command: 'export USE_AIFORME_API_KEY=sk-your-api-key' },
@@ -1859,11 +1859,11 @@ export default {
       items: [
         {
           title: 'When should I add /v1?',
-          description: 'Check the final request path. If the client itself calls /v1/chat/completions or /v1/messages, configure only https://useaifor.me. If the client calls /chat/completions or /messages relative to baseURL, configure https://useaifor.me/v1.'
+          description: 'Check the final request path. If the client itself calls /v1/chat/completions or /v1/messages, configure only https://58token.vip. If the client calls /chat/completions or /messages relative to baseURL, configure https://58token.vip/v1.'
         },
         {
           title: 'Which Base URL should Codex, Claude Code, and Gemini CLI use?',
-          description: 'Codex Desktop uses https://useaifor.me. Codex CLI Responses providers use https://useaifor.me. Claude Code ANTHROPIC_BASE_URL uses https://useaifor.me. Gemini CLI native mode uses https://useaifor.me, while OpenAI-compatible wrappers use https://useaifor.me/v1.'
+          description: 'Codex Desktop uses https://58token.vip. Codex CLI Responses providers use https://58token.vip. Claude Code ANTHROPIC_BASE_URL uses https://58token.vip. Gemini CLI native mode uses https://58token.vip, while OpenAI-compatible wrappers use https://58token.vip/v1.'
         },
         {
           title: '401 or invalid API key',

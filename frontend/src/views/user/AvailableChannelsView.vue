@@ -432,7 +432,7 @@ const marketplaceGroupMultipliers = ref<Record<string, number>>({ ...DEFAULT_MAR
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)

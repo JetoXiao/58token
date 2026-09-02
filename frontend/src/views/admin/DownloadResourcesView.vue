@@ -148,7 +148,7 @@ const uploadTransferSummary = computed(() => {
   return uploadSpeedBytesPerSecond.value > 0 ? `${transferred} · ${formatBytes(uploadSpeedBytesPerSecond.value)}/s` : transferred
 })
 const corsConfig = computed(() => JSON.stringify([{
-  AllowedOrigins: Array.from(new Set([window.location.origin, 'https://useaifor.me', 'https://useaifor.fun'])),
+  AllowedOrigins: Array.from(new Set([window.location.origin, 'https://58token.vip', 'https://58token.vip'])),
   AllowedMethods: ['PUT'],
   AllowedHeaders: ['Content-Type'],
   ExposeHeaders: ['ETag'],

@@ -32,11 +32,11 @@ describe('IntegrationDocsView docs snippets', () => {
   })
 
   it('describes Codex CLI base URL as the gateway origin in both locales', () => {
-    expect(englishSource).toContain('Codex CLI Responses providers use https://useaifor.me')
-    expect(chineseSource).toContain('Codex CLI 的 Responses provider 填 https://useaifor.me')
+    expect(englishSource).toContain('Codex CLI Responses providers use https://58token.vip')
+    expect(chineseSource).toContain('Codex CLI 的 Responses provider 填 https://58token.vip')
 
-    expect(englishSource).not.toContain('Codex CLI OpenAI-compatible providers use https://useaifor.me/v1')
-    expect(chineseSource).not.toContain('Codex CLI 的 OpenAI 兼容 provider 填 https://useaifor.me/v1')
+    expect(englishSource).not.toContain('Codex CLI OpenAI-compatible providers use https://58token.vip/v1')
+    expect(chineseSource).not.toContain('Codex CLI 的 OpenAI 兼容 provider 填 https://58token.vip/v1')
   })
 
   it('keeps the long docs table of contents scroll-aware', () => {

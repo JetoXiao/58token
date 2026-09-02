@@ -131,7 +131,7 @@ const downloadingID = ref<number | null>(null)
 const isDark = ref(false)
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)
 const isAuthenticated = computed(() => authStore.isAuthenticated)

@@ -273,7 +273,7 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
-const siteLogo = computed(() => BRAND_LOGO_URL)
+const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)
 const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
@@ -308,7 +308,7 @@ const routePaths = [
 ]
 const sdkCode = `const client = new OpenAI({
   apiKey: process.env.API_KEY,
-  baseURL: "https://api.useaifor.me/v1"
+  baseURL: "https://api.58token.vip/v1"
 })`
 const features = computed<Array<{ title: string; copy: string; icon: 'key' | 'sync' | 'chart' | 'shield' }>>(() => [
   { title: t('gateway.home.features.key.title'), copy: t('gateway.home.features.key.copy'), icon: 'key' },
