@@ -272,7 +272,7 @@ const { t } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '58TokenVip')
 const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)

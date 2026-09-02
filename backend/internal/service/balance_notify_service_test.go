@@ -106,7 +106,7 @@ func TestSanitizeEmailHeader_OnlyLF(t *testing.T) {
 }
 
 func TestSanitizeEmailHeader_Clean(t *testing.T) {
-	require.Equal(t, "UseAiForMe", sanitizeEmailHeader("UseAiForMe"))
+	require.Equal(t, "58TokenVip", sanitizeEmailHeader("58TokenVip"))
 }
 
 func TestSanitizeEmailHeader_Empty(t *testing.T) {

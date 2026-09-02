@@ -326,7 +326,7 @@ const baseSettingsResponse = {
   ],
   default_concurrency: 1,
   default_subscriptions: [],
-  site_name: "UseAiForMe",
+  site_name: "58TokenVip",
   site_logo: "",
   site_subtitle: "",
   api_base_url: "",

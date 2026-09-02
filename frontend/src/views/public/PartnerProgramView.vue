@@ -168,7 +168,7 @@ const fallbackPartnerTiers: AffiliatePartnerTier[] = [
   { level: 'cocreate', name: 'Co-create', rebate_rate_percent: 70, required_invitees: 100, next_required_invitees: null }
 ]
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '58TokenVip')
 const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 const marketingNavItems = computed(() => appStore.cachedPublicSettings?.marketing_nav_items)

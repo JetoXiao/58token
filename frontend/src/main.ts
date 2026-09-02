@@ -29,7 +29,7 @@ async function bootstrap() {
   appStore.initFromInjectedConfig()
 
   // Set document title immediately after config is loaded
-  if (appStore.siteName && appStore.siteName !== 'UseAiForMe') {
+  if (appStore.siteName && appStore.siteName !== '58TokenVip') {
     document.title = `${appStore.siteName} - AI API Gateway`
   }
 

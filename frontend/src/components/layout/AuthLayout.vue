@@ -66,7 +66,7 @@ import { useAppStore } from '@/stores'
 
 const appStore = useAppStore()
 
-const siteName = computed(() => appStore.siteName || 'UseAiForMe')
+const siteName = computed(() => appStore.siteName || '58TokenVip')
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || '让AI为我所用')
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
 

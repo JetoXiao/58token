@@ -431,7 +431,7 @@ const usdToCnyRate = ref(7)
 const marketplaceGroupMultipliers = ref<Record<string, number>>({ ...DEFAULT_MARKETPLACE_GROUP_MULTIPLIERS })
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '58TokenVip')
 const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')

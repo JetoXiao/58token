@@ -1,4 +1,4 @@
-# UseAiForMe
+# 58TokenVip
 
 <div align="center">
 
@@ -16,13 +16,13 @@ English | [中文](README_CN.md) | [日本語](README_JA.md)
 
 </div>
 
-> **UseAiForMe officially uses only the domains `sub2api.org` and `pincc.ai`. Other websites using the UseAiForMe name may be third-party deployments or services and are not affiliated with this project. Please verify and exercise your own judgment.**
+> **58TokenVip officially uses only the domains `sub2api.org` and `pincc.ai`. Other websites using the 58TokenVip name may be third-party deployments or services and are not affiliated with this project. Please verify and exercise your own judgment.**
 
 ---
 
 ## Demo
 
-Try UseAiForMe online: **[https://demo.sub2api.org/](https://demo.sub2api.org/)**
+Try 58TokenVip online: **[https://demo.sub2api.org/](https://demo.sub2api.org/)**
 
 Demo credentials (shared demo environment; **not** created automatically for self-hosted installs):
 
@@ -32,7 +32,7 @@ Demo credentials (shared demo environment; **not** created automatically for sel
 
 ## Overview
 
-UseAiForMe is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions. Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
+58TokenVip is an AI API gateway platform designed to distribute and manage API quotas from AI product subscriptions. Users can access upstream AI services through platform-generated API Keys, while the platform handles authentication, billing, load balancing, and request forwarding.
 
 ## Features
 
@@ -53,7 +53,7 @@ UseAiForMe is an AI API gateway platform designed to distribute and manage API q
 <table>
 <tr>
 <td width="180" align="center" valign="middle"><a href="https://shop.pincc.ai/"><img src="assets/partners/logos/pincc-logo.png" alt="pincc" width="150"></a></td>
-<td valign="middle"><b><a href="https://shop.pincc.ai/">PinCC</a></b> is the official relay service built on UseAiForMe, offering stable access to Claude Code, Codex, Gemini and other popular models — ready to use, no deployment or maintenance required.</td>
+<td valign="middle"><b><a href="https://shop.pincc.ai/">PinCC</a></b> is the official relay service built on 58TokenVip, offering stable access to Claude Code, Codex, Gemini and other popular models — ready to use, no deployment or maintenance required.</td>
 </tr>
 
 <tr>
@@ -78,7 +78,7 @@ UseAiForMe is an AI API gateway platform designed to distribute and manage API q
 
 <tr>
 <td width="180"><a href="https://code.silkapi.com/register?aff=SUB2API"><img src="assets/partners/logos/silkapi.png" alt="silkapi" width="150"></a></td>
-<td>Thanks to SilkAPI for sponsoring this project! <a href="https://code.silkapi.com/register?aff=SUB2API">SilkAPI</a> is a relay service built on UseAiForMe, specializing in providing high-speed and stable Codex API relay.</td>
+<td>Thanks to SilkAPI for sponsoring this project! <a href="https://code.silkapi.com/register?aff=SUB2API">SilkAPI</a> is a relay service built on 58TokenVip, specializing in providing high-speed and stable Codex API relay.</td>
 </tr>
 
 <tr>
@@ -124,11 +124,11 @@ Register now via <a href="https://pateway.ai/?ch=1tsfr51">this link</a> to recei
 
 ## Ecosystem
 
-Community projects that extend or integrate with UseAiForMe:
+Community projects that extend or integrate with 58TokenVip:
 
 | Project | Description | Features |
 |---------|-------------|----------|
-| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~Self-service payment system~~ | **Now Built-in** — Payment is now integrated into UseAiForMe, no separate deployment needed. See [Payment Configuration Guide](docs/PAYMENT.md) |
+| ~~[Sub2ApiPay](https://github.com/touwaeriol/sub2apipay)~~ | ~~Self-service payment system~~ | **Now Built-in** — Payment is now integrated into 58TokenVip, no separate deployment needed. See [Payment Configuration Guide](docs/PAYMENT.md) |
 | [sub2api-mobile](https://github.com/ckken/sub2api-mobile) | Mobile admin console | Cross-platform app (iOS/Android/Web) for user management, account management, monitoring dashboard, and multi-backend switching; built with Expo + React Native |
 
 ## Tech Stack
@@ -144,7 +144,7 @@ Community projects that extend or integrate with UseAiForMe:
 
 ## Nginx Reverse Proxy Note
 
-When using Nginx as a reverse proxy for UseAiForMe (or CRS) with Codex CLI, add the following to the `http` block in your Nginx configuration:
+When using Nginx as a reverse proxy for 58TokenVip (or CRS) with Codex CLI, add the following to the `http` block in your Nginx configuration:
 
 ```nginx
 underscores_in_headers on;
@@ -560,7 +560,7 @@ Simple Mode is designed for individual developers or internal teams who want qui
 
 ## Antigravity Support
 
-UseAiForMe supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
+58TokenVip supports [Antigravity](https://antigravity.so/) accounts. After authorization, dedicated endpoints are available for Claude and Gemini models.
 
 ### Dedicated Endpoints
 

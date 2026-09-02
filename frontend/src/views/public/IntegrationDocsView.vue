@@ -412,7 +412,7 @@ const { t, tm, rt, te, locale } = useI18n()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'UseAiForMe')
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || '58TokenVip')
 const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || t('home.heroSubtitle'))
 const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')

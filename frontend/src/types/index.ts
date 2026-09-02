@@ -1,5 +1,5 @@
 /**
- * Core Type Definitions for UseAiForMe Frontend
+ * Core Type Definitions for 58TokenVip Frontend
  */
 
 // ==================== Common Types ====================

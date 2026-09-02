@@ -1,6 +1,6 @@
-# UseAiForMe Individual Contributor License Agreement (v1.0)
+# 58TokenVip Individual Contributor License Agreement (v1.0)
 
-Thank you for your interest in contributing to UseAiForMe ("the Project"). This Contributor License Agreement ("Agreement") documents the rights granted by contributors to the Project.
+Thank you for your interest in contributing to 58TokenVip ("the Project"). This Contributor License Agreement ("Agreement") documents the rights granted by contributors to the Project.
 
 By signing this Agreement, you accept and agree to the following terms and conditions for your present and future contributions submitted to the Project.
 

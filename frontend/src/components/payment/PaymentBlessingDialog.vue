@@ -105,7 +105,7 @@ const currentLocale = computed(() => {
 
 const seenStorageKey = computed(() => {
   const orderKey = String(props.orderKey || '').trim()
-  return orderKey ? `useaiforme:payment-blessing:${orderKey}` : ''
+  return orderKey ? `58token:payment-blessing:${orderKey}` : ''
 })
 
 function wasAlreadyShown(): boolean {

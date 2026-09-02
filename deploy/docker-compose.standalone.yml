@@ -1,7 +1,7 @@
 # =============================================================================
-# UseAiForMe Docker Compose - Standalone Configuration
+# 58TokenVip Docker Compose - Standalone Configuration
 # =============================================================================
-# This configuration runs only the UseAiForMe application.
+# This configuration runs only the 58TokenVip application.
 # PostgreSQL and Redis must be provided externally.
 #
 # Usage:

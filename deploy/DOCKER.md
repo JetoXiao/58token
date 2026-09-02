@@ -1,6 +1,6 @@
-# UseAiForMe Docker Image
+# 58TokenVip Docker Image
 
-UseAiForMe is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
+58TokenVip is an AI API Gateway Platform for distributing and managing AI product subscription API quotas.
 
 ## Quick Start
 

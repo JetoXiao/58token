@@ -1,5 +1,5 @@
 # =============================================================================
-# UseAiForMe Docker Compose Configuration
+# 58TokenVip Docker Compose Configuration
 # =============================================================================
 # Quick Start:
 #   1. Copy .env.example to .env and configure
@@ -13,7 +13,7 @@
 
 services:
   # ===========================================================================
-  # UseAiForMe Application
+  # 58TokenVip Application
   # ===========================================================================
   sub2api:
     image: weishaw/sub2api:latest

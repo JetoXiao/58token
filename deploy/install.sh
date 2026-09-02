@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# UseAiForMe Installation Script
-# UseAiForMe 安装脚本
+# 58TokenVip Installation Script
+# 58TokenVip 安装脚本
 # Usage: curl -sSL https://raw.githubusercontent.com/Wei-Shaw/sub2api/main/deploy/install.sh | bash
 #
 
@@ -63,7 +63,7 @@ declare -A MSG_ZH=(
     ["enter_choice"]="请输入选择 (默认: 1)"
 
     # Installation
-    ["install_title"]="UseAiForMe 安装脚本"
+    ["install_title"]="58TokenVip 安装脚本"
     ["run_as_root"]="请使用 root 权限运行 (使用 sudo)"
     ["detected_platform"]="检测到平台"
     ["unsupported_arch"]="不支持的架构"
@@ -91,11 +91,11 @@ declare -A MSG_ZH=(
     ["ready_for_setup"]="准备就绪，可以启动设置向导"
 
     # Completion
-    ["install_complete"]="UseAiForMe 安装完成！"
+    ["install_complete"]="58TokenVip 安装完成！"
     ["install_dir"]="安装目录"
     ["next_steps"]="后续步骤"
     ["step1_check_services"]="确保 PostgreSQL 和 Redis 正在运行："
-    ["step2_start_service"]="启动 UseAiForMe 服务："
+    ["step2_start_service"]="启动 58TokenVip 服务："
     ["step3_enable_autostart"]="设置开机自启："
     ["step4_open_wizard"]="在浏览器中打开设置向导："
     ["wizard_guide"]="设置向导将引导您完成："
@@ -109,7 +109,7 @@ declare -A MSG_ZH=(
     ["cmd_stop"]="停止服务"
 
     # Upgrade
-    ["upgrading"]="正在升级 UseAiForMe..."
+    ["upgrading"]="正在升级 58TokenVip..."
     ["current_version"]="当前版本"
     ["stopping_service"]="正在停止服务..."
     ["backup_created"]="备份已创建"
@@ -125,11 +125,11 @@ declare -A MSG_ZH=(
     ["validating_version"]="正在验证版本..."
     ["available_versions"]="可用版本列表"
     ["fetching_versions"]="正在获取可用版本..."
-    ["not_installed"]="UseAiForMe 尚未安装，请先执行全新安装"
+    ["not_installed"]="58TokenVip 尚未安装，请先执行全新安装"
     ["fresh_install_hint"]="用法"
 
     # Uninstall
-    ["uninstall_confirm"]="这将从系统中移除 UseAiForMe。"
+    ["uninstall_confirm"]="这将从系统中移除 58TokenVip。"
     ["are_you_sure"]="确定要继续吗？(y/N)"
     ["uninstall_cancelled"]="卸载已取消"
     ["removing_files"]="正在移除文件..."
@@ -141,21 +141,21 @@ declare -A MSG_ZH=(
     ["install_lock_removed"]="安装锁文件已移除，重新安装时将进入设置向导"
     ["purge_prompt"]="是否同时删除配置目录？这将清除所有配置和数据 [y/N]: "
     ["removing_config_dir"]="正在移除配置目录..."
-    ["uninstall_complete"]="UseAiForMe 已卸载"
+    ["uninstall_complete"]="58TokenVip 已卸载"
 
     # Help
     ["usage"]="用法"
     ["cmd_none"]="(无参数)"
-    ["cmd_install"]="安装 UseAiForMe"
+    ["cmd_install"]="安装 58TokenVip"
     ["cmd_upgrade"]="升级到最新版本"
-    ["cmd_uninstall"]="卸载 UseAiForMe"
+    ["cmd_uninstall"]="卸载 58TokenVip"
     ["cmd_install_version"]="安装/回退到指定版本"
     ["cmd_list_versions"]="列出可用版本"
     ["opt_version"]="指定要安装的版本号 (例如: v1.0.0)"
 
     # Server configuration
     ["server_config_title"]="服务器配置"
-    ["server_config_desc"]="配置 UseAiForMe 服务监听地址"
+    ["server_config_desc"]="配置 58TokenVip 服务监听地址"
     ["server_host_prompt"]="服务器监听地址"
     ["server_host_hint"]="0.0.0.0 表示监听所有网卡，127.0.0.1 仅本地访问"
     ["server_port_prompt"]="服务器端口"
@@ -188,7 +188,7 @@ declare -A MSG_EN=(
     ["enter_choice"]="Enter your choice (default: 1)"
 
     # Installation
-    ["install_title"]="UseAiForMe Installation Script"
+    ["install_title"]="58TokenVip Installation Script"
     ["run_as_root"]="Please run as root (use sudo)"
     ["detected_platform"]="Detected platform"
     ["unsupported_arch"]="Unsupported architecture"
@@ -216,11 +216,11 @@ declare -A MSG_EN=(
     ["ready_for_setup"]="Ready for Setup Wizard"
 
     # Completion
-    ["install_complete"]="UseAiForMe installation completed!"
+    ["install_complete"]="58TokenVip installation completed!"
     ["install_dir"]="Installation directory"
     ["next_steps"]="NEXT STEPS"
     ["step1_check_services"]="Make sure PostgreSQL and Redis are running:"
-    ["step2_start_service"]="Start UseAiForMe service:"
+    ["step2_start_service"]="Start 58TokenVip service:"
     ["step3_enable_autostart"]="Enable auto-start on boot:"
     ["step4_open_wizard"]="Open the Setup Wizard in your browser:"
     ["wizard_guide"]="The Setup Wizard will guide you through:"
@@ -234,7 +234,7 @@ declare -A MSG_EN=(
     ["cmd_stop"]="Stop"
 
     # Upgrade
-    ["upgrading"]="Upgrading UseAiForMe..."
+    ["upgrading"]="Upgrading 58TokenVip..."
     ["current_version"]="Current version"
     ["stopping_service"]="Stopping service..."
     ["backup_created"]="Backup created"
@@ -250,11 +250,11 @@ declare -A MSG_EN=(
     ["validating_version"]="Validating version..."
     ["available_versions"]="Available versions"
     ["fetching_versions"]="Fetching available versions..."
-    ["not_installed"]="UseAiForMe is not installed. Please run a fresh install first"
+    ["not_installed"]="58TokenVip is not installed. Please run a fresh install first"
     ["fresh_install_hint"]="Usage"
 
     # Uninstall
-    ["uninstall_confirm"]="This will remove UseAiForMe from your system."
+    ["uninstall_confirm"]="This will remove 58TokenVip from your system."
     ["are_you_sure"]="Are you sure? (y/N)"
     ["uninstall_cancelled"]="Uninstall cancelled"
     ["removing_files"]="Removing files..."
@@ -266,21 +266,21 @@ declare -A MSG_EN=(
     ["install_lock_removed"]="Install lock removed. Setup wizard will appear on next install."
     ["purge_prompt"]="Also remove config directory? This will delete all config and data [y/N]: "
     ["removing_config_dir"]="Removing config directory..."
-    ["uninstall_complete"]="UseAiForMe has been uninstalled"
+    ["uninstall_complete"]="58TokenVip has been uninstalled"
 
     # Help
     ["usage"]="Usage"
     ["cmd_none"]="(none)"
-    ["cmd_install"]="Install UseAiForMe"
+    ["cmd_install"]="Install 58TokenVip"
     ["cmd_upgrade"]="Upgrade to the latest version"
-    ["cmd_uninstall"]="Remove UseAiForMe"
+    ["cmd_uninstall"]="Remove 58TokenVip"
     ["cmd_install_version"]="Install/rollback to a specific version"
     ["cmd_list_versions"]="List available versions"
     ["opt_version"]="Specify version to install (e.g., v1.0.0)"
 
     # Server configuration
     ["server_config_title"]="Server Configuration"
-    ["server_config_desc"]="Configure UseAiForMe server listen address"
+    ["server_config_desc"]="Configure 58TokenVip server listen address"
     ["server_host_prompt"]="Server listen address"
     ["server_host_hint"]="0.0.0.0 listens on all interfaces, 127.0.0.1 for local only"
     ["server_port_prompt"]="Server port"
@@ -669,7 +669,7 @@ install_service() {
     # Create service file with configured host and port
     cat > /etc/systemd/system/sub2api.service << EOF
 [Unit]
-Description=UseAiForMe - AI API Gateway Platform
+Description=58TokenVip - AI API Gateway Platform
 Documentation=https://github.com/Wei-Shaw/sub2api
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service
@@ -805,7 +805,7 @@ print_completion() {
 
 # Upgrade function
 upgrade() {
-    # Check if UseAiForMe is installed
+    # Check if 58TokenVip is installed
     if [ ! -f "$INSTALL_DIR/sub2api" ]; then
         print_error "$(msg 'not_installed')"
         print_info "$(msg 'fresh_install_hint'): $0 install"
@@ -843,11 +843,11 @@ upgrade() {
 }
 
 # Install specific version (for upgrade or rollback)
-# Requires: UseAiForMe must already be installed
+# Requires: 58TokenVip must already be installed
 install_version() {
     local target_version="$1"
 
-    # Check if UseAiForMe is installed
+    # Check if 58TokenVip is installed
     if [ ! -f "$INSTALL_DIR/sub2api" ]; then
         print_error "$(msg 'not_installed')"
         print_info "$(msg 'fresh_install_hint'): $0 install -v $target_version"

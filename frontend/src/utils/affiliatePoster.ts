@@ -16,7 +16,7 @@ type PosterFeature = {
 }
 
 export async function generateAffiliatePoster(options: AffiliatePosterOptions): Promise<Blob> {
-  const { inviteLink, affiliateCode, siteName = 'UseAiForMe' } = options
+  const { inviteLink, affiliateCode, siteName = '58TokenVip' } = options
   const canvas = document.createElement('canvas')
   canvas.width = POSTER_WIDTH
   canvas.height = POSTER_HEIGHT
@@ -57,7 +57,7 @@ export async function generateAffiliatePoster(options: AffiliatePosterOptions): 
 
 export function buildAffiliatePosterFilename(affiliateCode: string): string {
   const safeCode = affiliateCode.replace(/[^\w-]/g, '').slice(0, 32) || 'invite'
-  return `UseAiForMe-invite-${safeCode}.png`
+  return `58TokenVip-invite-${safeCode}.png`
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -163,7 +163,7 @@ function drawFeaturePanel(ctx: CanvasRenderingContext2D): void {
 
   ctx.fillStyle = '#0f172a'
   ctx.font = posterFont(800, 38)
-  ctx.fillText('为什么选择 UseAiForMe', 118, 608)
+  ctx.fillText('为什么选择 58TokenVip', 118, 608)
 
   const features: PosterFeature[] = [
     { title: '模型覆盖', description: 'Codex / Claude / OpenAI 常用模型' },

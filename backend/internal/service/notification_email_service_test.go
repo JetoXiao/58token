@@ -207,8 +207,8 @@ func TestNotificationEmailFallbackClassification(t *testing.T) {
 
 func TestEmailQueueTasksPreserveLocaleHints(t *testing.T) {
 	queue := &EmailQueueService{taskChan: make(chan EmailTask, 2)}
-	require.NoError(t, queue.EnqueueVerifyCode("user@example.com", "UseAiForMe", "zh-CN"))
-	require.NoError(t, queue.EnqueuePasswordReset("user@example.com", "UseAiForMe", "https://example.com/reset", "en-US"))
+	require.NoError(t, queue.EnqueueVerifyCode("user@example.com", "58TokenVip", "zh-CN"))
+	require.NoError(t, queue.EnqueuePasswordReset("user@example.com", "58TokenVip", "https://example.com/reset", "en-US"))
 
 	verifyTask := <-queue.taskChan
 	require.Equal(t, TaskTypeVerifyCode, verifyTask.TaskType)
@@ -479,7 +479,7 @@ func (s *notificationEmailTestSMTPServer) settings() map[string]string {
 		SettingKeySMTPUsername: "user",
 		SettingKeySMTPPassword: "password",
 		SettingKeySMTPFrom:     "noreply@example.com",
-		SettingKeySMTPFromName: "UseAiForMe",
+		SettingKeySMTPFromName: "58TokenVip",
 		SettingKeySMTPUseTLS:   "false",
 	}
 }

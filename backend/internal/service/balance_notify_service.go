@@ -22,7 +22,7 @@ const (
 	quotaDimWeekly = "weekly"
 	quotaDimTotal  = "total"
 
-	defaultSiteName = "UseAiForMe"
+	defaultSiteName = "58TokenVip"
 )
 
 // quotaDimLabels maps dimension names to display labels.

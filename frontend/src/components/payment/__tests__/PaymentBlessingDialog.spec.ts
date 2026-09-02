@@ -60,7 +60,7 @@ describe('PaymentBlessingDialog', () => {
   })
 
   it('only shows once per order in the same browser session', async () => {
-    window.sessionStorage.setItem('useaiforme:payment-blessing:order-seen', '1')
+    window.sessionStorage.setItem('58token:payment-blessing:order-seen', '1')
     const wrapper = mount(PaymentBlessingDialog, {
       props: { modelValue: true, orderKey: 'order-seen' },
     })

@@ -1,5 +1,5 @@
 /**
- * API Client for UseAiForMe Backend
+ * API Client for 58TokenVip Backend
  * Central export point for all API modules
  */
 

@@ -1,8 +1,8 @@
 import type { Router } from 'vue-router'
 
-const ATTRIBUTION_KEY = 'useaiforme_visitor_attribution'
-const VISITOR_ID_KEY = 'useaiforme_visitor_id'
-const SESSION_ID_KEY = 'useaiforme_session_id'
+const ATTRIBUTION_KEY = '58token_visitor_attribution'
+const VISITOR_ID_KEY = '58token_visitor_id'
+const SESSION_ID_KEY = '58token_session_id'
 const ATTRIBUTION_TTL = 30 * 24 * 60 * 60 * 1000
 
 interface Attribution {

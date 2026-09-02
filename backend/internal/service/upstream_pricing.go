@@ -233,7 +233,7 @@ func (s *AccountTestService) fetchUpstreamPricingCatalog(ctx context.Context, ac
 			continue
 		}
 		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "UseAiForMe/1.0")
+		req.Header.Set("User-Agent", "58TokenVip/1.0")
 		if apiKey != "" {
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 		}
@@ -420,7 +420,7 @@ func (s *AccountTestService) fetchUpstreamJSONObject(ctx context.Context, endpoi
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "UseAiForMe/1.0")
+	req.Header.Set("User-Agent", "58TokenVip/1.0")
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
 	if err != nil {
@@ -526,7 +526,7 @@ func (s *AccountTestService) fetchUpstreamJSONObjectWithUser(ctx context.Context
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "UseAiForMe/1.0")
+	req.Header.Set("User-Agent", "58TokenVip/1.0")
 	req.Header.Set("Authorization", "Bearer "+token)
 	if strings.TrimSpace(userID) != "" {
 		req.Header.Set("New-Api-User", strings.TrimSpace(userID))
@@ -625,7 +625,7 @@ func (s *AccountTestService) fetchSub2APIModelPlaza(ctx context.Context, baseURL
 				continue
 			}
 			req.Header.Set("Accept", "application/json")
-			req.Header.Set("User-Agent", "UseAiForMe/1.0")
+			req.Header.Set("User-Agent", "58TokenVip/1.0")
 			req.Header.Set("Authorization", "Bearer "+dashboardToken)
 			resp, requestErr := s.doUpstreamModelsRequest(req, upstreamModelsProxyURL(account), account)
 			if requestErr != nil {
@@ -748,7 +748,7 @@ func (s *AccountTestService) fetchEffectiveUpstreamGroupRatios(
 				continue
 			}
 			req.Header.Set("Accept", "application/json")
-			req.Header.Set("User-Agent", "UseAiForMe/1.0")
+			req.Header.Set("User-Agent", "58TokenVip/1.0")
 			req.Header.Set("Authorization", "Bearer "+dashboardToken)
 			if dashboardUserID != "" {
 				req.Header.Set("New-Api-User", dashboardUserID)

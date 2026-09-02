@@ -1,6 +1,6 @@
 # Layout Components
 
-Vue 3 layout components for the UseAiForMe frontend, built with Composition API, TypeScript, and TailwindCSS.
+Vue 3 layout components for the 58TokenVip frontend, built with Composition API, TypeScript, and TailwindCSS.
 
 ## Components
 
