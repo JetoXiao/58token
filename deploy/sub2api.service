@@ -1,5 +1,5 @@
 [Unit]
-Description=58TokenVip - AI API Gateway Platform
+Description=58Token - AI API Gateway Platform
 Documentation=https://github.com/Wei-Shaw/sub2api
 After=network.target postgresql.service redis.service
 Wants=postgresql.service redis.service

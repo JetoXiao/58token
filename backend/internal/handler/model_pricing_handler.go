@@ -27,7 +27,7 @@ func (h *ModelPricingHandler) GetPublicPricing(c *gin.Context) {
 		return
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "58TokenVip/1.0")
+	req.Header.Set("User-Agent", "58Token/1.0")
 
 	resp, err := h.client.Do(req)
 	if err != nil {

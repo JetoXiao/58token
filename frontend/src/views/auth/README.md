@@ -1,6 +1,6 @@
 # Authentication Views
 
-This directory contains Vue 3 authentication views for the 58TokenVip frontend application.
+This directory contains Vue 3 authentication views for the 58Token frontend application.
 
 ## Components
 

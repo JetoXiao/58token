@@ -1,5 +1,5 @@
 # =============================================================================
-# 58TokenVip Dockerfile for GoReleaser
+# 58Token Dockerfile for GoReleaser
 # =============================================================================
 # This Dockerfile is used by GoReleaser to build Docker images.
 # It only packages the pre-built binary, no compilation needed.
@@ -13,7 +13,7 @@ FROM ${POSTGRES_IMAGE} AS pg-client
 FROM ${ALPINE_IMAGE}
 
 LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
-LABEL description="58TokenVip - AI API Gateway Platform"
+LABEL description="58Token - AI API Gateway Platform"
 LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 
 # Install runtime dependencies

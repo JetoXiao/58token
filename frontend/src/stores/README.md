@@ -1,6 +1,6 @@
 # Pinia Stores Documentation
 
-This directory contains all Pinia stores for the 58TokenVip frontend application.
+This directory contains all Pinia stores for the 58Token frontend application.
 
 ## Stores Overview
 

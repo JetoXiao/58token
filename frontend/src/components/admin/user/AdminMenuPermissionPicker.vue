@@ -77,8 +77,6 @@ const adminLabelKeys: Record<string, string> = {
   admin_visitor_analytics: 'nav.visitorAnalytics',
   admin_download_resources: 'nav.downloadResources',
   admin_ops: 'nav.ops',
-  admin_ttft_analysis: 'nav.ttftAnalysis',
-  admin_response_cache: 'nav.responseCache',
   admin_requests: 'nav.requests',
   admin_users: 'nav.users',
   admin_groups: 'nav.groups',

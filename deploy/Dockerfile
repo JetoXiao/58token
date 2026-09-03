@@ -1,5 +1,5 @@
 # =============================================================================
-# 58TokenVip Multi-Stage Dockerfile
+# 58Token Multi-Stage Dockerfile
 # =============================================================================
 # Stage 1: Build frontend
 # Stage 2: Build Go backend with embedded frontend
@@ -74,7 +74,7 @@ FROM ${ALPINE_IMAGE}
 
 # Labels
 LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"
-LABEL description="58TokenVip - AI API Gateway Platform"
+LABEL description="58Token - AI API Gateway Platform"
 LABEL org.opencontainers.image.source="https://github.com/Wei-Shaw/sub2api"
 
 # Install runtime dependencies

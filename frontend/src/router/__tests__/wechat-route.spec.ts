@@ -8,7 +8,7 @@ const authStore = vi.hoisted(() => ({
 }))
 
 const appStore = vi.hoisted(() => ({
-  siteName: '58TokenVip',
+  siteName: '58Token',
   backendModeEnabled: false,
   cachedPublicSettings: null as null | Record<string, unknown>,
 }))

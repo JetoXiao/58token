@@ -51,7 +51,7 @@ func RunCLI() error {
 
 	fmt.Println()
 	fmt.Println("╔═══════════════════════════════════════════╗")
-	fmt.Println("║       58TokenVip Installation Wizard         ║")
+	fmt.Println("║       58Token Installation Wizard         ║")
 	fmt.Println("╚═══════════════════════════════════════════╝")
 	fmt.Println()
 

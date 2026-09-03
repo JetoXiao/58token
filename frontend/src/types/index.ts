@@ -1,5 +1,5 @@
 /**
- * Core Type Definitions for 58TokenVip Frontend
+ * Core Type Definitions for 58Token Frontend
  */
 
 // ==================== Common Types ====================

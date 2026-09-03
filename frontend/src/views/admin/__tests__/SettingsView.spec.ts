@@ -326,7 +326,7 @@ const baseSettingsResponse = {
   ],
   default_concurrency: 1,
   default_subscriptions: [],
-  site_name: "58TokenVip",
+  site_name: "58Token",
   site_logo: "",
   site_subtitle: "",
   api_base_url: "",

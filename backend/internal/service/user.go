@@ -175,8 +175,6 @@ func isSubAdminMenuPermissionKey(item string) bool {
 		"admin_visitor_analytics",
 		"admin_download_resources",
 		"admin_ops",
-		"admin_ttft_analysis",
-		"admin_response_cache",
 		"admin_requests",
 		"admin_users",
 		"admin_groups",

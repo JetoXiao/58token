@@ -1,5 +1,5 @@
 /**
- * Vue Router configuration for 58TokenVip frontend
+ * Vue Router configuration for 58Token frontend
  * Defines all application routes with lazy loading and navigation guards
  */
 
@@ -535,30 +535,6 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/admin/ops/response-cache',
-    name: 'AdminResponseCache',
-    component: () => import('@/views/admin/ops/ResponseCacheView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      adminMenuKey: 'admin_response_cache',
-      title: 'Response Cache',
-      titleKey: 'nav.responseCache'
-    }
-  },
-  {
-    path: '/admin/ops/ttft',
-    name: 'AdminTTFTAnalysis',
-    component: () => import('@/views/admin/ops/TTFTAnalysisView.vue'),
-    meta: {
-      requiresAuth: true,
-      requiresAdmin: true,
-      adminMenuKey: 'admin_ttft_analysis',
-      title: 'TTFT Analysis',
-      titleKey: 'nav.ttftAnalysis'
-    }
-  },
-  {
     path: '/admin/requests',
     name: 'AdminRequests',
     component: () => import('@/views/admin/RequestsView.vue'),
@@ -967,7 +943,7 @@ router.beforeEach(async (to, _from, next) => {
     const menuItem = publicItems.find((item) => item.id === id)
       ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
-      const siteName = appStore.siteName || '58TokenVip'
+      const siteName = appStore.siteName || '58Token'
       document.title = `${menuItem.label} - ${siteName}`
     } else {
       document.title = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)

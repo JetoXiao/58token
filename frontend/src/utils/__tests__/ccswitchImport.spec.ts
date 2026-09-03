@@ -13,7 +13,7 @@ function paramsFromDeeplink(deeplink: string): URLSearchParams {
 describe('ccswitchImport utils', () => {
   const baseInput = {
     baseUrl: 'https://api.example.com',
-    providerName: '58TokenVip',
+    providerName: '58Token',
     apiKey: 'sk-test',
     usageScript: 'return true'
   }

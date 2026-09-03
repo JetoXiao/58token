@@ -822,8 +822,6 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/visitor-analytics', label: t('nav.visitorAnalytics'), icon: ChartIcon, permissionKey: 'admin_visitor_analytics' },
     { path: '/admin/download-resources', label: t('nav.downloadResources'), icon: FolderIcon, permissionKey: 'admin_download_resources' },
     { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_ops' },
-    { path: '/admin/ops/ttft', label: t('nav.ttftAnalysis'), icon: ChartIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_ttft_analysis' },
-    { path: '/admin/ops/response-cache', label: t('nav.responseCache'), icon: ServerIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_response_cache' },
     { path: '/admin/requests', label: t('nav.requests'), icon: OrderListIcon, featureFlag: flagOpsMonitoring, permissionKey: 'admin_requests' },
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true, permissionKey: 'admin_users' },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true, permissionKey: 'admin_groups' },

@@ -942,7 +942,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		LoginAgreementDocuments:          loginAgreementDocuments,
 		TurnstileEnabled:                 settings[SettingKeyTurnstileEnabled] == "true",
 		TurnstileSiteKey:                 settings[SettingKeyTurnstileSiteKey],
-		SiteName:                         s.getStringOrDefault(settings, SettingKeySiteName, "58TokenVip"),
+		SiteName:                         s.getStringOrDefault(settings, SettingKeySiteName, "58Token"),
 		SiteLogo:                         settings[SettingKeySiteLogo],
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "让AI为我所用"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],
@@ -2755,7 +2755,7 @@ func (s *SettingService) IsTotpEncryptionKeyConfigured() bool {
 func (s *SettingService) GetSiteName(ctx context.Context) string {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)
 	if err != nil || value == "" {
-		return "58TokenVip"
+		return "58Token"
 	}
 	return value
 }
@@ -2943,7 +2943,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyLoginAgreementUpdatedAt:                   defaultLoginAgreementDate,
 		SettingKeyLoginAgreementDocuments:                   loginAgreementDocumentsJSON,
 		SettingKeyAPIKeyACLTrustForwardedIP:                 "false",
-		SettingKeySiteName:                                  "58TokenVip",
+		SettingKeySiteName:                                  "58Token",
 		SettingKeySiteLogo:                                  "",
 		SettingKeySupportContactConfig:                      defaultSupportContactConfigJSON,
 		SettingKeyPurchaseSubscriptionEnabled:               "false",
@@ -3143,7 +3143,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		TurnstileSiteKey:                 settings[SettingKeyTurnstileSiteKey],
 		TurnstileSecretKeyConfigured:     settings[SettingKeyTurnstileSecretKey] != "",
 		APIKeyACLTrustForwardedIP:        apiKeyACLTrustForwardedIP,
-		SiteName:                         s.getStringOrDefault(settings, SettingKeySiteName, "58TokenVip"),
+		SiteName:                         s.getStringOrDefault(settings, SettingKeySiteName, "58Token"),
 		SiteLogo:                         settings[SettingKeySiteLogo],
 		SiteSubtitle:                     s.getStringOrDefault(settings, SettingKeySiteSubtitle, "让AI为我所用"),
 		APIBaseURL:                       settings[SettingKeyAPIBaseURL],

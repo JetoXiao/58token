@@ -1,5 +1,5 @@
 [Unit]
-Description=58TokenVip Data Management Daemon
+Description=58Token Data Management Daemon
 After=network.target
 Wants=network.target
 

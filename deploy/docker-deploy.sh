@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# 58TokenVip Docker Deployment Preparation Script
+# 58Token Docker Deployment Preparation Script
 # =============================================================================
-# This script prepares deployment files for 58TokenVip:
+# This script prepares deployment files for 58Token:
 #   - Downloads docker-compose.local.yml and .env.example
 #   - Generates secure secrets (JWT_SECRET, TOTP_ENCRYPTION_KEY, POSTGRES_PASSWORD)
 #   - Creates necessary data directories
@@ -54,7 +54,7 @@ command_exists() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  58TokenVip Deployment Preparation"
+    echo "  58Token Deployment Preparation"
     echo "=========================================="
     echo ""
 

@@ -1,5 +1,5 @@
 /**
- * API Client for 58TokenVip Backend
+ * API Client for 58Token Backend
  * Central export point for all API modules
  */
 

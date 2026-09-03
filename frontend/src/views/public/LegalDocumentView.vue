@@ -109,7 +109,7 @@ marked.setOptions({
 
 const documentId = computed(() => String(route.params.documentId || ''))
 const documents = computed(() => settings.value?.login_agreement_documents ?? [])
-const siteName = computed(() => settings.value?.site_name || '58TokenVip')
+const siteName = computed(() => settings.value?.site_name || '58Token')
 const siteLogo = computed(() => appStore.siteLogo || BRAND_LOGO_URL)
 const updatedAt = computed(() => settings.value?.login_agreement_updated_at || '')
 

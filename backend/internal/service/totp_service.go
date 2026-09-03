@@ -89,7 +89,7 @@ const (
 	totpLoginTTL    = 5 * time.Minute
 	totpAttemptsTTL = 15 * time.Minute
 	maxTotpAttempts = 5
-	totpIssuer      = "58TokenVip"
+	totpIssuer      = "58Token"
 )
 
 // TotpService handles TOTP operations

@@ -11,7 +11,7 @@ Both LoginView and RegisterView use the AuthLayout component, which provides:
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │                                     │   │
-│  │         58TokenVip Logo                │   │
+│  │         58Token Logo                │   │
 │  │  "Subscription to API Conversion"   │   │
 │  │                                     │   │
 │  └─────────────────────────────────────┘   │
@@ -39,7 +39,7 @@ Centered: Both horizontally and vertically
 ```
 ┌─────────────────────────────────────────────┐
 │                                             │
-│         🔷 58TokenVip                          │
+│         🔷 58Token                          │
 │    Subscription to API Conversion Platform  │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
@@ -133,13 +133,13 @@ Centered: Both horizontally and vertically
 ```
 ┌─────────────────────────────────────────────┐
 │                                             │
-│         🔷 58TokenVip                          │
+│         🔷 58Token                          │
 │    Subscription to API Conversion Platform  │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │                                     │   │
 │  │        Create Account               │   │
-│  │     Sign up to start using 58TokenVip  │   │
+│  │     Sign up to start using 58Token  │   │
 │  │                                     │   │
 │  │  Username                           │   │
 │  │  ┌────────────────────────────────┐ │   │
