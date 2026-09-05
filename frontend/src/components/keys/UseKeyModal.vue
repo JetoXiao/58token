@@ -7,15 +7,15 @@
   >
     <div class="space-y-4">
       <!-- No Group Assigned Warning -->
-      <div v-if="!platform" class="flex items-start gap-3 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
-        <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+      <div v-if="!platform" class="flex items-start gap-3 rounded-lg border border-accent-200 bg-accent-50 p-4 dark:border-accent-800/40 dark:bg-accent-900/20">
+        <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
         </svg>
         <div>
-          <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+          <p class="text-sm font-medium text-accent-800 dark:text-accent-200">
             {{ t('keys.useKeyModal.noGroupTitle') }}
           </p>
-          <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+          <p class="mt-1 text-sm text-accent-700 dark:text-accent-300">
             {{ t('keys.useKeyModal.noGroupDescription') }}
           </p>
         </div>
@@ -75,9 +75,9 @@
         <!-- Codex Import Script -->
         <div
           v-if="activeClientTab === 'codex-import'"
-          class="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-700/60 dark:bg-amber-900/10"
+          class="space-y-4 rounded-lg border border-accent-200 bg-accent-50/70 p-4 dark:border-accent-800/40 dark:bg-accent-900/10"
         >
-          <div class="space-y-2 text-sm leading-6 text-gray-700 dark:text-gray-300 [&>p:nth-last-child(-n+3)]:rounded-md [&>p:nth-last-child(-n+3)]:border [&>p:nth-last-child(-n+3)]:border-amber-200 [&>p:nth-last-child(-n+3)]:bg-amber-100/80 [&>p:nth-last-child(-n+3)]:px-3 [&>p:nth-last-child(-n+3)]:py-2 [&>p:nth-last-child(-n+3)]:font-semibold [&>p:nth-last-child(-n+3)]:text-amber-900 dark:[&>p:nth-last-child(-n+3)]:border-amber-700/70 dark:[&>p:nth-last-child(-n+3)]:bg-amber-900/30 dark:[&>p:nth-last-child(-n+3)]:text-amber-100">
+          <div class="space-y-2 text-sm leading-6 text-gray-700 dark:text-gray-300 [&>p:nth-last-child(-n+3)]:rounded-md [&>p:nth-last-child(-n+3)]:border [&>p:nth-last-child(-n+3)]:border-accent-200 [&>p:nth-last-child(-n+3)]:bg-accent-100/80 [&>p:nth-last-child(-n+3)]:px-3 [&>p:nth-last-child(-n+3)]:py-2 [&>p:nth-last-child(-n+3)]:font-semibold [&>p:nth-last-child(-n+3)]:text-accent-900 dark:[&>p:nth-last-child(-n+3)]:border-accent-700/70 dark:[&>p:nth-last-child(-n+3)]:bg-accent-900/30 dark:[&>p:nth-last-child(-n+3)]:text-accent-100">
             <p class="font-medium text-gray-900 dark:text-gray-100">Codex 一键导入脚本</p>
             <p>下载后双击运行 BAT 文件，根据窗口提示输入选项即可完成导入。</p>
             <p>选项 1：导入配置文件至用户目录%USERPROFILE%\.codex，已有文件备份为.bak。</p>
@@ -103,7 +103,7 @@
             class="relative"
           >
             <!-- File Hint (if exists) -->
-            <p v-if="file.hint" class="text-xs text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
+            <p v-if="file.hint" class="mb-1.5 flex items-center gap-1 text-xs text-accent-600 dark:text-accent-300">
               <Icon name="exclamationCircle" size="sm" class="flex-shrink-0" />
               {{ file.hint }}
             </p>
@@ -115,7 +115,7 @@
                   @click="copyContent(file.content, index)"
                   class="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
                   :class="copiedIndex === index
-                    ? 'bg-green-500/20 text-green-400'
+                    ? 'bg-primary-500/20 text-primary-400'
                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white'"
                 >
                   <svg v-if="copiedIndex === index" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -134,9 +134,9 @@
         </div>
 
         <!-- Usage Note -->
-        <div v-if="showPlatformNote" class="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-          <Icon name="infoCircle" size="md" class="text-blue-500 flex-shrink-0 mt-0.5" />
-          <p class="text-sm text-blue-700 dark:text-blue-300">
+        <div v-if="showPlatformNote" class="flex items-start gap-3 rounded-lg border border-primary-100 bg-primary-50 p-3 dark:border-primary-900/30 dark:bg-primary-900/20">
+          <Icon name="infoCircle" size="md" class="mt-0.5 flex-shrink-0 text-primary-500" />
+          <p class="text-sm text-primary-700 dark:text-primary-300">
             {{ platformNote }}
           </p>
         </div>
@@ -395,10 +395,10 @@ const escapeHtml = (value: string) => value
 const wrapToken = (className: string, value: string) =>
   `<span class="${className}">${escapeHtml(value)}</span>`
 
-const keyword = (value: string) => wrapToken('text-emerald-300', value)
-const variable = (value: string) => wrapToken('text-sky-200', value)
+const keyword = (value: string) => wrapToken('text-primary-300', value)
+const variable = (value: string) => wrapToken('text-cyan-200', value)
 const operator = (value: string) => wrapToken('text-slate-400', value)
-const string = (value: string) => wrapToken('text-amber-200', value)
+const string = (value: string) => wrapToken('text-accent-200', value)
 const comment = (value: string) => wrapToken('text-slate-500', value)
 
 const CLAUDE_CODE_DEFAULT_MODEL = 'claude-opus-4-8'

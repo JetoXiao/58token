@@ -26,7 +26,7 @@
               <div class="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg bg-white shadow-md ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-600">
                 <img :src="siteLogo" alt="" class="h-full w-full object-contain" />
               </div>
-              <span class="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-emerald-500 text-white shadow-sm dark:border-dark-900">
+              <span class="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-primary-500 text-white shadow-sm dark:border-dark-900">
                 <Icon name="check" size="xs" :stroke-width="2.8" />
               </span>
             </div>

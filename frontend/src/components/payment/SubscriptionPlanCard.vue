@@ -17,13 +17,13 @@
             </span>
             <span
               v-if="isRenewal"
-              class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+              class="rounded-full bg-accent-100 px-2.5 py-1 text-[11px] font-bold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300"
             >
               {{ t('payment.renewNow') }}
             </span>
             <span
               v-if="limitedOfferActive"
-              class="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+              class="rounded-full bg-accent-100 px-2.5 py-1 text-[11px] font-bold text-accent-700 dark:bg-accent-900/30 dark:text-accent-300"
             >
               {{ t('payment.planCard.limitedOffer') }}
             </span>
@@ -51,14 +51,14 @@
             <p class="text-sm font-semibold text-gray-400 line-through dark:text-gray-500">
               {{ formatCurrency(limitedOfferActive ? regularPrice : plan.original_price) }}
             </p>
-            <p v-if="hasSavings" class="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+            <p v-if="hasSavings" class="mt-1 text-xs font-bold text-primary-700 dark:text-primary-300">
               {{ savingsText }}
             </p>
           </div>
         </div>
         <div
           v-if="limitedOfferActive"
-          class="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-200"
+          class="mt-3 rounded-xl border border-accent-200 bg-accent-50 px-3 py-2.5 text-xs font-semibold text-accent-700 dark:border-accent-900/50 dark:bg-accent-900/20 dark:text-accent-200"
         >
           {{ t('payment.planCard.limitedOfferUntil', { time: limitedOfferEndText, price: formatCurrency(regularPrice) }) }}
         </div>
@@ -87,13 +87,13 @@
 
       <div
         v-if="workdayFriendly"
-        class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 dark:border-emerald-900/50 dark:bg-emerald-900/20"
+        class="mb-4 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2.5 dark:border-primary-900/50 dark:bg-primary-900/20"
       >
-        <div class="flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-200">
+        <div class="flex items-center gap-2 text-sm font-bold text-primary-800 dark:text-primary-200">
           <Icon name="calendar" size="sm" :stroke-width="2" />
           <span>{{ t('payment.planCard.workdayFriendly') }}</span>
         </div>
-        <p class="mt-1 text-xs leading-relaxed text-emerald-700/90 dark:text-emerald-200/80">
+        <p class="mt-1 text-xs leading-relaxed text-primary-700/90 dark:text-primary-200/80">
           {{ t('payment.planCard.workdayFriendlyDesc', { daily: formatCurrency(plan.daily_limit_usd), weekly: formatCurrency(plan.weekly_limit_usd) }) }}
         </p>
       </div>
@@ -125,7 +125,7 @@
         </div>
       </div>
 
-      <div v-if="hasSavings" class="mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+      <div v-if="hasSavings" class="mb-4 rounded-xl bg-primary-50 px-3 py-2 text-xs font-bold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
         <div class="flex items-center gap-2">
           <Icon name="sparkles" size="sm" :stroke-width="2" />
           <span>{{ t('payment.planCard.dealHint', { original: formatCurrency(savingsComparePrice), price: formatCurrency(plan.price) }) }}</span>

@@ -15,12 +15,12 @@
             :class="[
               'flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br',
               isOpenAILike
-                ? 'from-green-500 to-green-600'
+                ? 'from-primary-500 to-cyan-500'
                 : isGemini
-                  ? 'from-blue-500 to-blue-600'
+                  ? 'from-cyan-500 to-sky-500'
                   : isAntigravity
-                    ? 'from-purple-500 to-purple-600'
-                    : 'from-orange-500 to-orange-600'
+                    ? 'from-accent-500 to-primary-600'
+                    : 'from-accent-500 to-orange-500'
             ]"
           >
             <Icon name="sparkles" size="md" class="text-white" />
@@ -49,7 +49,7 @@
         <legend class="input-label">{{ t('admin.accounts.oauth.authMethod') }}</legend>
         <div class="mt-2 flex gap-4">
           <label class="flex cursor-pointer items-center">
-            <input
+              <input
               v-model="addMethod"
               type="radio"
               value="oauth"
@@ -60,7 +60,7 @@
             }}</span>
           </label>
           <label class="flex cursor-pointer items-center">
-            <input
+              <input
               v-model="addMethod"
               type="radio"
               value="setup-token"
@@ -83,10 +83,10 @@
             :class="[
               'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
               geminiOAuthType === 'google_one'
-                ? 'bg-purple-500 text-white'
+                ? 'bg-accent-500 text-white'
                 : geminiOAuthType === 'code_assist'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-amber-500 text-white'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-cyan-500 text-white'
             ]"
           >
             <Icon v-if="geminiOAuthType === 'google_one'" name="user" size="sm" />

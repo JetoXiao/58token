@@ -5,7 +5,7 @@
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.dashboard.balanceDeductionTitle') }}</h3>
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.dashboard.balanceDeductionDescription') }}</p>
       </div>
-      <span class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">${{ formatCost(totalCost) }}</span>
+      <span class="text-sm font-semibold text-primary-600 dark:text-primary-400">${{ formatCost(totalCost) }}</span>
     </div>
     <div v-if="loading" class="flex h-64 items-center justify-center"><LoadingSpinner /></div>
     <div v-else-if="points.length && chartData" class="h-64"><Chart type="bar" :data="chartData" :options="chartOptions" /></div>
@@ -41,7 +41,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 const { t } = useI18n()
 const props = defineProps<{ points: DailyBalanceDeductionPoint[]; loading?: boolean }>()
 
-const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+const colors = ['#3b82f6', '#8b5cf6', '#2f8bff', '#ef4444', '#22b8f0', '#c4b5fd', '#14b8a6', '#ff8a70']
 const points = computed(() => props.points || [])
 const totalCost = computed(() => points.value.reduce((sum, point) => sum + Number(point.total_actual_cost || 0), 0))
 

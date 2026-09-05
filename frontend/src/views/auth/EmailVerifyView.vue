@@ -15,13 +15,13 @@
       <!-- No Data Warning -->
       <div
         v-if="!hasRegisterData"
-        class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20"
+        class="rounded-xl border border-accent-200 bg-accent-50 p-4 dark:border-accent-800/40 dark:bg-accent-900/20"
       >
         <div class="flex items-start gap-3">
           <div class="flex-shrink-0">
-            <Icon name="exclamationCircle" size="md" class="text-amber-500" />
+            <Icon name="exclamationCircle" size="md" class="text-accent-500" />
           </div>
-          <div class="text-sm text-amber-700 dark:text-amber-400">
+          <div class="text-sm text-accent-700 dark:text-accent-300">
             <p class="font-medium">{{ t('auth.sessionExpired') }}</p>
             <p class="mt-1">{{ t('auth.sessionExpiredDesc') }}</p>
           </div>
@@ -54,13 +54,13 @@
         <!-- Code Status -->
         <div
           v-if="codeSent"
-          class="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-800/50 dark:bg-green-900/20"
+          class="rounded-xl border border-primary-200 bg-primary-50 p-4 dark:border-primary-800/40 dark:bg-primary-900/20"
         >
           <div class="flex items-start gap-3">
             <div class="flex-shrink-0">
-              <Icon name="checkCircle" size="md" class="text-green-500" />
+              <Icon name="checkCircle" size="md" class="text-primary-500" />
             </div>
-            <p class="text-sm text-green-700 dark:text-green-400">
+            <p class="text-sm text-primary-700 dark:text-primary-300">
               {{ t('auth.codeSentSuccess') }}
             </p>
           </div>

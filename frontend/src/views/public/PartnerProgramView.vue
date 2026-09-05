@@ -1,8 +1,8 @@
 <template>
-  <div class="relative flex min-h-screen flex-col overflow-hidden bg-[#f7f8fb] text-slate-950 dark:bg-[#05060a] dark:text-white">
+  <div class="partner-program-page relative flex min-h-screen flex-col overflow-hidden bg-[#f7fbfe] text-slate-950 dark:bg-[#05060a] dark:text-white">
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
-      <div class="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-100/70 via-white/20 to-transparent dark:from-emerald-950/35 dark:via-white/[0.03]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.055)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:linear-gradient(to_bottom,black,transparent_82%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+      <div class="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-primary-100/70 via-white/18 to-transparent dark:from-primary-950/35 dark:via-white/[0.03]"></div>
     </div>
 
     <MarketingNavbar
@@ -26,7 +26,7 @@
         <LocaleSwitcher />
         <button
           type="button"
-          class="h-10 rounded-xl border border-slate-200/70 bg-white/70 p-2 text-slate-600 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/12 dark:hover:text-white"
+        class="h-10 rounded-xl border border-primary-200/70 bg-white/75 p-2 text-slate-600 transition hover:bg-white hover:text-slate-950 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/12 dark:hover:text-white"
           :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
           @click="toggleTheme"
         >
@@ -37,9 +37,9 @@
     </MarketingNavbar>
 
     <main class="relative z-10 flex-1 px-4 pb-16 pt-6 sm:px-6">
-      <section class="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-slate-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
+      <section class="mx-auto grid max-w-7xl gap-8 rounded-[2rem] border border-primary-100/80 bg-white/74 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8 lg:grid-cols-[minmax(0,1fr)_430px] lg:items-center">
         <div>
-          <div class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+            <div class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-900/60 dark:bg-primary-900/20 dark:text-primary-300">
             <Icon name="sparkles" size="sm" />
             {{ t('gateway.partner.eyebrow') }}
           </div>
@@ -52,22 +52,22 @@
           <div class="mt-7 flex flex-wrap gap-3">
             <RouterLink
               :to="primaryCtaTo"
-              class="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+              class="inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-primary-500 via-cyan-400 to-accent-400 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(34,211,238,0.18)] transition hover:-translate-y-0.5 hover:from-primary-400 hover:via-cyan-300 hover:to-accent-300 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
             >
               {{ t('gateway.partner.primaryCta') }}
               <Icon name="arrowRight" size="sm" />
             </RouterLink>
             <RouterLink
               to="/docs"
-              class="inline-flex items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-xl transition hover:border-emerald-300 hover:text-emerald-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-emerald-700 dark:hover:text-emerald-300"
+              class="inline-flex items-center justify-center rounded-2xl border border-primary-200/80 bg-white/75 px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-xl transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
             >
               {{ t('gateway.partner.secondaryCta') }}
             </RouterLink>
           </div>
         </div>
 
-        <div class="rounded-[1.5rem] border border-emerald-200/80 bg-emerald-50/65 p-5 shadow-sm backdrop-blur dark:border-emerald-900/50 dark:bg-emerald-900/15">
-          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('gateway.partner.rateCard.eyebrow') }}</p>
+        <div class="rounded-[1.5rem] border border-cyan-200/80 bg-white/68 p-5 shadow-sm backdrop-blur dark:border-primary-900/50 dark:bg-primary-900/15">
+          <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('gateway.partner.rateCard.eyebrow') }}</p>
           <div class="mt-4 text-4xl font-semibold leading-tight tracking-normal text-slate-950 dark:text-white md:text-5xl">{{ t('gateway.partner.rateCard.headline') }}</div>
           <p class="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ t('gateway.partner.rateCard.copy') }}</p>
           <div class="mt-5 grid grid-cols-2 gap-3">
@@ -76,15 +76,15 @@
               <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ stat.label }}</div>
             </div>
           </div>
-          <div class="mt-4 rounded-2xl border border-emerald-200 bg-white/65 p-4 text-sm leading-6 text-slate-600 dark:border-emerald-900/50 dark:bg-white/[0.04] dark:text-slate-300">
+          <div class="mt-4 rounded-2xl border border-primary-200 bg-white/65 p-4 text-sm leading-6 text-slate-600 dark:border-primary-900/50 dark:bg-white/[0.04] dark:text-slate-300">
             {{ t('gateway.partner.rateCard.note') }}
           </div>
         </div>
       </section>
 
       <section class="mx-auto mt-6 grid max-w-7xl gap-4 md:grid-cols-3">
-        <article v-for="item in valueProps" :key="item.title" class="rounded-[1.5rem] border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-emerald-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-emerald-300">
+        <article v-for="item in valueProps" :key="item.title" class="rounded-[1.5rem] border border-primary-100/80 bg-white/76 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-primary-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-primary-300">
             <Icon :name="item.icon" size="md" />
           </div>
           <h2 class="mt-5 text-lg font-semibold text-slate-950 dark:text-white">{{ item.title }}</h2>
@@ -92,18 +92,18 @@
         </article>
       </section>
 
-      <section class="mx-auto mt-6 max-w-7xl rounded-[2rem] border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] md:p-8">
+      <section class="mx-auto mt-6 max-w-7xl rounded-[2rem] border border-primary-100/80 bg-white/76 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] md:p-8">
         <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-300">{{ t('gateway.partner.tiers.eyebrow') }}</p>
+            <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-300">{{ t('gateway.partner.tiers.eyebrow') }}</p>
             <h2 class="mt-3 text-3xl font-semibold tracking-normal text-slate-950 dark:text-white">{{ t('gateway.partner.tiers.title') }}</h2>
           </div>
           <p class="max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">{{ t('gateway.partner.tiers.copy') }}</p>
         </div>
         <div class="mt-6 grid gap-3 md:grid-cols-4">
-          <div v-for="tier in tiers" :key="tier.name" class="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-white/10 dark:bg-slate-950/35">
+          <div v-for="tier in tiers" :key="tier.name" class="rounded-2xl border border-primary-100 bg-white/82 p-4 dark:border-white/10 dark:bg-slate-950/35">
             <div class="text-sm font-semibold text-slate-950 dark:text-white">{{ tier.name }}</div>
-            <div class="mt-3 text-lg font-semibold text-emerald-600 dark:text-emerald-300">{{ tier.benefit }}</div>
+            <div class="mt-3 text-lg font-semibold text-primary-600 dark:text-primary-300">{{ tier.benefit }}</div>
             <p class="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-200">{{ tier.requirement }}</p>
             <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{{ tier.copy }}</p>
           </div>
@@ -111,12 +111,12 @@
       </section>
 
       <section class="mx-auto mt-6 grid max-w-7xl gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-        <div class="rounded-[2rem] border border-slate-200/70 bg-white/75 p-6 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
-          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-violet-600 dark:text-violet-300">{{ t('gateway.partner.flow.eyebrow') }}</p>
+        <div class="rounded-[2rem] border border-primary-100/80 bg-white/76 p-6 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent-600 dark:text-accent-300">{{ t('gateway.partner.flow.eyebrow') }}</p>
           <h2 class="mt-3 text-3xl font-semibold tracking-normal text-slate-950 dark:text-white">{{ t('gateway.partner.flow.title') }}</h2>
           <div class="mt-6 space-y-4">
             <div v-for="(step, index) in steps" :key="step.title" class="flex gap-4">
-              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">{{ index + 1 }}</div>
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-primary-500 to-accent-400 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">{{ index + 1 }}</div>
               <div>
                 <h3 class="text-base font-semibold text-slate-950 dark:text-white">{{ step.title }}</h3>
                 <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">{{ step.copy }}</p>
@@ -125,12 +125,12 @@
           </div>
         </div>
 
-        <div class="rounded-[2rem] border border-slate-200/70 bg-slate-950 p-6 text-white shadow-[0_26px_90px_rgba(15,23,42,0.16)] dark:border-white/10 dark:bg-white/[0.06]">
-          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-300">{{ t('gateway.partner.settlement.eyebrow') }}</p>
+        <div class="rounded-[2rem] border border-primary-200/80 bg-gradient-to-br from-primary-500 via-cyan-500 to-accent-500 p-6 text-white shadow-[0_26px_90px_rgba(45,212,191,0.18)] dark:border-white/10 dark:bg-white/[0.06]">
+          <p class="text-sm font-semibold uppercase tracking-[0.18em] text-primary-200">{{ t('gateway.partner.settlement.eyebrow') }}</p>
           <h2 class="mt-3 text-3xl font-semibold tracking-normal">{{ t('gateway.partner.settlement.title') }}</h2>
           <div class="mt-6 grid gap-3 sm:grid-cols-3">
             <div v-for="item in settlementItems" :key="item.title" class="rounded-2xl border border-white/10 bg-white/10 p-4">
-              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-emerald-200">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-primary-200">
                 <Icon :name="item.icon" size="sm" />
               </div>
               <div class="mt-4 text-base font-semibold">{{ item.title }}</div>

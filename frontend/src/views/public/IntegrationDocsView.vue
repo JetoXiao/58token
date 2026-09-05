@@ -1,10 +1,11 @@
 <template>
-  <div class="relative flex min-h-screen flex-col overflow-x-clip bg-[#f7f8fb] text-gray-950 dark:bg-[#05060a] dark:text-white">
+  <div class="integration-docs-page relative flex min-h-screen flex-col overflow-x-clip bg-[#f7fbfe] text-gray-950 dark:bg-[#05060a] dark:text-white">
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-400/20"></div>
-      <div class="absolute right-[-14rem] top-24 h-[34rem] w-[34rem] rounded-full bg-violet-300/25 blur-3xl dark:bg-violet-500/18"></div>
-      <div class="absolute bottom-[-18rem] left-[-10rem] h-[38rem] w-[38rem] rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-400/10"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+      <div class="absolute left-[-10rem] top-[-16rem] h-[40rem] w-[40rem] rounded-full bg-primary-300/34 blur-3xl dark:bg-primary-400/18"></div>
+      <div class="absolute right-[-12rem] top-16 h-[36rem] w-[36rem] rounded-full bg-accent-300/28 blur-3xl dark:bg-accent-500/16"></div>
+      <div class="absolute bottom-[-18rem] right-[-8rem] h-[36rem] w-[36rem] rounded-full bg-accent-200/28 blur-3xl dark:bg-accent-500/8"></div>
+      <div class="absolute left-[18%] top-[44%] h-[24rem] w-[24rem] rounded-full bg-cyan-200/20 blur-3xl dark:bg-cyan-400/8"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.055)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
     </div>
 
     <MarketingNavbar
@@ -28,7 +29,7 @@
         <LocaleSwitcher />
         <button
           type="button"
-          class="rounded-xl border border-gray-200/70 bg-white/70 p-2 text-gray-600 transition hover:bg-white hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+        class="rounded-xl border border-primary-200/70 bg-white/75 p-2 text-gray-600 transition hover:bg-white hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
           @click="toggleTheme"
         >
@@ -39,7 +40,7 @@
     </MarketingNavbar>
 
     <main class="relative z-10 flex-1 px-4 pb-16 pt-6 sm:px-6">
-      <section class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-gray-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8">
+      <section class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-primary-100/80 bg-white/74 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8">
         <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
             <div class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-300">
@@ -55,31 +56,31 @@
             <div class="mt-6 flex flex-wrap gap-3">
               <RouterLink
                 to="/register"
-                class="inline-flex items-center justify-center rounded-2xl border border-gray-900/10 bg-gray-950 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_44px_rgba(15,23,42,0.18)] transition hover:-translate-y-0.5 hover:bg-gray-800 dark:border-white/15 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+              class="inline-flex items-center justify-center rounded-2xl border border-cyan-400/30 bg-gradient-to-r from-primary-500 via-cyan-400 to-accent-400 px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_44px_rgba(34,211,238,0.18)] transition hover:-translate-y-0.5 hover:from-primary-400 hover:via-cyan-300 hover:to-accent-300 dark:border-white/15 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
               >
                 {{ t('integrationDocs.hero.primaryCta') }}
               </RouterLink>
               <RouterLink
                 to="/available-channels"
-                class="inline-flex items-center justify-center rounded-2xl border border-gray-200/80 bg-white/75 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm backdrop-blur-xl transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
+              class="inline-flex items-center justify-center rounded-2xl border border-primary-200/80 bg-white/75 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm backdrop-blur-xl transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
               >
                 {{ t('integrationDocs.hero.secondaryCta') }}
               </RouterLink>
             </div>
           </div>
 
-          <div class="rounded-[1.5rem] border border-emerald-200/80 bg-white/62 p-5 shadow-sm backdrop-blur dark:border-emerald-900/50 dark:bg-white/[0.04]">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
+          <div class="rounded-[1.5rem] border border-primary-200/80 bg-white/66 p-5 shadow-sm backdrop-blur dark:border-primary-900/50 dark:bg-white/[0.04]">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
               {{ t('integrationDocs.baseUrl.label') }}
             </p>
             <div class="mt-3 space-y-3">
               <div>
                 <p class="text-xs font-semibold text-gray-500 dark:text-slate-400">{{ t('integrationDocs.baseUrl.gatewayLabel') }}</p>
-                <div class="mt-1 flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/80 px-4 py-3 dark:border-white/10 dark:bg-slate-950/60">
+                <div class="mt-1 flex items-center gap-2 rounded-2xl border border-primary-100 bg-white/82 px-4 py-3 dark:border-white/10 dark:bg-slate-950/60">
                   <code class="min-w-0 flex-1 break-all font-mono text-sm text-gray-950 dark:text-slate-100">{{ gatewayOrigin }}</code>
                   <button
                     type="button"
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-primary-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/15"
                     @click="copyConfig(gatewayOrigin, 'gateway-origin')"
                   >
                     <Icon :name="copiedKey === 'gateway-origin' ? 'checkCircle' : 'copy'" size="xs" />
@@ -97,7 +98,7 @@
         <div ref="tocColumnRef" class="relative z-20 md:min-h-full">
           <aside
             ref="tocPanelRef"
-            class="z-20 max-h-[calc(100vh-9rem)] self-start overflow-y-auto rounded-[1.5rem] border border-gray-200/70 bg-white/85 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75"
+            class="z-20 max-h-[calc(100vh-9rem)] self-start overflow-y-auto rounded-[1.5rem] border border-primary-100/80 bg-white/88 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-slate-950/75"
             :style="tocPanelStyle"
           >
             <div class="flex items-center justify-between gap-3">
@@ -237,15 +238,15 @@
                     </div>
                     <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-slate-400">{{ guide.description }}</p>
                   </div>
-                  <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm dark:border-emerald-900/50 dark:bg-emerald-900/20">
+                  <div class="rounded-2xl border border-primary-200 bg-primary-50/70 px-4 py-3 text-sm dark:border-primary-900/50 dark:bg-primary-900/20">
                     <div class="flex items-start justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="font-semibold text-emerald-800 dark:text-emerald-200">{{ guide.baseUrlLabel }}</p>
-                        <code class="mt-1 block break-all font-mono text-emerald-950 dark:text-emerald-100">{{ guide.baseUrl }}</code>
+                        <p class="font-semibold text-primary-800 dark:text-primary-200">{{ guide.baseUrlLabel }}</p>
+                        <code class="mt-1 block break-all font-mono text-primary-950 dark:text-primary-100">{{ guide.baseUrl }}</code>
                       </div>
                       <button
                         type="button"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-300/80 bg-white/75 px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-400 hover:bg-white dark:border-emerald-800/70 dark:bg-emerald-950/45 dark:text-emerald-100 dark:hover:bg-emerald-900/55"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-primary-300/80 bg-white/75 px-3 py-2 text-xs font-semibold text-primary-800 shadow-sm transition hover:border-primary-400 hover:bg-white dark:border-primary-800/70 dark:bg-primary-950/45 dark:text-primary-100 dark:hover:bg-primary-900/55"
                         @click="copyConfig(guide.baseUrl, `base-url-${guide.title}`)"
                       >
                         <Icon :name="copiedKey === `base-url-${guide.title}` ? 'checkCircle' : 'copy'" size="xs" />
@@ -1037,7 +1038,7 @@ const DocsSection = defineComponent({
     return () =>
       h('section', {
         id: props.id,
-        class: 'scroll-mt-6 rounded-[1.5rem] border border-gray-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] md:p-6'
+        class: 'scroll-mt-6 rounded-[1.5rem] border border-primary-100/80 bg-white/76 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] md:p-6'
       }, [
         h('div', { class: 'mb-5' }, [
           h('h2', { class: 'text-2xl font-semibold tracking-normal text-gray-950 dark:text-white' }, props.title),

@@ -71,15 +71,15 @@
             <div class="space-y-4 p-6">
               <!-- Security Warning -->
               <div
-                class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
+                class="rounded-lg border border-accent-200 bg-accent-50 p-4 dark:border-accent-800 dark:bg-accent-900/20"
               >
                 <div class="flex items-start">
                   <Icon
                     name="exclamationTriangle"
                     size="md"
-                    class="mt-0.5 flex-shrink-0 text-amber-500"
+                    class="mt-0.5 flex-shrink-0 text-accent-500"
                   />
-                  <p class="ml-3 text-sm text-amber-700 dark:text-amber-300">
+                  <p class="ml-3 text-sm text-accent-700 dark:text-accent-300">
                     {{ t("admin.settings.adminApiKey.securityWarning") }}
                   </p>
                 </div>
@@ -180,16 +180,14 @@
                 <!-- Newly Generated Key Display -->
                 <div
                   v-if="newAdminApiKey"
-                  class="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
+                  class="space-y-3 rounded-lg border border-primary-200 bg-primary-50 p-4 dark:border-primary-800 dark:bg-primary-900/20"
                 >
-                  <p
-                    class="text-sm font-medium text-green-700 dark:text-green-300"
-                  >
+                  <p class="text-sm font-medium text-primary-700 dark:text-primary-300">
                     {{ t("admin.settings.adminApiKey.keyWarning") }}
                   </p>
                   <div class="flex items-center gap-2">
                     <code
-                      class="flex-1 select-all break-all rounded border border-green-300 bg-white px-3 py-2 font-mono text-sm dark:border-green-700 dark:bg-dark-800"
+                      class="flex-1 select-all break-all rounded border border-primary-300 bg-white px-3 py-2 font-mono text-sm dark:border-primary-700 dark:bg-dark-800"
                     >
                       {{ newAdminApiKey }}
                     </code>
@@ -201,7 +199,7 @@
                       {{ t("admin.settings.adminApiKey.copyKey") }}
                     </button>
                   </div>
-                  <p class="text-xs text-green-600 dark:text-green-400">
+                  <p class="text-xs text-primary-600 dark:text-primary-400">
                     {{ t("admin.settings.adminApiKey.usage") }}
                   </p>
                 </div>
@@ -1556,7 +1554,7 @@
                   <!-- Warning when encryption key not configured -->
                   <p
                     v-if="!form.totp_encryption_key_configured"
-                    class="mt-2 text-sm text-amber-600 dark:text-amber-400"
+                    class="mt-2 text-sm text-accent-600 dark:text-accent-400"
                   >
                     {{ t("admin.settings.registration.totpKeyNotConfigured") }}
                   </p>
@@ -2287,7 +2285,7 @@
                     (form.wechat_connect_mp_enabled ||
                       form.wechat_connect_mobile_enabled)
                   "
-                  class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-300"
+                  class="rounded-lg border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-accent-700 dark:border-accent-900/40 dark:bg-accent-900/10 dark:text-accent-300"
                 >
                   {{
                     localText(
@@ -2568,7 +2566,7 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           {{ t("admin.settings.dingtalk.syncCorpEmailHint") }}
                         </p>
-                        <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <p class="text-xs text-accent-600 dark:text-accent-400 mt-1">
                           {{ t("admin.settings.dingtalk.syncCorpEmailPermissionHint") }}
                         </p>
                       </div>
@@ -2614,7 +2612,7 @@
                         <p class="text-sm text-gray-500 dark:text-gray-400">
                           {{ t("admin.settings.dingtalk.syncDeptHint") }}
                         </p>
-                        <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <p class="text-xs text-accent-600 dark:text-accent-400 mt-1">
                           {{ t("admin.settings.dingtalk.syncDeptPermissionHint") }}
                         </p>
                       </div>
@@ -3934,7 +3932,7 @@
                           !expandedProviders[pIdx] &&
                           provider.api_key_configured
                         "
-                        class="text-xs text-green-500"
+                        class="text-xs text-primary-500"
                       >
                         {{
                           t(
@@ -4132,8 +4130,8 @@
                             quotaPercentage(provider) > 90
                               ? 'bg-red-500'
                               : quotaPercentage(provider) > 70
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
+                                ? 'bg-accent-500'
+                                : 'bg-primary-500'
                           "
                           :style="{
                             width:
@@ -4288,7 +4286,7 @@
             <div class="space-y-6 p-6">
               <!-- Backend Mode -->
               <div
-                class="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
+                class="flex items-center justify-between rounded-lg border border-accent-200 bg-accent-50 p-4 dark:border-accent-800 dark:bg-accent-900/20"
               >
                 <div>
                   <h3 class="text-sm font-medium text-gray-900 dark:text-white">
@@ -4803,7 +4801,7 @@
                   {{ t("admin.settings.site.homeContentHint") }}
                 </p>
                 <!-- iframe CSP Warning -->
-                <p class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                <p class="mt-2 text-xs text-accent-600 dark:text-accent-400">
                   {{ t("admin.settings.site.homeContentIframeWarning") }}
                 </p>
               </div>

@@ -15,7 +15,7 @@
             :class="[
               'flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br',
               isOpenAILike
-                ? 'from-green-500 to-green-600'
+                ? 'from-primary-500 to-cyan-500'
                 : isGemini
                   ? 'from-blue-500 to-blue-600'
                   : isAntigravity
@@ -86,7 +86,7 @@
                 ? 'bg-purple-500 text-white'
                 : geminiOAuthType === 'code_assist'
                   ? 'bg-blue-500 text-white'
-                  : 'bg-amber-500 text-white'
+                  : 'bg-accent-500 text-white'
             ]"
           >
             <Icon v-if="geminiOAuthType === 'google_one'" name="user" size="sm" />

@@ -1,8 +1,8 @@
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+  <div class="auth-shell relative flex min-h-screen items-center justify-center overflow-hidden p-4">
     <!-- Background -->
     <div
-      class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
+      class="absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,rgba(96,165,250,0.16),transparent_28%),radial-gradient(circle_at_86%_12%,rgba(196,181,253,0.14),transparent_24%),radial-gradient(circle_at_78%_82%,rgba(251,146,60,0.08),transparent_20%),radial-gradient(circle_at_18%_82%,rgba(45,212,191,0.10),transparent_22%),linear-gradient(180deg,#fbfdff_0%,#f4f8fd_48%,#eef4fa_100%)] dark:bg-[radial-gradient(circle_at_14%_10%,rgba(56,189,248,0.16),transparent_28%),radial-gradient(circle_at_86%_12%,rgba(196,181,253,0.10),transparent_24%),radial-gradient(circle_at_18%_82%,rgba(45,212,191,0.08),transparent_22%),linear-gradient(180deg,#05060a_0%,#090c14_52%,#05060a_100%)]"
     ></div>
 
     <!-- Decorative Elements -->
@@ -20,7 +20,7 @@
 
       <!-- Grid Pattern -->
       <div
-        class="absolute inset-0 bg-[linear-gradient(rgba(20,184,166,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(20,184,166,0.03)_1px,transparent_1px)] bg-[size:64px_64px]"
+        class="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.035)_1px,transparent_1px)] bg-[size:64px_64px] opacity-70"
       ></div>
     </div>
 

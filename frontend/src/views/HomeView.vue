@@ -11,14 +11,12 @@
 
   <div
     v-else
-    class="gateway-page relative min-h-screen overflow-hidden bg-[#f8fafc] text-slate-950 transition-colors duration-500 dark:bg-[#050509] dark:text-white"
+    class="gateway-page relative min-h-screen overflow-hidden bg-transparent text-slate-950 transition-colors duration-500 dark:bg-[#050509] dark:text-white"
   >
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(124,58,237,0.18),transparent_34%),radial-gradient(circle_at_82%_10%,rgba(6,182,212,0.18),transparent_30%),linear-gradient(180deg,#ffffff_0%,#f8fafc_46%,#eef2ff_100%)] dark:bg-[radial-gradient(circle_at_18%_8%,rgba(124,58,237,0.34),transparent_34%),radial-gradient(circle_at_82%_10%,rgba(6,182,212,0.26),transparent_30%),linear-gradient(180deg,#050509_0%,#080a12_52%,#050509_100%)]"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.055)_1px,transparent_1px)] bg-[size:72px_72px] opacity-70 [mask-image:radial-gradient(circle_at_top,black,transparent_72%)] dark:bg-[linear-gradient(rgba(255,255,255,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.055)_1px,transparent_1px)]"></div>
-      <div class="token-particle particle-a"></div>
-      <div class="token-particle particle-b"></div>
-      <div class="token-particle particle-c"></div>
+      <div class="absolute inset-0 bg-[radial-gradient(circle_at_10%_12%,rgba(214,231,255,0.96)_0%,rgba(214,231,255,0.78)_11%,transparent_30%),radial-gradient(circle_at_49%_2%,rgba(228,220,255,0.95)_0%,rgba(228,220,255,0.6)_11%,transparent_28%),radial-gradient(circle_at_88%_12%,rgba(255,216,196,0.96)_0%,rgba(255,216,196,0.5)_12%,transparent_30%),radial-gradient(circle_at_14%_88%,rgba(215,242,255,0.88)_0%,rgba(215,242,255,0.36)_12%,transparent_30%),radial-gradient(circle_at_90%_90%,rgba(255,231,219,0.76)_0%,rgba(255,231,219,0.24)_10%,transparent_28%),linear-gradient(180deg,#fcfdff_0%,#f4f8ff_40%,#eef3fb_100%)] dark:bg-[radial-gradient(circle_at_10%_12%,rgba(56,189,248,0.2),transparent_30%),radial-gradient(circle_at_49%_2%,rgba(196,181,253,0.18),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(251,146,60,0.14),transparent_26%),radial-gradient(circle_at_14%_88%,rgba(45,212,191,0.14),transparent_30%),linear-gradient(180deg,#050509_0%,#080a12_52%,#050509_100%)]"></div>
+      <div class="absolute left-1/2 top-[42%] h-[34rem] w-[48rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/18 blur-[140px] dark:bg-white/[0.05]"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(148,163,184,0.022)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.022)_1px,transparent_1px)] bg-[size:72px_72px] opacity-16 [mask-image:radial-gradient(circle_at_top,black,transparent_74%)] dark:bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)]"></div>
     </div>
 
     <MarketingNavbar
@@ -54,8 +52,8 @@
     <main class="relative z-10">
       <section class="mx-auto grid min-h-[calc(100vh-6rem)] max-w-7xl items-center gap-12 px-4 pb-20 pt-12 sm:px-6 lg:grid-cols-[0.95fr_1.05fr] lg:pt-6">
         <div class="animate-fade-in">
-          <div class="inline-flex items-center gap-2 rounded-full border border-violet-300/50 bg-white/70 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm backdrop-blur-xl dark:border-violet-400/30 dark:bg-white/[0.06] dark:text-violet-200 dark:shadow-[0_0_34px_rgba(124,58,237,0.18)]">
-            <span class="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_14px_rgba(6,182,212,0.9)]"></span>
+          <div class="inline-flex items-center gap-2 rounded-full border border-primary-300/50 bg-white/70 px-3 py-1.5 text-xs font-semibold text-primary-700 shadow-sm backdrop-blur-xl dark:border-primary-400/30 dark:bg-white/[0.06] dark:text-primary-200 dark:shadow-[0_0_34px_rgba(59,130,246,0.18)]">
+            <span class="h-1.5 w-1.5 rounded-full bg-primary-400 shadow-[0_0_14px_rgba(59,130,246,0.9)]"></span>
             {{ t('gateway.home.hero.eyebrow') }}
           </div>
           <h1 class="mt-7 max-w-4xl text-5xl font-semibold leading-[1.02] tracking-normal text-slate-950 dark:text-white sm:text-6xl lg:text-7xl">
@@ -91,13 +89,13 @@
           <div class="routing-visual relative aspect-square rounded-[2rem] border border-slate-200/70 bg-white/55 shadow-[0_30px_120px_rgba(15,23,42,0.18)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_0_120px_rgba(6,182,212,0.12)]">
             <div class="absolute inset-8 rounded-[1.5rem] border border-slate-200/50 dark:border-white/10"></div>
             <div class="absolute left-5 top-5 z-10 rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2 text-[11px] font-semibold text-slate-600 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/45 dark:text-slate-300">
-              <span class="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]"></span>
+              <span class="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-primary-400 shadow-[0_0_10px_rgba(59,130,246,0.9)]"></span>
               {{ t('gateway.home.routeVisual.ingress') }}
             </div>
             <div class="absolute right-5 top-5 z-10 rounded-2xl border border-cyan-200/80 bg-cyan-50/70 px-3 py-2 text-[11px] font-semibold text-cyan-800 shadow-sm backdrop-blur-xl dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-100">
               {{ t('gateway.home.routeVisual.latency') }}
             </div>
-            <div class="absolute bottom-5 left-5 z-10 rounded-2xl border border-violet-200/80 bg-violet-50/70 px-3 py-2 text-[11px] font-semibold text-violet-800 shadow-sm backdrop-blur-xl dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-100">
+            <div class="absolute bottom-5 left-5 z-10 rounded-2xl border border-accent-200/80 bg-accent-50/70 px-3 py-2 text-[11px] font-semibold text-accent-800 shadow-sm backdrop-blur-xl dark:border-accent-400/20 dark:bg-accent-400/10 dark:text-accent-100">
               {{ t('gateway.home.routeVisual.policy') }}
             </div>
             <div class="absolute bottom-5 right-5 z-10 rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2 text-[11px] font-semibold text-slate-600 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/45 dark:text-slate-300">
@@ -112,7 +110,7 @@
               <div class="space-y-1.5">
                 <span class="block h-1.5 w-11/12 rounded-full bg-slate-200 dark:bg-white/12"></span>
                 <span class="block h-1.5 w-8/12 rounded-full bg-cyan-300/70"></span>
-                <span class="block h-1.5 w-10/12 rounded-full bg-violet-300/70"></span>
+                <span class="block h-1.5 w-10/12 rounded-full bg-accent-300/70"></span>
               </div>
             </div>
 
@@ -162,7 +160,7 @@
 
       <section class="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <article v-for="feature in features" :key="feature.title" class="group rounded-2xl border border-slate-200/70 bg-white/70 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_20px_70px_rgba(124,58,237,0.14)] dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-cyan-400/40 dark:hover:shadow-[0_0_55px_rgba(6,182,212,0.12)]">
+          <article v-for="feature in features" :key="feature.title" class="group rounded-2xl border border-slate-200/70 bg-white/70 p-5 backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-primary-300 hover:shadow-[0_20px_70px_rgba(59,130,246,0.14)] dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-cyan-400/40 dark:hover:shadow-[0_0_55px_rgba(6,182,212,0.12)]">
             <div class="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-cyan-600 dark:border-white/10 dark:bg-white/[0.06] dark:text-cyan-300">
               <Icon :name="feature.icon" size="md" />
             </div>
@@ -182,8 +180,8 @@
           <div class="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div class="flex gap-2">
               <span class="h-3 w-3 rounded-full bg-red-400"></span>
-              <span class="h-3 w-3 rounded-full bg-amber-300"></span>
-              <span class="h-3 w-3 rounded-full bg-emerald-400"></span>
+              <span class="h-3 w-3 rounded-full bg-accent-300"></span>
+              <span class="h-3 w-3 rounded-full bg-primary-400"></span>
             </div>
             <button class="rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:bg-white/15" @click="copyCode">
               {{ copied ? t('common.copied') : t('common.copy') }}
@@ -196,7 +194,7 @@
       <section class="mx-auto max-w-7xl px-4 py-14 sm:px-6">
         <div class="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
           <div class="rounded-[2rem] border border-slate-200/70 bg-white/70 p-6 backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
-            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-violet-600 dark:text-violet-300">{{ t('gateway.home.dashboard.eyebrow') }}</p>
+            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-primary-600 dark:text-primary-300">{{ t('gateway.home.dashboard.eyebrow') }}</p>
             <h2 class="mt-4 text-3xl font-semibold tracking-normal text-slate-950 dark:text-white">{{ t('gateway.home.dashboard.title') }}</h2>
             <p class="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-400">{{ t('gateway.home.dashboard.copy') }}</p>
           </div>
@@ -214,7 +212,7 @@
                   <span>24h</span>
                 </div>
                 <div class="flex h-36 items-end gap-2">
-                  <span v-for="bar in trafficBars" :key="bar" class="flex-1 rounded-t-lg bg-gradient-to-t from-violet-500 to-cyan-400 opacity-80" :style="{ height: `${bar}%` }"></span>
+                  <span v-for="bar in trafficBars" :key="bar" class="flex-1 rounded-t-lg bg-gradient-to-t from-primary-500 to-cyan-400 opacity-80" :style="{ height: `${bar}%` }"></span>
                 </div>
               </div>
               <div class="rounded-2xl border border-slate-200/70 bg-white/70 p-4 dark:border-white/10 dark:bg-slate-950/35">
@@ -223,7 +221,7 @@
                   <div v-for="model in modelShare" :key="model.name">
                     <div class="flex justify-between text-xs"><span>{{ model.name }}</span><span>{{ model.value }}%</span></div>
                     <div class="mt-1 h-1.5 rounded-full bg-slate-200 dark:bg-white/10">
-                      <div class="h-full rounded-full bg-gradient-to-r from-violet-500 to-cyan-400" :style="{ width: `${model.value}%` }"></div>
+                      <div class="h-full rounded-full bg-gradient-to-r from-primary-500 to-cyan-400" :style="{ width: `${model.value}%` }"></div>
                     </div>
                   </div>
                 </div>
@@ -295,10 +293,10 @@ const metrics = computed(() => [
 ])
 
 const modelNodes = [
-  { name: 'GPT', short: 'G', caption: 'OpenAI', color: 'from-emerald-400 to-cyan-400', position: 'node-top' },
-  { name: 'Claude', short: 'C', caption: 'Anthropic', color: 'from-orange-300 to-rose-400', position: 'node-right' },
-  { name: 'Gemini', short: 'G', caption: 'Google', color: 'from-blue-400 to-violet-400', position: 'node-bottom' },
-  { name: 'DeepSeek', short: 'D', caption: 'DeepSeek', color: 'from-cyan-300 to-blue-500', position: 'node-left' }
+  { name: 'GPT', short: 'G', caption: 'OpenAI', color: 'from-primary-400 to-cyan-400', position: 'node-top' },
+  { name: 'Claude', short: 'C', caption: 'Anthropic', color: 'from-accent-300 to-primary-400', position: 'node-right' },
+  { name: 'Gemini', short: 'G', caption: 'Google', color: 'from-cyan-300 to-primary-500', position: 'node-bottom' },
+  { name: 'DeepSeek', short: 'D', caption: 'DeepSeek', color: 'from-cyan-300 to-primary-500', position: 'node-left' }
 ]
 const routePaths = [
   'M300 300 C300 210 300 160 300 92',

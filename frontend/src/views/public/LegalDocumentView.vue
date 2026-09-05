@@ -1,9 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-50 text-gray-900 dark:bg-dark-950 dark:text-white">
-    <header class="border-b border-gray-200 bg-white/95 dark:border-dark-800 dark:bg-dark-900/95">
+  <div class="legal-document-page min-h-screen text-gray-900 dark:bg-dark-950 dark:text-white">
+    <div class="pointer-events-none fixed inset-0 overflow-hidden">
+      <div class="absolute left-[-10rem] top-[-16rem] h-[38rem] w-[38rem] rounded-full bg-sky-300/24 blur-3xl dark:bg-sky-400/12"></div>
+      <div class="absolute right-[-10rem] top-16 h-[34rem] w-[34rem] rounded-full bg-violet-300/18 blur-3xl dark:bg-violet-500/12"></div>
+      <div class="absolute bottom-[-16rem] left-[16%] h-[28rem] w-[28rem] rounded-full bg-amber-200/18 blur-3xl dark:bg-amber-500/8"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.04)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_82%)] dark:bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)]"></div>
+    </div>
+
+    <header class="relative z-10 border-b border-sky-100/80 bg-white/82 backdrop-blur-2xl dark:border-dark-800 dark:bg-dark-900/95">
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <RouterLink to="/home" class="flex min-w-0 items-center gap-3">
-          <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-200 dark:bg-dark-800 dark:ring-dark-700">
+          <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-sky-100 dark:bg-dark-800 dark:ring-dark-700">
             <img :src="siteLogo || BRAND_LOGO_URL" alt="Logo" class="h-full w-full object-contain" />
           </span>
           <span class="truncate text-base font-semibold text-gray-950 dark:text-white">
@@ -12,21 +19,21 @@
         </RouterLink>
         <RouterLink
           to="/login"
-          class="inline-flex flex-shrink-0 items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-primary-600/20 transition hover:bg-primary-700"
+          class="inline-flex flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-cyan-600/20 transition hover:from-primary-400 hover:via-cyan-300 hover:to-sky-300"
         >
           登录
         </RouterLink>
       </div>
     </header>
 
-    <main class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
+    <main class="relative z-10 mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10">
       <div v-if="loading" class="flex min-h-[320px] items-center justify-center">
-        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
+        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
       </div>
 
       <section
         v-else-if="loadError"
-        class="rounded-lg border border-red-200 bg-red-50 p-6 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
+        class="rounded-xl border border-red-200 bg-red-50/90 p-6 text-red-700 backdrop-blur dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200"
       >
         <h1 class="text-lg font-semibold">文档加载失败</h1>
         <p class="mt-2 text-sm">请稍后刷新页面重试。</p>
@@ -34,10 +41,10 @@
 
       <section
         v-else-if="!currentDocument"
-        class="rounded-lg border border-gray-200 bg-white p-6 dark:border-dark-700 dark:bg-dark-900"
+        class="rounded-xl border border-sky-100/80 bg-white/82 p-6 backdrop-blur-2xl dark:border-dark-700 dark:bg-dark-900"
       >
         <div class="flex items-start gap-3">
-          <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-600 dark:bg-dark-800 dark:text-dark-300">
+            <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-600 dark:bg-dark-800 dark:text-dark-300">
             <Icon name="document" size="sm" />
           </span>
           <div>
@@ -50,13 +57,13 @@
       </section>
 
       <article v-else>
-        <div class="mb-8 border-b border-gray-200 pb-6 dark:border-dark-700">
+        <div class="mb-8 border-b border-sky-100 pb-6 dark:border-dark-700">
           <div class="flex items-start gap-4">
-            <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-300">
+            <span class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-700 dark:bg-primary-500/10 dark:text-primary-300">
               <Icon :name="documentIcon" size="md" />
             </span>
             <div class="min-w-0">
-              <p class="text-sm font-medium text-primary-700 dark:text-primary-300">登录条款</p>
+              <p class="text-sm font-medium text-sky-700 dark:text-primary-300">登录条款</p>
               <h1 class="mt-2 break-words text-2xl font-bold tracking-normal text-gray-950 dark:text-white sm:text-3xl">
                 {{ currentDocument.title }}
               </h1>
@@ -74,7 +81,7 @@
         ></div>
         <div
           v-else
-          class="rounded-lg border border-dashed border-gray-300 bg-white px-6 py-14 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400"
+          class="rounded-xl border border-dashed border-sky-200 bg-white/82 px-6 py-14 text-center text-sm text-gray-500 backdrop-blur-2xl dark:border-dark-700 dark:bg-dark-900 dark:text-dark-400"
         >
           暂无正文内容
         </div>

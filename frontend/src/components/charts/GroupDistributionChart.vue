@@ -73,7 +73,7 @@
                 <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
                   {{ formatTokens(group.total_tokens) }}
                 </td>
-                <td class="py-1.5 text-right text-green-600 dark:text-green-400">
+                <td class="py-1.5 text-right text-primary-600 dark:text-primary-400">
                   ${{ formatCost(group.actual_cost) }}
                 </td>
                 <td class="py-1.5 text-right text-orange-500 dark:text-orange-400">
@@ -170,15 +170,15 @@ const toggleBreakdown = async (type: string, id: number | string) => {
 
 const chartColors = [
   '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
   '#8b5cf6',
-  '#ec4899',
-  '#14b8a6',
-  '#f97316',
+  '#2f8bff',
+  '#ef4444',
+  '#22b8f0',
+  '#c4b5fd',
+  '#5b21b6',
+  '#06b6d4',
   '#6366f1',
-  '#84cc16'
+  '#8ac7ff'
 ]
 
 const displayGroupStats = computed(() => {

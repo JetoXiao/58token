@@ -21,6 +21,22 @@
       'cv03',
       'cv04',
       'cv11';
+    background-image:
+      radial-gradient(circle at 12% 10%, rgba(96, 165, 250, 0.12), transparent 28%),
+      radial-gradient(circle at 86% 14%, rgba(196, 181, 253, 0.12), transparent 24%),
+      radial-gradient(circle at 84% 82%, rgba(251, 146, 60, 0.08), transparent 20%),
+      radial-gradient(circle at 16% 86%, rgba(45, 212, 191, 0.09), transparent 20%),
+      linear-gradient(180deg, #fbfdff 0%, #f4f8fd 46%, #eef4fa 100%);
+    background-attachment: fixed;
+    background-size: cover;
+  }
+
+  html.dark body {
+    background-image:
+      radial-gradient(circle at 12% 10%, rgba(56, 189, 248, 0.14), transparent 28%),
+      radial-gradient(circle at 84% 12%, rgba(196, 181, 253, 0.10), transparent 24%),
+      radial-gradient(circle at 82% 82%, rgba(45, 212, 191, 0.08), transparent 22%),
+      linear-gradient(180deg, #05060a 0%, #090c14 52%, #05060a 100%);
   }
 
   /* 自定义滚动条 - 仅针对 Firefox，避免 Chrome 取消 webkit 的全局定制 */
@@ -82,17 +98,17 @@
   }
 
   .btn-primary {
-    @apply bg-white text-slate-950 shadow-md shadow-white/10;
-    @apply hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-lg hover:shadow-cyan-500/10;
-    @apply dark:bg-white dark:text-slate-950;
+    @apply bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400 text-white shadow-md shadow-primary-500/20;
+    @apply hover:-translate-y-0.5 hover:from-primary-400 hover:via-cyan-300 hover:to-sky-300 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply dark:from-primary-400 dark:via-cyan-300 dark:to-sky-300 dark:text-slate-950;
   }
 
   .btn-auth-primary {
-    @apply border border-primary-500/60 bg-white/95 text-slate-950 shadow-md shadow-primary-500/15 ring-1 ring-primary-500/10;
-    @apply hover:border-primary-500 hover:bg-primary-50 hover:shadow-lg hover:shadow-primary-500/20;
-    @apply focus:ring-primary-500/60;
-    @apply disabled:opacity-100 disabled:border-gray-300 disabled:bg-white/85 disabled:text-gray-500 disabled:shadow-sm;
-    @apply dark:border-primary-400/50 dark:bg-white dark:text-slate-950 dark:ring-primary-400/20;
+    @apply border border-cyan-400/35 bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400 text-white shadow-md shadow-cyan-500/20 ring-1 ring-cyan-400/10;
+    @apply hover:-translate-y-0.5 hover:from-primary-400 hover:via-cyan-300 hover:to-sky-300 hover:shadow-lg hover:shadow-cyan-500/25;
+    @apply focus:ring-cyan-400/40;
+    @apply disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-500 disabled:shadow-none;
+    @apply dark:border-cyan-300/35 dark:from-primary-400 dark:via-cyan-300 dark:to-sky-300 dark:text-slate-950 dark:ring-cyan-300/20;
     @apply dark:disabled:border-white/15 dark:disabled:bg-white/[0.08] dark:disabled:text-dark-300;
   }
 
@@ -114,17 +130,37 @@
   }
 
   .btn-success {
-    @apply bg-gradient-to-r from-emerald-500 to-emerald-600;
-    @apply text-white shadow-md shadow-emerald-500/25;
-    @apply hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30;
-    @apply dark:shadow-emerald-500/20;
+    @apply bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400;
+    @apply text-white shadow-md shadow-primary-500/20;
+    @apply hover:from-primary-400 hover:via-cyan-300 hover:to-sky-300 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply dark:shadow-primary-500/20;
   }
 
   .btn-warning {
-    @apply bg-gradient-to-r from-amber-500 to-amber-600;
-    @apply text-white shadow-md shadow-amber-500/25;
-    @apply hover:from-amber-600 hover:to-amber-700 hover:shadow-lg hover:shadow-amber-500/30;
-    @apply dark:shadow-amber-500/20;
+    @apply bg-gradient-to-r from-accent-500 via-primary-500 to-cyan-400;
+    @apply text-white shadow-md shadow-accent-500/20;
+    @apply hover:from-accent-400 hover:via-primary-400 hover:to-cyan-300 hover:shadow-lg hover:shadow-accent-500/25;
+    @apply dark:shadow-accent-500/20;
+  }
+
+  .btn-error,
+  .btn-danger {
+    @apply bg-gradient-to-r from-accent-500 to-primary-600 text-white shadow-md shadow-accent-500/20;
+    @apply hover:from-accent-400 hover:to-primary-500 hover:shadow-lg hover:shadow-accent-500/25;
+  }
+
+  .btn-outline-success,
+  .btn-success-outline {
+    @apply border border-primary-300 bg-white/75 text-primary-700 shadow-sm backdrop-blur-xl;
+    @apply hover:border-primary-400 hover:bg-primary-50 hover:text-primary-800;
+    @apply dark:border-primary-300/35 dark:bg-white/[0.04] dark:text-primary-300 dark:hover:border-primary-300 dark:hover:bg-primary-500/10;
+  }
+
+  .btn-outline-warning,
+  .btn-warning-outline {
+    @apply border border-accent-300 bg-white/75 text-accent-700 shadow-sm backdrop-blur-xl;
+    @apply hover:border-accent-400 hover:bg-accent-50 hover:text-accent-800;
+    @apply dark:border-accent-300/35 dark:bg-white/[0.04] dark:text-accent-300 dark:hover:border-accent-300 dark:hover:bg-accent-500/10;
   }
 
   .btn-stripe {
@@ -135,31 +171,30 @@
   }
 
   .btn-airwallex {
-    @apply bg-[#14171A] text-white shadow-md shadow-emerald-500/20;
-    @apply hover:bg-[#20252a] hover:shadow-lg hover:shadow-emerald-500/25;
-    @apply dark:bg-[#7AF0C4] dark:text-gray-950 dark:shadow-emerald-500/20;
-    @apply dark:hover:bg-[#62d9ad];
+    @apply bg-gradient-to-r from-primary-500 via-accent-500 to-cyan-400 text-white shadow-md shadow-primary-500/20;
+    @apply hover:from-primary-400 hover:via-accent-400 hover:to-cyan-300 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply dark:from-primary-400 dark:via-accent-400 dark:to-cyan-300 dark:text-slate-950 dark:shadow-primary-500/20;
   }
 
   .btn-usdt {
-    @apply border border-emerald-700 bg-emerald-600 text-white shadow-md shadow-emerald-500/25;
-    @apply hover:-translate-y-0.5 hover:border-emerald-800 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30;
-    @apply focus:ring-emerald-500/50 dark:border-emerald-300 dark:bg-emerald-400 dark:text-slate-950;
-    @apply dark:hover:border-emerald-200 dark:hover:bg-emerald-300 dark:shadow-emerald-500/20;
+    @apply border border-primary-600 bg-primary-500 text-white shadow-md shadow-primary-500/20;
+    @apply hover:-translate-y-0.5 hover:border-primary-700 hover:bg-primary-600 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply focus:ring-primary-500/50 dark:border-primary-300 dark:bg-primary-400 dark:text-slate-950;
+    @apply dark:hover:border-primary-200 dark:hover:bg-primary-300 dark:shadow-primary-500/20;
   }
 
   .btn-alipay {
-    @apply bg-[#00AEEF] text-white shadow-md shadow-[#00AEEF]/25;
-    @apply hover:bg-[#009dd6] hover:shadow-lg hover:shadow-[#00AEEF]/30;
-    @apply active:bg-[#008cbe];
-    @apply dark:shadow-[#00AEEF]/20;
+    @apply bg-gradient-to-r from-primary-500 via-cyan-400 to-sky-400 text-white shadow-md shadow-primary-500/20;
+    @apply hover:from-primary-400 hover:via-cyan-300 hover:to-sky-300 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply active:from-primary-600 active:via-cyan-500 active:to-sky-500;
+    @apply dark:shadow-primary-500/20;
   }
 
   .btn-wxpay {
-    @apply bg-[#2BB741] text-white shadow-md shadow-[#2BB741]/25;
-    @apply hover:bg-[#24a038] hover:shadow-lg hover:shadow-[#2BB741]/30;
-    @apply active:bg-[#1d8a2f];
-    @apply dark:shadow-[#2BB741]/20;
+    @apply bg-gradient-to-r from-primary-500 via-accent-500 to-cyan-400 text-white shadow-md shadow-primary-500/20;
+    @apply hover:from-primary-400 hover:via-accent-400 hover:to-cyan-300 hover:shadow-lg hover:shadow-primary-500/25;
+    @apply active:from-primary-600 active:via-accent-600 active:to-cyan-500;
+    @apply dark:shadow-primary-500/20;
   }
 
   .btn-sm {
@@ -247,9 +282,9 @@
   }
 
   .card-glass {
-    @apply bg-white/70 dark:bg-dark-800/70;
-    @apply backdrop-blur-xl;
-    @apply border border-white/20 dark:border-dark-700/50;
+    @apply bg-gradient-to-br from-white/90 via-white/80 to-sky-50/70 dark:bg-white/[0.045];
+    @apply backdrop-blur-2xl;
+    @apply border border-sky-100/80 dark:border-white/10;
     @apply shadow-glass;
   }
 
@@ -284,11 +319,11 @@
   }
 
   .stat-icon-success {
-    @apply bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400;
+    @apply bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400;
   }
 
   .stat-icon-warning {
-    @apply bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400;
+    @apply bg-accent-100 text-accent-600 dark:bg-accent-900/30 dark:text-accent-400;
   }
 
   .stat-icon-danger {
@@ -308,7 +343,7 @@
   }
 
   .stat-trend-up {
-    @apply text-emerald-600 dark:text-emerald-400;
+    @apply text-primary-600 dark:text-primary-400;
   }
 
   .stat-trend-down {
@@ -357,11 +392,11 @@
   }
 
   .badge-success {
-    @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400;
+    @apply bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400;
   }
 
   .badge-warning {
-    @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400;
+    @apply bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400;
   }
 
   .badge-danger {
@@ -543,7 +578,7 @@
   }
 
   .toast-success {
-    @apply border-l-emerald-500;
+    @apply border-l-primary-500;
   }
 
   .toast-error {
@@ -551,7 +586,7 @@
   }
 
   .toast-warning {
-    @apply border-l-amber-500;
+    @apply border-l-accent-500;
   }
 
   .toast-info {
@@ -681,7 +716,7 @@
   }
 
   .progress-bar {
-    @apply h-full bg-gradient-to-r from-primary-500 to-primary-400;
+    @apply h-full bg-gradient-to-r from-primary-500 via-accent-500 to-cyan-400;
     @apply transition-all duration-300;
   }
 
@@ -743,13 +778,13 @@
   }
 
   .tour-success-box {
-    @apply rounded-md border-l-4 border-emerald-500 bg-emerald-50 px-3 py-2 text-xs text-emerald-900;
-    @apply dark:border-emerald-400 dark:bg-emerald-950/40 dark:text-emerald-200;
+    @apply rounded-md border-l-4 border-primary-500 bg-primary-50 px-3 py-2 text-xs text-primary-900;
+    @apply dark:border-primary-400 dark:bg-primary-950/40 dark:text-primary-200;
   }
 
   .tour-warning-box {
-    @apply rounded-md border-l-4 border-amber-500 bg-amber-50 px-3 py-2 text-xs text-amber-900;
-    @apply dark:border-amber-400 dark:bg-amber-950/40 dark:text-amber-200;
+    @apply rounded-md border-l-4 border-accent-500 bg-accent-50 px-3 py-2 text-xs text-accent-900;
+    @apply dark:border-accent-400 dark:bg-accent-950/40 dark:text-accent-200;
   }
 
   .tour-error-box {
@@ -772,7 +807,7 @@
 @layer utilities {
   /* 文字渐变 */
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-600 via-sky-500 to-violet-500 bg-clip-text text-transparent;
   }
 
   /* 玻璃效果 */

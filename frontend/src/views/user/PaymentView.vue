@@ -34,7 +34,7 @@
             <div class="space-y-6">
               <div class="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-900 sm:p-8">
                 <div class="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl dark:bg-cyan-400/10"></div>
-                <div class="pointer-events-none absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-violet-500/15 blur-3xl dark:bg-violet-500/10"></div>
+                <div class="pointer-events-none absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-accent-500/15 blur-3xl dark:bg-accent-500/10"></div>
                 <div class="relative grid gap-6">
                   <div>
                     <p class="inline-flex rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300">
@@ -52,9 +52,9 @@
                         <p class="mt-2 text-4xl font-black text-gray-950 dark:text-white">{{ formatUsdBalance(user?.balance || 0) }}</p>
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ user?.username || t('payment.rechargeAccount') }}</p>
                       </div>
-                      <div class="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 text-sm dark:border-emerald-900/50 dark:bg-emerald-900/20">
-                        <p class="font-semibold text-emerald-800 dark:text-emerald-200">{{ t('payment.usdtExchangeRateTitle') }}</p>
-                        <p class="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ usdtCnyExchangeRateLabel }}</p>
+                      <div class="rounded-2xl border border-primary-200 bg-primary-50/70 p-4 text-sm dark:border-primary-900/50 dark:bg-primary-900/20">
+                        <p class="font-semibold text-primary-800 dark:text-primary-200">{{ t('payment.usdtExchangeRateTitle') }}</p>
+                        <p class="mt-1 text-2xl font-black text-primary-700 dark:text-primary-300">{{ usdtCnyExchangeRateLabel }}</p>
                       </div>
                     </div>
                   </div>
@@ -68,7 +68,7 @@
                       <div>
                         <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.paymentRailTitle') }}</p>
                       </div>
-                      <span class="w-fit rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                      <span class="w-fit rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-900/60 dark:bg-primary-900/20 dark:text-primary-300">
                         {{ t('payment.rechargeValueTitle') }}
                       </span>
                     </div>
@@ -92,7 +92,7 @@
                             :class="[
                               'rounded-full px-2 py-0.5 text-[11px] font-semibold',
                               rmbRailAvailable
-                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                ? 'border border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900/60 dark:bg-primary-900/20 dark:text-primary-300'
                                 : 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300',
                             ]"
                           >
@@ -120,7 +120,7 @@
                             :class="[
                               'rounded-full px-2 py-0.5 text-[11px] font-semibold',
                               usdtRailAvailable
-                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300'
+                                ? 'border border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-900/60 dark:bg-primary-900/20 dark:text-primary-300'
                                 : 'bg-gray-200 text-gray-600 dark:bg-dark-700 dark:text-gray-300',
                             ]"
                           >
@@ -152,7 +152,7 @@
                         ]"
                         @click="selectRechargePackage(pkg.amount)"
                       >
-                        <span v-if="pkg.badgeKey" class="absolute right-4 top-4 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+                        <span v-if="pkg.badgeKey" class="absolute right-4 top-4 rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-bold text-accent-700 dark:border-accent-900/50 dark:bg-accent-900/20 dark:text-accent-300">
                           {{ t(pkg.badgeKey) }}
                         </span>
                         <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">{{ t(pkg.nameKey) }}</p>
@@ -166,14 +166,14 @@
                             {{ t('payment.rmbOnlinePayHint') }}
                           </p>
                         </div>
-                        <div class="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 dark:border-emerald-900/50 dark:bg-emerald-900/20">
+                        <div class="mt-5 rounded-xl border border-primary-200 bg-primary-50/80 p-3 dark:border-primary-900/50 dark:bg-primary-900/20">
                           <div class="flex items-start justify-between gap-3">
-                            <p class="text-xs font-medium text-emerald-700 dark:text-emerald-300">{{ t('payment.receiveUsd') }}</p>
-                            <span v-if="bonusForAmount(pkg.amount) > 0" class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200">
+                            <p class="text-xs font-medium text-primary-700 dark:text-primary-300">{{ t('payment.receiveUsd') }}</p>
+                            <span v-if="bonusForAmount(pkg.amount) > 0" class="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-bold text-primary-700 dark:bg-primary-900/40 dark:text-primary-200">
                               {{ t('payment.rechargeBonusBadge', { amount: formatUsdBalance(bonusForAmount(pkg.amount)) }) }}
                             </span>
                           </div>
-                          <p class="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ formatUsdBalance(creditedForAmount(pkg.amount)) }}</p>
+                          <p class="mt-1 text-2xl font-black text-primary-700 dark:text-primary-300">{{ formatUsdBalance(creditedForAmount(pkg.amount)) }}</p>
                         </div>
                       </button>
                     </div>
@@ -191,7 +191,7 @@
                       :max="globalMaxAmount"
                       prefix="¥"
                     />
-                    <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
+                    <p v-if="amountError" class="mt-2 text-xs text-accent-600 dark:text-accent-300">{{ amountError }}</p>
                   </div>
                 </div>
 
@@ -228,14 +228,14 @@
                       </div>
                       <div v-if="rechargeBonusAmount > 0" class="flex justify-between gap-4">
                         <span class="text-gray-500 dark:text-gray-400">{{ t('payment.rechargeBonus') }}</span>
-                        <span class="font-semibold text-emerald-700 dark:text-emerald-300">{{ formatUsdBalance(rechargeBonusAmount) }}</span>
+                        <span class="font-semibold text-primary-700 dark:text-primary-300">{{ formatUsdBalance(rechargeBonusAmount) }}</span>
                       </div>
-                      <div class="rounded-xl bg-emerald-50 p-4 dark:bg-emerald-900/20">
+                      <div class="rounded-xl bg-primary-50 p-4 dark:bg-primary-900/20">
                         <div class="flex items-center justify-between gap-4">
-                          <span class="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{{ t('payment.creditedBalance') }}</span>
-                          <span class="text-2xl font-black text-emerald-700 dark:text-emerald-300">{{ formatUsdBalance(creditedAmount) }}</span>
+                          <span class="text-sm font-semibold text-primary-700 dark:text-primary-300">{{ t('payment.creditedBalance') }}</span>
+                          <span class="text-2xl font-black text-primary-700 dark:text-primary-300">{{ formatUsdBalance(creditedAmount) }}</span>
                         </div>
-                        <p class="mt-2 text-xs leading-5 text-emerald-700/80 dark:text-emerald-300/80">
+                        <p class="mt-2 text-xs leading-5 text-primary-700/80 dark:text-primary-300/80">
                           {{ t('payment.rechargeRatePreview', { usd: balanceRechargeMultiplier.toFixed(2) }) }}
                         </p>
                       </div>
@@ -413,7 +413,7 @@
                         <span v-if="selectedPlanHasSavings" :class="['rounded-full px-2 py-0.5 text-xs font-semibold', planDiscountClass]">
                           {{ selectedPlanDiscountText }}
                         </span>
-                        <span v-if="selectedPlanLimitedOfferActive" class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                        <span v-if="selectedPlanLimitedOfferActive" class="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-bold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
                           {{ t('payment.planCard.limitedOffer') }}
                         </span>
                       </div>
@@ -434,7 +434,7 @@
                           <p class="text-sm font-semibold text-gray-400 line-through dark:text-gray-500">
                             {{ formatSelectedPlanAmount(selectedPlanLimitedOfferActive ? selectedPlanRegularPrice : (selectedPlan.original_price || 0)) }}
                           </p>
-                          <p v-if="selectedPlanHasSavings" class="mt-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                          <p v-if="selectedPlanHasSavings" class="mt-1 text-xs font-bold text-primary-700 dark:text-primary-300">
                             {{ selectedPlanSavingsText }}
                           </p>
                         </div>
@@ -443,7 +443,7 @@
 
                     <div
                       v-if="selectedPlanLimitedOfferActive"
-                      class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-200"
+                      class="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-xs font-semibold text-primary-700 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-200"
                     >
                       {{ t('payment.planCard.limitedOfferUntil', { time: selectedPlanLimitedOfferEndText, price: formatSelectedPlanAmount(selectedPlanRegularPrice) }) }}
                     </div>
@@ -480,18 +480,18 @@
 
                     <div
                       v-if="selectedPlanWorkdayFriendly"
-                      class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/50 dark:bg-emerald-900/20"
+                      class="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-900/50 dark:bg-primary-900/20"
                     >
-                      <div class="flex items-center gap-2 text-sm font-bold text-emerald-800 dark:text-emerald-200">
+                      <div class="flex items-center gap-2 text-sm font-bold text-primary-800 dark:text-primary-200">
                         <Icon name="calendar" size="sm" :stroke-width="2" />
                         <span>{{ t('payment.planCard.workdayFriendly') }}</span>
                       </div>
-                      <p class="mt-1 text-xs leading-5 text-emerald-700/90 dark:text-emerald-200/80">
+                      <p class="mt-1 text-xs leading-5 text-primary-700/90 dark:text-primary-200/80">
                         {{ t('payment.planCard.workdayFriendlyDesc', { daily: formatUsdQuotaValue(selectedPlan.daily_limit_usd), weekly: formatUsdQuotaValue(selectedPlan.weekly_limit_usd) }) }}
                       </p>
                     </div>
 
-                    <div v-if="selectedPlanHasSavings" class="rounded-xl bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                    <div v-if="selectedPlanHasSavings" class="rounded-xl bg-primary-50 px-4 py-3 text-xs font-bold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
                       {{ t('payment.planCard.dealHint', { original: formatSelectedPlanAmount(selectedPlanSavingsComparePrice), price: formatSelectedPlanAmount(selectedPlan.price) }) }}
                     </div>
 

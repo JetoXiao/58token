@@ -93,7 +93,7 @@
                       <span class="flex-1 text-left">{{ t('admin.accounts.syncFromCrs') }}</span>
                     </button>
                     <button class="account-tools-menu-item" @click="openImportData">
-                      <span class="account-tools-menu-icon bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      <span class="account-tools-menu-icon bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
                         <Icon name="upload" size="sm" />
                       </span>
                       <span class="flex-1 text-left">{{ t('admin.accounts.dataImport') }}</span>
@@ -120,7 +120,7 @@
                       </div>
                     </div>
                     <button class="account-tools-menu-item" @click="openErrorPassthrough">
-                      <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+                      <span class="account-tools-menu-icon bg-accent-50 text-accent-600 dark:bg-accent-900/20 dark:text-accent-300">
                         <Icon name="shield" size="sm" />
                       </span>
                       <span class="flex-1 text-left">{{ t('admin.errorPassthrough.title') }}</span>
@@ -170,7 +170,7 @@
         </div>
         <div
           v-if="hasPendingListSync"
-          class="mt-2 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200"
+          class="mt-2 flex items-center justify-between rounded-lg border border-accent-200 bg-accent-50 px-3 py-2 text-sm text-accent-800 dark:border-accent-700/40 dark:bg-accent-900/20 dark:text-accent-200"
         >
           <span>{{ t('admin.accounts.listPendingSyncHint') }}</span>
           <button
@@ -325,13 +325,13 @@
               <div v-if="isExpired(value) || (row.auto_pause_on_expired && value)" class="flex items-center gap-1">
                 <span
                   v-if="isExpired(value)"
-                  class="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                  class="inline-flex items-center rounded-md bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-700 dark:bg-accent-900/30 dark:text-accent-300"
                 >
                   {{ t('admin.accounts.expired') }}
                 </span>
                 <span
                   v-if="row.auto_pause_on_expired && value"
-                  class="inline-flex items-center rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                  class="inline-flex items-center rounded-md bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
                 >
                   {{ t('admin.accounts.autoPauseOnExpired') }}
                 </span>
@@ -431,7 +431,7 @@
                     account.platform === 'anthropic'
                       ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                       : account.platform === 'openai'
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
                         : account.platform === 'antigravity'
                           ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
                           : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
@@ -1304,8 +1304,8 @@ function getOpenAICompactMeta(row: any): { label: string; className: string; dot
     case 'active':
       return {
         label: t('admin.accounts.openai.compactSupported'),
-        className: 'text-emerald-600 dark:text-emerald-300',
-        dotClass: 'bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.14)]'
+        className: 'text-primary-600 dark:text-primary-300',
+        dotClass: 'bg-primary-500 shadow-[0_0_0_2px_rgba(59,130,246,0.14)]'
       }
     case 'blocked':
       return {

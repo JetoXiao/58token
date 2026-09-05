@@ -1,10 +1,10 @@
 <template>
-  <div class="relative flex min-h-screen flex-col overflow-hidden bg-[#f7f8fb] text-gray-950 dark:bg-[#05060a] dark:text-white">
+  <div class="available-channels-page relative flex min-h-screen flex-col overflow-hidden bg-[#f7fbfe] text-gray-950 dark:bg-[#05060a] dark:text-white">
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute left-1/2 top-[-18rem] h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-cyan-300/30 blur-3xl dark:bg-cyan-400/20"></div>
-      <div class="absolute right-[-14rem] top-24 h-[34rem] w-[34rem] rounded-full bg-violet-300/25 blur-3xl dark:bg-violet-500/18"></div>
-      <div class="absolute bottom-[-18rem] left-[-10rem] h-[38rem] w-[38rem] rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-400/10"></div>
-      <div class="absolute inset-0 bg-[linear-gradient(rgba(15,23,42,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(15,23,42,0.045)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
+      <div class="absolute left-[-10rem] top-[-16rem] h-[40rem] w-[40rem] rounded-full bg-sky-300/34 blur-3xl dark:bg-sky-400/18"></div>
+      <div class="absolute right-[-14rem] top-20 h-[34rem] w-[34rem] rounded-full bg-violet-300/28 blur-3xl dark:bg-violet-500/16"></div>
+      <div class="absolute bottom-[-18rem] left-[-10rem] h-[38rem] w-[38rem] rounded-full bg-primary-300/18 blur-3xl dark:bg-primary-400/10"></div>
+      <div class="absolute inset-0 bg-[linear-gradient(rgba(59,130,246,0.055)_1px,transparent_1px),linear-gradient(90deg,rgba(59,130,246,0.055)_1px,transparent_1px)] bg-[size:72px_72px] [mask-image:radial-gradient(circle_at_top,black,transparent_78%)] dark:bg-[linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px)]"></div>
     </div>
 
     <MarketingNavbar
@@ -28,7 +28,7 @@
         <LocaleSwitcher />
         <button
           type="button"
-          class="rounded-xl border border-gray-200/70 bg-white/70 p-2 text-gray-600 transition hover:bg-white hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
+          class="rounded-xl border border-sky-200/70 bg-white/75 p-2 text-gray-600 transition hover:bg-white hover:text-gray-950 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white"
           :title="isDark ? t('home.switchToLight') : t('home.switchToDark')"
           @click="toggleTheme"
         >
@@ -39,10 +39,10 @@
     </MarketingNavbar>
 
     <main class="relative z-10 flex-1 px-4 pb-14 pt-6 sm:px-6">
-      <section class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-gray-200/70 bg-white/72 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8">
+      <section class="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-sky-100/80 bg-white/74 p-5 shadow-[0_26px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] dark:shadow-[0_26px_90px_rgba(0,0,0,0.30)] md:p-8">
         <div class="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-end">
           <div>
-            <div class="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-300">
+            <div class="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:border-primary-800/60 dark:bg-primary-900/20 dark:text-primary-300">
               <Icon name="sparkles" size="sm" />
               {{ t('availableChannels.hero.eyebrow') }}
             </div>
@@ -53,15 +53,15 @@
               {{ t('availableChannels.hero.subtitle') }}
             </p>
             <div class="mt-6 flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
-              <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <span class="rounded-full border border-primary-200 bg-primary-50 px-3 py-1 font-medium text-primary-700 dark:border-primary-900/60 dark:bg-primary-900/20 dark:text-primary-300">
                 {{ t('availableChannels.hero.exchangeRate', { rate: usdToCnyLabel }) }}
               </span>
               <span class="rounded-full border border-gray-200 bg-white/70 px-3 py-1 dark:border-white/10 dark:bg-white/5">
                 {{ t('availableChannels.hero.unit') }}
               </span>
             </div>
-            <div class="mt-4 max-w-3xl rounded-2xl border border-emerald-200/80 bg-white/62 p-4 text-sm leading-6 text-gray-600 shadow-sm backdrop-blur dark:border-emerald-900/50 dark:bg-white/[0.04] dark:text-slate-300">
-              <p class="font-semibold text-emerald-700 dark:text-emerald-300">{{ t('availableChannels.hero.pricingFormula') }}</p>
+            <div class="mt-4 max-w-3xl rounded-2xl border border-primary-200/80 bg-white/62 p-4 text-sm leading-6 text-gray-600 shadow-sm backdrop-blur dark:border-primary-900/50 dark:bg-white/[0.04] dark:text-slate-300">
+              <p class="font-semibold text-primary-700 dark:text-primary-300">{{ t('availableChannels.hero.pricingFormula') }}</p>
               <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">{{ pricingExample }}</p>
             </div>
           </div>
@@ -76,13 +76,13 @@
       </section>
 
       <div class="mx-auto mt-6 grid max-w-7xl gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] xl:sticky xl:top-6 xl:self-start">
+        <aside class="rounded-[1.5rem] border border-sky-100/80 bg-white/78 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] xl:sticky xl:top-6 xl:self-start">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ t('availableChannels.filters.title') }}</h2>
               <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">{{ t('availableChannels.filters.description') }}</p>
             </div>
-            <button type="button" class="rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-primary-300 hover:text-primary-600 dark:border-white/10 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:text-primary-300" @click="resetFilters">
+            <button type="button" class="rounded-xl border border-sky-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-sky-300 hover:text-sky-600 dark:border-white/10 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:text-primary-300" @click="resetFilters">
               {{ t('availableChannels.filters.reset') }}
             </button>
           </div>
@@ -95,7 +95,7 @@
         </aside>
 
         <section class="min-w-0 space-y-5">
-          <div class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 p-4 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
+          <div class="rounded-[1.5rem] border border-sky-100/80 bg-white/75 p-4 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045]">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div class="relative min-w-0 flex-1">
                 <Icon name="search" size="md" class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500" />
@@ -103,13 +103,13 @@
                   v-model="searchQuery"
                   type="text"
                   :placeholder="t('availableChannels.searchPlaceholder')"
-                  class="h-12 w-full rounded-2xl border border-gray-200 bg-white/80 pl-11 pr-4 text-sm text-gray-950 outline-none transition placeholder:text-gray-400 focus:border-primary-300 focus:ring-4 focus:ring-primary-100 dark:border-white/10 dark:bg-white/[0.05] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-700 dark:focus:ring-primary-950/40"
+                class="h-12 w-full rounded-2xl border border-sky-100 bg-white/84 pl-11 pr-4 text-sm text-gray-950 outline-none transition placeholder:text-gray-400 focus:border-sky-300 focus:ring-4 focus:ring-sky-100 dark:border-white/10 dark:bg-white/[0.05] dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-700 dark:focus:ring-primary-950/40"
                 />
               </div>
               <div class="flex flex-wrap items-center gap-3">
                 <SegmentedControl :items="currencyItems" :model-value="currencyMode" @update:model-value="currencyMode = $event as CurrencyMode" />
                 <SegmentedControl :items="viewItems" :model-value="viewMode" @update:model-value="viewMode = $event as ViewMode" />
-                <button type="button" class="inline-flex h-12 items-center justify-center rounded-2xl border border-gray-200 bg-white/80 px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300" :disabled="loading" @click="loadPricingConfig">
+                <button type="button" class="inline-flex h-12 items-center justify-center rounded-2xl border border-sky-100 bg-white/84 px-4 text-sm font-medium text-gray-700 shadow-sm transition hover:border-sky-300 hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.05] dark:text-slate-200 dark:hover:border-primary-700 dark:hover:text-primary-300" :disabled="loading" @click="loadPricingConfig">
                   <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
                 </button>
               </div>
@@ -122,21 +122,21 @@
             </div>
           </div>
 
-          <div v-if="loading" class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
+          <div v-if="loading" class="rounded-[1.5rem] border border-sky-100/80 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
             <Icon name="refresh" size="lg" class="mx-auto animate-spin text-primary-500" />
             <p class="mt-3 text-sm text-gray-500 dark:text-slate-400">{{ t('common.loading') }}</p>
           </div>
 
-          <div v-else-if="filteredModels.length === 0" class="rounded-[1.5rem] border border-gray-200/70 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
+          <div v-else-if="filteredModels.length === 0" class="rounded-[1.5rem] border border-sky-100/80 bg-white/75 py-16 text-center shadow-sm dark:border-white/10 dark:bg-white/[0.045]">
             <Icon name="inbox" size="xl" class="mx-auto mb-3 h-12 w-12 text-gray-400" />
             <p class="text-sm text-gray-500 dark:text-slate-400">{{ t('availableChannels.empty') }}</p>
           </div>
 
           <div v-else-if="viewMode === 'cards'" class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            <article v-for="item in filteredModels" :key="`${item.modelName}-${item.group}`" class="group rounded-[1.5rem] border border-gray-200/70 bg-white/82 p-5 shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-lg hover:shadow-primary-100/60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-primary-800 dark:hover:shadow-primary-950/20">
+            <article v-for="item in filteredModels" :key="`${item.modelName}-${item.group}`" class="group rounded-[1.5rem] border border-sky-100/80 bg-white/84 p-5 shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-100/60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-primary-800 dark:hover:shadow-primary-950/20">
               <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                 <div class="flex min-w-0 items-start gap-3">
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 shadow-sm dark:border-white/10 dark:bg-white/5">
                     <ModelIcon :model="item.modelName" size="24px" />
                   </span>
                   <div class="min-w-0 flex-1">
@@ -150,10 +150,10 @@
                   </div>
                 </div>
                 <div class="flex shrink-0 flex-col items-end gap-2">
-                  <span class="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 dark:border-white/10 dark:text-slate-300">
+                  <span class="rounded-full border border-sky-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:border-white/10 dark:text-slate-300">
                     {{ item.billingLabel }}
                   </span>
-                  <span class="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                  <span class="rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-semibold text-accent-700 dark:border-accent-900/60 dark:bg-accent-900/20 dark:text-accent-300">
                     {{ itemDiscountLabel(item) }}
                   </span>
                 </div>
@@ -164,7 +164,7 @@
               </p>
 
               <div class="mt-4 flex flex-wrap gap-1.5">
-                <span v-for="tag in item.capabilities.slice(0, 5)" :key="`${item.modelName}-${item.group}-${tag}`" class="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                <span v-for="tag in item.capabilities.slice(0, 5)" :key="`${item.modelName}-${item.group}-${tag}`" class="rounded-full border border-sky-100 bg-sky-50 px-2 py-1 text-[11px] font-medium text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                   {{ localizedCapability(tag) }}
                 </span>
               </div>
@@ -175,10 +175,10 @@
             </article>
           </div>
 
-          <div v-else class="overflow-hidden rounded-[1.5rem] border border-gray-200/70 bg-white/82 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045]">
+          <div v-else class="overflow-hidden rounded-[1.5rem] border border-sky-100/80 bg-white/84 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-white/[0.045]">
             <div class="overflow-x-auto">
               <table class="min-w-[980px] w-full border-collapse text-sm">
-                <thead class="bg-gray-50/80 text-xs font-medium uppercase text-gray-500 dark:bg-white/[0.04] dark:text-slate-400">
+                <thead class="bg-sky-50/80 text-xs font-medium uppercase text-gray-500 dark:bg-white/[0.04] dark:text-slate-400">
                   <tr>
                     <th class="px-5 py-4 text-left">{{ t('availableChannels.table.model') }}</th>
                     <th class="px-5 py-4 text-left">{{ t('availableChannels.table.provider') }}</th>
@@ -190,7 +190,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in filteredModels" :key="`row-${item.modelName}-${item.group}`" class="border-t border-gray-100 transition hover:bg-gray-50/70 dark:border-white/10 dark:hover:bg-white/[0.04]">
+                  <tr v-for="item in filteredModels" :key="`row-${item.modelName}-${item.group}`" class="border-t border-sky-100 transition hover:bg-sky-50/70 dark:border-white/10 dark:hover:bg-white/[0.04]">
                     <td class="px-5 py-4">
                       <button type="button" class="flex min-w-0 items-center gap-3 font-semibold text-gray-950 hover:text-primary-600 dark:text-white dark:hover:text-primary-300" @click="copyModel(item.modelName)">
                         <ModelIcon :model="item.modelName" size="20px" />
@@ -343,8 +343,8 @@ const FilterBlock = defineComponent({
           class: [
             'flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm font-medium transition',
             active
-              ? 'border-primary-500 bg-primary-100 text-primary-800 shadow-[0_0_0_3px_rgba(20,184,166,0.16)] ring-1 ring-primary-300 dark:border-primary-400 dark:bg-primary-500/20 dark:text-primary-100 dark:shadow-[0_0_0_3px_rgba(45,212,191,0.16)] dark:ring-primary-500/60'
-              : 'border-gray-200 bg-white/70 text-gray-600 hover:border-primary-200 hover:text-primary-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:border-primary-800 dark:hover:text-primary-300'
+              ? 'border-sky-400 bg-sky-100 text-sky-800 shadow-[0_0_0_3px_rgba(96,165,250,0.16)] ring-1 ring-sky-300 dark:border-sky-300 dark:bg-sky-400/20 dark:text-sky-50 dark:shadow-[0_0_0_3px_rgba(125,211,252,0.14)] dark:ring-sky-400/60'
+              : 'border-sky-100 bg-white/70 text-gray-600 hover:border-sky-200 hover:text-sky-600 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:border-sky-800 dark:hover:text-sky-300'
           ],
           onClick: () => emit('toggle', option.value)
         }, [
@@ -363,7 +363,7 @@ const StatCard = defineComponent({
     value: { type: [String, Number], required: true }
   },
   setup(props) {
-    return () => h('div', { class: 'rounded-2xl border border-gray-200 bg-white/80 p-4 dark:border-white/10 dark:bg-white/[0.05]' }, [
+    return () => h('div', { class: 'rounded-2xl border border-sky-100 bg-white/82 p-4 dark:border-white/10 dark:bg-white/[0.05]' }, [
       h('p', { class: 'text-xs font-medium text-gray-500 dark:text-slate-400' }, props.label),
       h('p', { class: 'mt-2 text-2xl font-semibold text-gray-950 dark:text-white' }, props.value)
     ])
@@ -378,15 +378,15 @@ const SegmentedControl = defineComponent({
   },
   emits: ['update:modelValue'],
   setup(props, { emit }) {
-    return () => h('div', { class: 'inline-flex rounded-2xl border border-gray-200 bg-gray-50 p-1 dark:border-white/10 dark:bg-white/[0.04]' },
+    return () => h('div', { class: 'inline-flex rounded-2xl border border-sky-100 bg-sky-50/70 p-1 dark:border-white/10 dark:bg-white/[0.04]' },
       props.items.map((item) => h('button', {
         key: item.value,
         type: 'button',
         class: [
           'rounded-xl px-3 py-2 text-sm font-medium transition',
           props.modelValue === item.value
-            ? 'bg-white text-gray-950 shadow-sm dark:bg-white/10 dark:text-white'
-            : 'text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+            ? 'bg-white text-sky-800 shadow-sm dark:bg-white/10 dark:text-white'
+            : 'text-gray-500 hover:text-sky-700 dark:text-slate-400 dark:hover:text-white'
         ],
         onClick: () => emit('update:modelValue', item.value)
       }, item.label))
@@ -400,14 +400,14 @@ const PriceRowView = defineComponent({
     row: { type: Object as PropType<PriceRow>, required: true }
   },
   setup(props) {
-    return () => h('div', { class: 'rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04]' }, [
+    return () => h('div', { class: 'rounded-xl border border-sky-100 bg-sky-50/80 p-3 dark:border-white/10 dark:bg-white/[0.04]' }, [
       h('div', { class: 'flex items-center justify-between gap-3' }, [
         h('span', { class: 'text-xs font-medium text-gray-500 dark:text-slate-400' }, props.row.label),
         h('span', { class: 'text-sm font-semibold text-gray-950 dark:text-white' }, props.row.platform)
       ]),
       h('div', { class: 'mt-1 flex items-center justify-between gap-3' }, [
         h('span', { class: 'text-[11px] text-gray-400 dark:text-slate-500' }, props.row.unit),
-        h('span', { class: 'text-xs font-medium text-emerald-700 dark:text-emerald-300' }, props.row.official)
+        h('span', { class: 'text-xs font-medium text-primary-700 dark:text-primary-300' }, props.row.official)
       ])
     ])
   }

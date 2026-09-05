@@ -22,7 +22,7 @@
         <span class="flex items-center gap-2">
           <span
             v-if="method.type === 'balance'"
-            class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+            class="flex h-7 w-7 items-center justify-center rounded-md bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
           >
             <Icon name="dollar" size="sm" :stroke-width="2.2" />
           </span>
@@ -97,12 +97,12 @@ function methodIcon(type: string): string {
 }
 
 function methodSelectedClass(type: string): string {
-  if (type.includes('alipay')) return 'border-[#02A9F1] bg-blue-50 text-gray-900 shadow-sm dark:bg-blue-950 dark:text-gray-100'
-  if (type.includes('wxpay')) return 'border-[#09BB07] bg-green-50 text-gray-900 shadow-sm dark:bg-green-950 dark:text-gray-100'
-  if (type === 'balance') return 'border-emerald-400 bg-emerald-50 text-gray-900 shadow-sm dark:border-emerald-500 dark:bg-emerald-950 dark:text-gray-100'
-  if (type === 'usdt') return 'border-emerald-400 bg-emerald-50 text-gray-900 shadow-sm dark:border-emerald-500 dark:bg-emerald-950 dark:text-gray-100'
-  if (type === 'stripe') return 'border-[#676BE5] bg-indigo-50 text-gray-900 shadow-sm dark:bg-indigo-950 dark:text-gray-100'
-  if (type === 'airwallex') return 'border-[#FF6B3D] bg-orange-50 text-gray-900 shadow-sm dark:border-[#FF8E3C] dark:bg-orange-950 dark:text-gray-100'
+  if (type.includes('alipay')) return 'border-primary-400 bg-primary-50 text-gray-900 shadow-sm dark:bg-primary-950 dark:text-gray-100'
+  if (type.includes('wxpay')) return 'border-accent-400 bg-accent-50 text-gray-900 shadow-sm dark:border-accent-500 dark:bg-accent-950 dark:text-gray-100'
+  if (type === 'balance') return 'border-primary-400 bg-primary-50 text-gray-900 shadow-sm dark:border-primary-500 dark:bg-primary-950 dark:text-gray-100'
+  if (type === 'usdt') return 'border-primary-400 bg-primary-50 text-gray-900 shadow-sm dark:border-primary-500 dark:bg-primary-950 dark:text-gray-100'
+  if (type === 'stripe') return 'border-accent-400 bg-accent-50 text-gray-900 shadow-sm dark:bg-accent-950 dark:text-gray-100'
+  if (type === 'airwallex') return 'border-primary-500 bg-primary-50 text-gray-900 shadow-sm dark:border-primary-400 dark:bg-primary-950 dark:text-gray-100'
   return 'border-primary-500 bg-primary-50 text-gray-900 shadow-sm dark:bg-primary-950 dark:text-gray-100'
 }
 </script>

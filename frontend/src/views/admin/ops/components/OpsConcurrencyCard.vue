@@ -303,9 +303,9 @@ watch(
 
 function getLoadBarClass(loadPct: number): string {
   if (loadPct >= 90) return 'bg-red-500 dark:bg-red-600'
-  if (loadPct >= 70) return 'bg-orange-500 dark:bg-orange-600'
-  if (loadPct >= 50) return 'bg-yellow-500 dark:bg-yellow-600'
-  return 'bg-green-500 dark:bg-green-600'
+  if (loadPct >= 70) return 'bg-accent-500 dark:bg-accent-600'
+  if (loadPct >= 50) return 'bg-primary-400 dark:bg-primary-500'
+  return 'bg-primary-500 dark:bg-primary-400'
 }
 
 function getLoadBarStyle(loadPct: number): string {
@@ -314,9 +314,9 @@ function getLoadBarStyle(loadPct: number): string {
 
 function getLoadTextClass(loadPct: number): string {
   if (loadPct >= 90) return 'text-red-600 dark:text-red-400'
-  if (loadPct >= 70) return 'text-orange-600 dark:text-orange-400'
-  if (loadPct >= 50) return 'text-yellow-600 dark:text-yellow-400'
-  return 'text-green-600 dark:text-green-400'
+  if (loadPct >= 70) return 'text-accent-600 dark:text-accent-400'
+  if (loadPct >= 50) return 'text-primary-600 dark:text-primary-400'
+  return 'text-primary-500 dark:text-primary-300'
 }
 
 function formatDuration(seconds: number): string {
@@ -345,7 +345,7 @@ watch(
     <!-- 头部 -->
     <div class="mb-4 flex shrink-0 items-center justify-between gap-3">
       <h3 class="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white">
-        <svg class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-4 w-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
         {{ t('admin.ops.concurrency.title') }}
@@ -355,7 +355,7 @@ watch(
         <button
           class="flex items-center justify-center rounded-lg px-2 py-1 transition-colors"
           :class="showByUser
-            ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+            ? 'bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400'
             : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:bg-dark-700 dark:text-gray-400 dark:hover:bg-dark-600 dark:hover:text-gray-300'"
           :title="showByUser ? t('admin.ops.concurrency.switchToPlatform') : t('admin.ops.concurrency.switchToUser')"
           @click="showByUser = !showByUser"
@@ -482,7 +482,7 @@ watch(
                 />
               </svg>
               <span class="text-gray-600 dark:text-gray-300">
-                <span class="font-bold text-green-600 dark:text-green-400">{{ row.available_accounts }}</span
+                <span class="font-bold text-primary-600 dark:text-primary-400">{{ row.available_accounts }}</span
                 >/{{ row.total_accounts }}
               </span>
               <span class="text-gray-400 dark:text-gray-500">{{ row.availability_percentage }}%</span>
@@ -491,7 +491,7 @@ watch(
             <!-- 限流账号 -->
             <span
               v-if="row.rate_limited_accounts > 0"
-              class="rounded-full bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              class="rounded-full bg-accent-100 px-1.5 py-0.5 font-semibold text-accent-700 dark:bg-accent-900/30 dark:text-accent-400"
             >
               {{ t('admin.ops.concurrency.rateLimited', { count: row.rate_limited_accounts }) }}
             </span>
@@ -534,7 +534,7 @@ watch(
               <!-- 状态徽章 -->
               <span
                 v-if="row.is_available"
-                class="inline-flex items-center gap-1 rounded bg-green-100 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                class="inline-flex items-center gap-1 rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400"
               >
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -543,7 +543,7 @@ watch(
               </span>
               <span
                 v-else-if="row.is_rate_limited"
-                class="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                class="inline-flex items-center gap-1 rounded bg-accent-100 px-1.5 py-0.5 text-[10px] font-medium text-accent-700 dark:bg-accent-900/30 dark:text-accent-400"
               >
                 <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

@@ -86,7 +86,7 @@
                 </div>
                 <div class="flex items-center justify-between gap-4">
                   <span class="text-gray-500 dark:text-dark-400">{{ t('common.freeQuota') }}</span>
-                  <span class="font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span class="font-semibold text-primary-600 dark:text-primary-400">
                     {{ formatCurrency(freeQuotaBalance) }}
                   </span>
                 </div>
@@ -151,7 +151,7 @@
                 </div>
                 <div class="mt-1 flex justify-between text-xs">
                   <span class="text-primary-600 dark:text-primary-400">{{ formatCurrency(paidBalance) }}</span>
-                  <span class="text-emerald-600 dark:text-emerald-400">{{ formatCurrency(freeQuotaBalance) }}</span>
+                  <span class="text-primary-600 dark:text-primary-400">{{ formatCurrency(freeQuotaBalance) }}</span>
                 </div>
               </div>
 

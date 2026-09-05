@@ -13,16 +13,16 @@
 
       <!-- Invalid Link State -->
       <div v-if="isInvalidLink" class="space-y-6">
-        <div class="rounded-xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-800/50 dark:bg-amber-900/20">
+        <div class="rounded-xl border border-accent-200 bg-accent-50 p-6 dark:border-accent-800/40 dark:bg-accent-900/20">
           <div class="flex flex-col items-center gap-4 text-center">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-800/50">
-              <Icon name="exclamationCircle" size="lg" class="text-amber-600 dark:text-amber-400" />
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-accent-100 dark:bg-accent-900/30">
+              <Icon name="exclamationCircle" size="lg" class="text-accent-600 dark:text-accent-300" />
             </div>
             <div>
-              <h3 class="text-lg font-semibold text-amber-800 dark:text-amber-200">
+              <h3 class="text-lg font-semibold text-accent-800 dark:text-accent-200">
                 {{ t('auth.invalidResetLink') }}
               </h3>
-              <p class="mt-2 text-sm text-amber-700 dark:text-amber-300">
+              <p class="mt-2 text-sm text-accent-700 dark:text-accent-300">
                 {{ t('auth.invalidResetLinkHint') }}
               </p>
             </div>
@@ -41,16 +41,16 @@
 
       <!-- Success State -->
       <div v-else-if="isSuccess" class="space-y-6">
-        <div class="rounded-xl border border-green-200 bg-green-50 p-6 dark:border-green-800/50 dark:bg-green-900/20">
+        <div class="rounded-xl border border-primary-200 bg-primary-50 p-6 dark:border-primary-800/40 dark:bg-primary-900/20">
           <div class="flex flex-col items-center gap-4 text-center">
-            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-800/50">
-              <Icon name="checkCircle" size="lg" class="text-green-600 dark:text-green-400" />
+            <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/30">
+              <Icon name="checkCircle" size="lg" class="text-primary-600 dark:text-primary-400" />
             </div>
             <div>
-              <h3 class="text-lg font-semibold text-green-800 dark:text-green-200">
+              <h3 class="text-lg font-semibold text-primary-800 dark:text-primary-200">
                 {{ t('auth.passwordResetSuccess') }}
               </h3>
-              <p class="mt-2 text-sm text-green-700 dark:text-green-300">
+              <p class="mt-2 text-sm text-primary-700 dark:text-primary-300">
                 {{ t('auth.passwordResetSuccessHint') }}
               </p>
             </div>

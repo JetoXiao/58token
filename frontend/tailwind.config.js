@@ -1,38 +1,84 @@
 /** @type {import('tailwindcss').Config} */
+const primaryPalette = {
+  50: '#eff8ff',
+  100: '#dbeeff',
+  200: '#b9dcff',
+  300: '#8ac7ff',
+  400: '#58adff',
+  500: '#2f8bff',
+  600: '#1f6fe6',
+  700: '#1e5cc0',
+  800: '#1f4b9a',
+  900: '#1d3f7b',
+  950: '#11244d'
+}
+
+const accentPalette = {
+  50: '#f6f3ff',
+  100: '#efe9ff',
+  200: '#ddd4ff',
+  300: '#c4b5fd',
+  400: '#a78bfa',
+  500: '#8b5cf6',
+  600: '#7c3aed',
+  700: '#6d28d9',
+  800: '#5b21b6',
+  900: '#4c1d95',
+  950: '#2e1065'
+}
+
+const cyanPalette = {
+  50: '#effdff',
+  100: '#daf8ff',
+  200: '#b8efff',
+  300: '#87e2ff',
+  400: '#59cff8',
+  500: '#2fb3e9',
+  600: '#2491c8',
+  700: '#2273a0',
+  800: '#215c81',
+  900: '#1e4b66',
+  950: '#102d40'
+}
+
+const warmPalette = {
+  50: '#fff7f2',
+  100: '#ffeadd',
+  200: '#ffd3be',
+  300: '#ffb88e',
+  400: '#ff9d68',
+  500: '#ff8149',
+  600: '#e96730',
+  700: '#c64f26',
+  800: '#9f4020',
+  900: '#80341d',
+  950: '#46190e'
+}
+
 export default {
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        // 主色调 - Teal/Cyan 青色系
-        primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e'
-        },
-        // 辅助色 - 深蓝灰
-        accent: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617'
-        },
+        // 品牌色族统一映射：蓝青紫 + 暖橙光晕
+        primary: primaryPalette,
+        accent: accentPalette,
+        cyan: cyanPalette,
+        blue: primaryPalette,
+        sky: cyanPalette,
+        teal: cyanPalette,
+        emerald: cyanPalette,
+        green: cyanPalette,
+        lime: cyanPalette,
+        purple: accentPalette,
+        violet: accentPalette,
+        fuchsia: accentPalette,
+        pink: accentPalette,
+        amber: warmPalette,
+        yellow: warmPalette,
+        orange: warmPalette,
+        rose: warmPalette,
         // 深色模式背景
         dark: {
           50: '#f8fafc',
@@ -68,20 +114,20 @@ export default {
       boxShadow: {
         glass: '0 24px 80px rgba(0, 0, 0, 0.22)',
         'glass-sm': '0 10px 32px rgba(0, 0, 0, 0.16)',
-        glow: '0 0 28px rgba(34, 211, 238, 0.24)',
-        'glow-lg': '0 0 64px rgba(139, 92, 246, 0.28)',
+        glow: '0 0 28px rgba(47, 139, 255, 0.24)',
+        'glow-lg': '0 0 64px rgba(139, 92, 246, 0.24)',
         card: '0 18px 60px rgba(0, 0, 0, 0.22)',
         'card-hover': '0 28px 90px rgba(0, 0, 0, 0.32)',
         'inner-glow': 'inset 0 1px 0 rgba(255, 255, 255, 0.1)'
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-primary': 'linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)',
+        'gradient-primary': 'linear-gradient(135deg, #2f8bff 0%, #22b8f0 100%)',
         'gradient-dark': 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
         'gradient-glass':
           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
         'mesh-gradient':
-          'radial-gradient(at 24% 8%, rgba(34, 211, 238, 0.18) 0px, transparent 34%), radial-gradient(at 88% 2%, rgba(139, 92, 246, 0.16) 0px, transparent 34%), radial-gradient(at 0% 82%, rgba(16, 185, 129, 0.10) 0px, transparent 38%)'
+          'radial-gradient(at 14% 10%, rgba(214, 231, 255, 0.88) 0px, transparent 30%), radial-gradient(at 50% 4%, rgba(228, 220, 255, 0.72) 0px, transparent 28%), radial-gradient(at 86% 12%, rgba(255, 216, 196, 0.72) 0px, transparent 28%), radial-gradient(at 12% 82%, rgba(215, 242, 255, 0.66) 0px, transparent 28%)'
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -119,8 +165,8 @@ export default {
           '100%': { backgroundPosition: '200% 0' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px rgba(20, 184, 166, 0.25)' },
-          '100%': { boxShadow: '0 0 30px rgba(20, 184, 166, 0.4)' }
+          '0%': { boxShadow: '0 0 20px rgba(47, 139, 255, 0.25)' },
+          '100%': { boxShadow: '0 0 30px rgba(34, 184, 240, 0.4)' }
         }
       },
       backdropBlur: {

@@ -3,8 +3,8 @@
     <!-- Today Revenue -->
     <div class="card p-4">
       <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-          <Icon name="dollar" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
+        <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
+          <Icon name="dollar" size="md" class="text-primary-600 dark:text-primary-300" :stroke-width="2" />
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('payment.admin.todayRevenue') }}</p>
@@ -48,8 +48,8 @@
     <!-- Average Amount -->
     <div class="card p-4">
       <div class="flex items-center gap-3">
-        <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-          <Icon name="chart" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
+        <div class="rounded-lg bg-accent-100 p-2 dark:bg-accent-900/30">
+          <Icon name="chart" size="md" class="text-accent-600 dark:text-accent-300" :stroke-width="2" />
         </div>
         <div>
           <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('payment.admin.avgAmount') }}</p>

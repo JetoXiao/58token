@@ -26,8 +26,8 @@
         <!-- Total Tokens -->
         <div class="card p-4">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-              <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" />
+            <div class="rounded-lg bg-accent-100 p-2 dark:bg-accent-900/30">
+              <Icon name="cube" size="md" class="text-accent-600 dark:text-accent-400" />
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -47,14 +47,14 @@
         <!-- Total Cost -->
         <div class="card p-4">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-              <Icon name="dollar" size="md" class="text-green-600 dark:text-green-400" />
+            <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
+              <Icon name="dollar" size="md" class="text-primary-600 dark:text-primary-400" />
             </div>
             <div class="min-w-0 flex-1">
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                 {{ t('usage.totalCost') }}
               </p>
-              <p class="text-xl font-bold text-green-600 dark:text-green-400">
+              <p class="text-xl font-bold text-primary-600 dark:text-primary-400">
                 ${{ (usageStats?.total_actual_cost || 0).toFixed(4) }}
               </p>
               <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -222,7 +222,7 @@
                 <div class="flex items-center gap-2">
                   <!-- Input -->
                   <div class="inline-flex items-center gap-1">
-                    <Icon name="arrowDown" size="sm" class="text-emerald-500" />
+                    <Icon name="arrowDown" size="sm" class="text-primary-500" />
                     <span class="font-medium text-gray-900 dark:text-white">{{
                       row.input_tokens.toLocaleString()
                     }}</span>
@@ -249,8 +249,8 @@
                   </div>
                   <!-- Cache Write -->
                   <div v-if="row.cache_creation_tokens > 0" class="inline-flex items-center gap-1">
-                    <Icon name="edit" size="sm" class="text-amber-500" />
-                    <span class="font-medium text-amber-600 dark:text-amber-400">{{
+                    <Icon name="edit" size="sm" class="text-accent-500" />
+                    <span class="font-medium text-accent-600 dark:text-accent-400">{{
                       formatCacheTokens(row.cache_creation_tokens)
                     }}</span>
                     <span v-if="row.cache_creation_1h_tokens > 0" class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-orange-100 text-orange-600 ring-1 ring-inset ring-orange-200 dark:bg-orange-500/20 dark:text-orange-400 dark:ring-orange-500/30">1h</span>
@@ -279,7 +279,7 @@
 
           <template #cell-cost="{ row }">
             <div class="flex items-center gap-1.5 text-sm">
-              <span class="font-medium text-green-600 dark:text-green-400">
+              <span class="font-medium text-primary-600 dark:text-primary-400">
                 ${{ row.actual_cost.toFixed(6) }}
               </span>
               <!-- Cost Detail Tooltip -->
@@ -379,7 +379,7 @@
                 <div v-if="tokenTooltipData.cache_creation_5m_tokens > 0" class="flex items-center justify-between gap-4">
                   <span class="text-gray-400 flex items-center gap-1.5">
                     {{ t('admin.usage.cacheCreation5mTokens') }}
-                    <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-amber-500/20 text-amber-400 ring-1 ring-inset ring-amber-500/30">5m</span>
+                    <span class="inline-flex items-center rounded px-1 py-px text-[10px] font-medium leading-tight bg-accent-500/20 text-accent-400 ring-1 ring-inset ring-accent-500/30">5m</span>
                   </span>
                   <span class="font-medium text-white">{{ tokenTooltipData.cache_creation_5m_tokens.toLocaleString() }}</span>
                 </div>
@@ -524,7 +524,7 @@
           </div>
           <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
             <span class="text-gray-400">{{ t('usage.billed') }}</span>
-            <span class="font-semibold text-green-400"
+            <span class="font-semibold text-primary-400"
               >${{ tooltipData?.actual_cost.toFixed(6) }}</span
             >
           </div>
@@ -708,7 +708,7 @@ const getRequestTypeBadgeClass = (log: UsageLog): string => {
   if (requestType === 'ws_v2') return 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200'
   if (requestType === 'stream') return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
   if (requestType === 'sync') return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-  return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+  return 'bg-accent-100 text-accent-800 dark:bg-accent-900 dark:text-accent-200'
 }
 
 

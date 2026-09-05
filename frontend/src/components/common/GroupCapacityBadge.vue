@@ -77,7 +77,7 @@ function capacityClass(used: number, max: number): string {
     return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
   }
   if (used > 0) {
-    return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+    return 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400'
   }
   return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
 }

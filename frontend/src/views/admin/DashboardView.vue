@@ -22,7 +22,7 @@
                 <p class="text-xl font-bold text-gray-900 dark:text-white">
                   {{ stats.total_api_keys }}
                 </p>
-                <p class="text-xs text-green-600 dark:text-green-400">
+                <p class="text-xs text-primary-600 dark:text-primary-400">
                   {{ stats.active_api_keys }} {{ t('common.active') }}
                 </p>
               </div>
@@ -43,7 +43,7 @@
                   {{ stats.total_accounts }}
                 </p>
                 <p class="text-xs">
-                  <span class="text-green-600 dark:text-green-400"
+                  <span class="text-primary-600 dark:text-primary-400"
                     >{{ stats.normal_accounts }} {{ t('common.active') }}</span
                   >
                   <span v-if="stats.error_accounts > 0" class="ml-1 text-red-500"
@@ -57,8 +57,8 @@
           <!-- Today Requests -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
-                <Icon name="chart" size="md" class="text-green-600 dark:text-green-400" :stroke-width="2" />
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
+                <Icon name="chart" size="md" class="text-primary-600 dark:text-primary-400" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -77,14 +77,14 @@
           <!-- New Users Today -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
-                <Icon name="userPlus" size="md" class="text-emerald-600 dark:text-emerald-400" :stroke-width="2" />
+              <div class="rounded-lg bg-accent-100 p-2 dark:bg-accent-900/30">
+                <Icon name="userPlus" size="md" class="text-accent-600 dark:text-accent-400" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
                   {{ t('admin.dashboard.users') }}
                 </p>
-                <p class="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                <p class="text-xl font-bold text-accent-600 dark:text-accent-400">
                   +{{ stats.today_new_users }}
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -100,8 +100,8 @@
           <!-- Today Tokens -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-amber-100 p-2 dark:bg-amber-900/30">
-                <Icon name="cube" size="md" class="text-amber-600 dark:text-amber-400" :stroke-width="2" />
+              <div class="rounded-lg bg-accent-100 p-2 dark:bg-accent-900/30">
+                <Icon name="cube" size="md" class="text-accent-600 dark:text-accent-400" :stroke-width="2" />
               </div>
               <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -118,7 +118,7 @@
                 </div>
                 <p class="text-xs">
                   <span
-                    class="text-green-600 dark:text-green-400"
+                    class="text-primary-600 dark:text-primary-400"
                     :title="t('admin.dashboard.actual')"
                     >${{ formatCost(stats.today_actual_cost) }}</span
                   >
@@ -154,7 +154,7 @@
                 </p>
                 <p class="text-xs">
                   <span
-                    class="text-green-600 dark:text-green-400"
+                    class="text-primary-600 dark:text-primary-400"
                     :title="t('admin.dashboard.actual')"
                     >${{ formatCost(stats.total_actual_cost) }}</span
                   >
@@ -511,17 +511,17 @@ const userTrendChartData = computed(() => {
   const sortedDates = Array.from(allDates).sort()
   const colors = [
     '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#ef4444',
     '#8b5cf6',
-    '#ec4899',
-    '#14b8a6',
-    '#f97316',
-    '#6366f1',
-    '#84cc16',
+    '#2f8bff',
+    '#ef4444',
+    '#22b8f0',
+    '#c4b5fd',
+    '#5b21b6',
     '#06b6d4',
-    '#a855f7'
+    '#6366f1',
+    '#8ac7ff',
+    '#a855f7',
+    '#ff8a70'
   ]
 
   const datasets = Array.from(userGroups.values()).map((group, idx) => ({

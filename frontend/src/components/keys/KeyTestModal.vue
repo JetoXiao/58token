@@ -31,7 +31,7 @@
             :class="[
               'rounded-full px-2.5 py-1 text-xs font-semibold',
               apiKey.status === 'active'
-                ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+                ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300'
                 : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
             ]"
           >
@@ -42,14 +42,14 @@
 
       <div
         v-if="apiKey && !apiKey.group"
-        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+        class="rounded-xl border border-accent-200 bg-accent-50 p-3 text-sm text-accent-800 dark:border-accent-800/40 dark:bg-accent-900/20 dark:text-accent-200"
       >
         {{ t('keys.testModal.noGroup') }}
       </div>
 
       <div
         v-else-if="apiKey && apiKey.status !== 'active'"
-        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+        class="rounded-xl border border-accent-200 bg-accent-50 p-3 text-sm text-accent-800 dark:border-accent-800/40 dark:bg-accent-900/20 dark:text-accent-200"
       >
         {{ t('keys.testModal.inactive') }}
       </div>
@@ -72,14 +72,14 @@
 
       <div
         v-if="selectedImageModelNeedsEnabled"
-        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+        class="rounded-xl border border-accent-200 bg-accent-50 p-3 text-sm text-accent-800 dark:border-accent-800/40 dark:bg-accent-900/20 dark:text-accent-200"
       >
         {{ t('keys.testModal.imageGenerationDisabled') }}
       </div>
 
       <div
         v-else-if="imageModelUnsupported"
-        class="rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200"
+        class="rounded-xl border border-accent-200 bg-accent-50 p-3 text-sm text-accent-800 dark:border-accent-800/40 dark:bg-accent-900/20 dark:text-accent-200"
       >
         {{ t('keys.testModal.unsupportedImageModel') }}
       </div>
@@ -115,7 +115,7 @@
             <Icon name="play" size="sm" :stroke-width="2" />
             <span>{{ supportsImageTest ? t('keys.testModal.imageReady') : t('keys.testModal.ready') }}</span>
           </div>
-          <div v-else-if="status === 'connecting'" class="flex items-center gap-2 text-yellow-400">
+          <div v-else-if="status === 'connecting'" class="flex items-center gap-2 text-accent-400">
             <Icon name="refresh" size="sm" class="animate-spin" :stroke-width="2" />
             <span>{{ t('keys.testModal.testing') }}</span>
           </div>
@@ -124,13 +124,13 @@
             {{ line.text }}
           </div>
 
-          <div v-if="streamingContent" class="text-green-400">
+          <div v-if="streamingContent" class="text-primary-400">
             {{ streamingContent }}<span class="animate-pulse">_</span>
           </div>
 
           <div
             v-if="status === 'success'"
-            class="mt-3 flex items-center gap-2 border-t border-gray-700 pt-3 text-green-400"
+            class="mt-3 flex items-center gap-2 border-t border-gray-700 pt-3 text-primary-400"
           >
             <Icon name="check" size="sm" :stroke-width="2" />
             <span>{{ t('keys.testModal.success') }}</span>
@@ -213,7 +213,7 @@
         </span>
       </div>
 
-      <p class="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+      <p class="rounded-lg bg-primary-50 px-3 py-2 text-xs text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
         {{ supportsImageTest ? t('keys.testModal.imageSmallUsageHint') : t('keys.testModal.smallUsageHint') }}
       </p>
     </div>
@@ -234,9 +234,9 @@
             status === 'connecting' || !canStartTest
               ? 'cursor-not-allowed bg-primary-400/70 text-white'
               : status === 'success'
-                ? 'bg-green-500 text-white hover:bg-green-600'
+              ? 'bg-primary-500 text-white hover:bg-primary-600'
                 : status === 'error'
-                  ? 'bg-orange-500 text-white hover:bg-orange-600'
+                  ? 'bg-accent-500 text-white hover:bg-accent-600'
                   : 'bg-primary-500 text-white hover:bg-primary-600'
           ]"
         >
@@ -544,7 +544,7 @@ const startTest = async () => {
 const beginTest = (apiKey: ApiKey) => {
   resetState()
   status.value = 'connecting'
-  addLine(t('keys.testModal.starting', { name: apiKey.name }), 'text-blue-400')
+  addLine(t('keys.testModal.starting', { name: apiKey.name }), 'text-primary-400')
   addLine(t('keys.testModal.groupLine', { group: apiKey.group?.name || '-' }), 'text-gray-400')
   addLine(t('keys.testModal.usingModel', { model: selectedModelId.value }), 'text-cyan-400')
   if (supportsImageTest.value) {
@@ -578,9 +578,9 @@ const startTextTest = async () => {
       throw new Error(await extractGatewayError(response))
     }
 
-    addLine(t('keys.testModal.connected'), 'text-green-400')
+    addLine(t('keys.testModal.connected'), 'text-primary-400')
     addLine(t('keys.testModal.sending'), 'text-gray-400')
-    addLine(t('keys.testModal.response'), 'text-yellow-400')
+    addLine(t('keys.testModal.response'), 'text-accent-400')
 
     await readStream(response)
     finalizeSuccess()
@@ -618,9 +618,9 @@ const startImageTest = async () => {
       throw new Error(await extractGatewayError(response))
     }
 
-    addLine(t('keys.testModal.connected'), 'text-green-400')
+    addLine(t('keys.testModal.connected'), 'text-primary-400')
     addLine(t('keys.testModal.sendingImage'), 'text-gray-400')
-    addLine(t('keys.testModal.response'), 'text-yellow-400')
+    addLine(t('keys.testModal.response'), 'text-accent-400')
 
     const payload = await response.json()
     const images = supportsOpenAIImageTest.value
@@ -633,7 +633,7 @@ const startImageTest = async () => {
 
     generatedImages.value = images
     images.forEach((image, index) => {
-      addLine(t('keys.testModal.imageReceived', { count: index + 1 }), 'text-green-300')
+      addLine(t('keys.testModal.imageReceived', { count: index + 1 }), 'text-primary-300')
       addLine(image.mimeType || 'image/*', 'text-gray-400')
     })
     finalizeSuccess()
@@ -819,7 +819,7 @@ const extractGeminiImages = (payload: unknown): PreviewImage[] => {
     }
   }
 
-  texts.forEach((text) => addLine(text, 'text-green-300'))
+  texts.forEach((text) => addLine(text, 'text-primary-300'))
   return images
 }
 
@@ -840,7 +840,7 @@ const appendContent = (text: string) => {
 
 const finalizeSuccess = () => {
   if (streamingContent.value) {
-    addLine(streamingContent.value, 'text-green-300')
+    addLine(streamingContent.value, 'text-primary-300')
     streamingContent.value = ''
   }
   status.value = 'success'
