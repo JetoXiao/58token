@@ -22,7 +22,7 @@ func (h *ModelMarketplaceHandler) ListPublic(c *gin.Context) {
 		return
 	}
 
-	c.Header("Cache-Control", "public, max-age=60")
+	c.Header("Cache-Control", "no-store")
 	response.Success(c, gin.H{
 		"items": items,
 	})

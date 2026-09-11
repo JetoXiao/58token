@@ -78,6 +78,10 @@ func RegisterPaymentRoutes(
 		// Config
 		adminGroup.GET("/config", adminPaymentHandler.GetConfig)
 		adminGroup.PUT("/config", adminPaymentHandler.UpdateConfig)
+		adminGroup.GET("/model-marketplace", adminPaymentHandler.ListMarketplaceGroups)
+		adminGroup.PUT("/model-marketplace", adminPaymentHandler.SaveMarketplaceGroups)
+		adminGroup.POST("/model-marketplace/sync", adminPaymentHandler.SyncMarketplaceGroups)
+		adminGroup.PUT("/model-marketplace/groups/:id", adminPaymentHandler.UpdateMarketplaceGroup)
 
 		// Orders
 		adminOrders := adminGroup.Group("/orders")

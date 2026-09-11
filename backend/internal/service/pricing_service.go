@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -138,6 +139,10 @@ type PricingRemoteClient interface {
 	FetchHashText(ctx context.Context, url string) (string, error)
 }
 
+type MarketplaceOfficialPriceStore interface {
+	SyncOfficialPrices(ctx context.Context, prices map[string]MarketplaceOfficialPrice) error
+}
+
 // LiteLLMRawEntry 用于解析原始JSON数据
 type LiteLLMRawEntry struct {
 	InputCostPerToken                   *float64 `json:"input_cost_per_token"`
@@ -159,12 +164,13 @@ type LiteLLMRawEntry struct {
 
 // PricingService 动态价格服务
 type PricingService struct {
-	cfg          *config.Config
-	remoteClient PricingRemoteClient
-	mu           sync.RWMutex
-	pricingData  map[string]*LiteLLMModelPricing
-	lastUpdated  time.Time
-	localHash    string
+	cfg                   *config.Config
+	remoteClient          PricingRemoteClient
+	marketplacePriceStore MarketplaceOfficialPriceStore
+	mu                    sync.RWMutex
+	pricingData           map[string]*LiteLLMModelPricing
+	lastUpdated           time.Time
+	localHash             string
 
 	// 停止信号
 	stopCh chan struct{}
@@ -172,12 +178,17 @@ type PricingService struct {
 }
 
 // NewPricingService 创建价格服务
-func NewPricingService(cfg *config.Config, remoteClient PricingRemoteClient) *PricingService {
+func NewPricingService(cfg *config.Config, remoteClient PricingRemoteClient, marketplacePriceStore ...MarketplaceOfficialPriceStore) *PricingService {
+	var store MarketplaceOfficialPriceStore
+	if len(marketplacePriceStore) > 0 {
+		store = marketplacePriceStore[0]
+	}
 	s := &PricingService{
-		cfg:          cfg,
-		remoteClient: remoteClient,
-		pricingData:  make(map[string]*LiteLLMModelPricing),
-		stopCh:       make(chan struct{}),
+		cfg:                   cfg,
+		remoteClient:          remoteClient,
+		marketplacePriceStore: store,
+		pricingData:           make(map[string]*LiteLLMModelPricing),
+		stopCh:                make(chan struct{}),
 	}
 	return s
 }
@@ -255,6 +266,7 @@ func (s *PricingService) checkAndUpdatePricing() error {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to load local file, downloading: %v", err)
 		return s.downloadPricingData()
 	}
+	s.syncLoadedMarketplaceOfficialPrices()
 
 	// 如果配置了哈希URL，通过远程哈希检查是否有更新
 	if s.cfg.Pricing.HashURL != "" {
@@ -297,6 +309,19 @@ func (s *PricingService) checkAndUpdatePricing() error {
 	return nil
 }
 
+func (s *PricingService) syncLoadedMarketplaceOfficialPrices() {
+	s.mu.RLock()
+	data := make(map[string]*LiteLLMModelPricing, len(s.pricingData))
+	for modelName, pricing := range s.pricingData {
+		data[modelName] = pricing
+	}
+	s.mu.RUnlock()
+
+	if err := s.syncMarketplaceOfficialPrices(context.Background(), data); err != nil {
+		logger.LegacyPrintf("service.pricing", "[Pricing] Marketplace official price sync failed: %v", err)
+	}
+}
+
 // syncWithRemote 与远程同步（基于哈希校验）
 func (s *PricingService) syncWithRemote() error {
 	// 如果配置了哈希URL，从远程获取哈希进行比对
@@ -317,6 +342,7 @@ func (s *PricingService) syncWithRemote() error {
 			return s.downloadPricingData()
 		}
 		logger.LegacyPrintf("service.pricing", "%s", "[Pricing] Hash check passed, no update needed")
+		s.syncLoadedMarketplaceOfficialPrices()
 		return nil
 	}
 
@@ -402,8 +428,50 @@ func (s *PricingService) downloadPricingData() error {
 	s.localHash = syncHash
 	s.mu.Unlock()
 
+	if err := s.syncMarketplaceOfficialPrices(context.Background(), data); err != nil {
+		// Marketplace persistence is an auxiliary side effect. A failure here
+		// must not change the existing pricing/billing update result.
+		logger.LegacyPrintf("service.pricing", "[Pricing] Marketplace official price sync failed: %v", err)
+	}
+
 	logger.LegacyPrintf("service.pricing", "[Pricing] Downloaded %d models successfully", len(data))
 	return nil
+}
+
+func (s *PricingService) syncMarketplaceOfficialPrices(
+	ctx context.Context,
+	data map[string]*LiteLLMModelPricing,
+) error {
+	if s == nil || s.marketplacePriceStore == nil {
+		return nil
+	}
+
+	prices := make(map[string]MarketplaceOfficialPrice)
+	for modelName, pricing := range data {
+		if pricing == nil {
+			continue
+		}
+		price := MarketplaceOfficialPrice{
+			Input:      perMillionPrice(pricing.InputCostPerToken),
+			Output:     perMillionPrice(pricing.OutputCostPerToken),
+			CacheWrite: perMillionPrice(pricing.CacheCreationInputTokenCost),
+			CacheRead:  perMillionPrice(pricing.CacheReadInputTokenCost),
+		}
+		if price.Input == nil && price.Output == nil && price.CacheWrite == nil && price.CacheRead == nil {
+			continue
+		}
+		prices[modelName] = price
+	}
+
+	return s.marketplacePriceStore.SyncOfficialPrices(ctx, prices)
+}
+
+func perMillionPrice(perToken float64) *float64 {
+	if perToken <= 0 {
+		return nil
+	}
+	value := math.Round(perToken*1_000_000*1_000_000_000_000) / 1_000_000_000_000
+	return &value
 }
 
 // parsePricingData 解析价格数据（处理各种格式）
@@ -544,7 +612,11 @@ func (s *PricingService) useFallbackPricing() error {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to copy fallback: %v", err)
 	}
 
-	return s.loadPricingData(fallbackFile)
+	if err := s.loadPricingData(fallbackFile); err != nil {
+		return err
+	}
+	s.syncLoadedMarketplaceOfficialPrices()
+	return nil
 }
 
 // fetchRemoteHash 从远程获取哈希值

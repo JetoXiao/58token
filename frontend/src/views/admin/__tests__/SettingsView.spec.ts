@@ -4,6 +4,15 @@ import { flushPromises, mount } from "@vue/test-utils";
 
 import SettingsView from "../SettingsView.vue";
 
+vi.mock("vue-router", () => ({
+  useRoute: () => ({
+    query: {},
+  }),
+  useRouter: () => ({
+    replace: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 const {
   getSettings,
   updateSettings,
@@ -22,6 +31,10 @@ const {
   updateProvider,
   createProvider,
   deleteProvider,
+  getMarketplaceGroups,
+  syncMarketplaceGroups,
+  saveMarketplaceGroups,
+  updateMarketplaceGroup,
   fetchPublicSettings,
   adminSettingsFetch,
   showError,
@@ -44,6 +57,10 @@ const {
   updateProvider: vi.fn(),
   createProvider: vi.fn(),
   deleteProvider: vi.fn(),
+  getMarketplaceGroups: vi.fn(),
+  syncMarketplaceGroups: vi.fn(),
+  saveMarketplaceGroups: vi.fn(),
+  updateMarketplaceGroup: vi.fn(),
   fetchPublicSettings: vi.fn(),
   adminSettingsFetch: vi.fn(),
   showError: vi.fn(),
@@ -78,6 +95,10 @@ vi.mock("@/api", () => ({
       updateProvider,
       createProvider,
       deleteProvider,
+      getMarketplaceGroups,
+      syncMarketplaceGroups,
+      saveMarketplaceGroups,
+      updateMarketplaceGroup,
     },
   },
 }));
@@ -466,6 +487,7 @@ function mountView() {
     global: {
       stubs: {
         AppLayout: AppLayoutStub,
+        "router-link": { template: "<a><slot /></a>" },
         Select: SelectStub,
         Toggle: ToggleStub,
         Icon: true,
@@ -531,6 +553,10 @@ describe("admin SettingsView payment visible method controls", () => {
     updateProvider.mockReset();
     createProvider.mockReset();
     deleteProvider.mockReset();
+    getMarketplaceGroups.mockReset();
+    syncMarketplaceGroups.mockReset();
+    saveMarketplaceGroups.mockReset();
+    updateMarketplaceGroup.mockReset();
     fetchPublicSettings.mockReset();
     adminSettingsFetch.mockReset();
     showError.mockReset();
@@ -587,6 +613,27 @@ describe("admin SettingsView payment visible method controls", () => {
     getProviders.mockResolvedValue({
       data: [],
     });
+    getMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: false,
+      },
+    });
+    syncMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: true,
+      },
+    });
+    saveMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: true,
+      },
+    });
+    updateMarketplaceGroup.mockResolvedValue({
+      data: null,
+    });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
   });
@@ -599,6 +646,173 @@ describe("admin SettingsView payment visible method controls", () => {
 
     expect(wrapper.text()).not.toContain("可见方式");
     expect(wrapper.text()).not.toContain("支付来源");
+  });
+
+  it("does not render source group id pills in marketplace maintenance", async () => {
+    getMarketplaceGroups.mockResolvedValueOnce({
+      data: {
+        groups: [
+          {
+            id: 9,
+            source_group_id: 12,
+            source_group_name: "source-group",
+            platform: "openai",
+            source_rate_multiplier: 1,
+            source_sort_order: 0,
+            source_models: ["gpt-5.5"],
+            display_name: "",
+            display_multiplier: 1,
+            enabled: true,
+            source_active: true,
+            is_virtual: false,
+            models: [
+              {
+                id: 10,
+                source_model_name: "gpt-5.5",
+                display_name: "",
+                enabled: true,
+                sort_order: 0,
+                is_virtual: false,
+                capability_tags: ["Reasoning", "Tools"],
+                capability_tags_configured: false,
+              },
+            ],
+          },
+        ],
+        synced: true,
+      },
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    expect(wrapper.text()).toContain("source-group");
+    expect(wrapper.text()).not.toContain("#12");
+  });
+
+  it("saves marketplace maintenance through the page-level settings save", async () => {
+    getMarketplaceGroups.mockResolvedValueOnce({
+      data: {
+        groups: [
+          {
+            id: 9,
+            source_group_id: 12,
+            source_group_name: "source-group",
+            platform: "openai",
+            source_rate_multiplier: 1,
+            source_sort_order: 0,
+            source_models: ["gpt-5.5"],
+            display_name: "Public Group",
+            display_multiplier: 1.25,
+            enabled: true,
+            source_active: true,
+            is_virtual: false,
+            models: [
+              {
+                id: 10,
+                source_model_name: "gpt-5.5",
+                display_name: "",
+                enabled: true,
+                sort_order: 0,
+                is_virtual: false,
+              },
+            ],
+          },
+        ],
+        synced: true,
+      },
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    const marketplaceCard = wrapper
+      .findAll(".card")
+      .find((node) =>
+        node.text().includes(
+          "admin.settings.payment.marketplaceGroupMultipliers.title",
+        ),
+      );
+    expect(marketplaceCard).toBeDefined();
+    expect(
+      marketplaceCard
+        ?.findAll("button")
+        .some((button) => button.text().includes("common.save")),
+    ).toBe(false);
+
+    await wrapper.find("form").trigger("submit.prevent");
+    await flushPromises();
+
+    expect(saveMarketplaceGroups).toHaveBeenCalledTimes(1);
+    expect(saveMarketplaceGroups).toHaveBeenCalledWith({
+      groups: [
+        expect.objectContaining({
+          id: 9,
+          source_group_id: 12,
+          display_name: "Public Group",
+          display_multiplier: 1.25,
+        }),
+      ],
+    });
+  });
+
+  it("does not render manual marketplace add or delete controls", async () => {
+    getMarketplaceGroups.mockResolvedValueOnce({
+      data: {
+        groups: [
+          {
+            id: 9,
+            source_group_id: 12,
+            source_group_name: "source-group",
+            platform: "openai",
+            source_rate_multiplier: 1,
+            source_sort_order: 0,
+            source_models: ["gpt-5.5"],
+            display_name: "",
+            display_multiplier: 1,
+            enabled: true,
+            source_active: true,
+            is_virtual: false,
+            models: [
+              {
+                id: 10,
+                source_model_name: "gpt-5.5",
+                display_name: "",
+                enabled: true,
+                sort_order: 0,
+                is_virtual: false,
+              },
+            ],
+          },
+        ],
+        synced: true,
+      },
+    });
+
+    const wrapper = mountView();
+
+    await flushPromises();
+    await openPaymentTab(wrapper);
+
+    expect(wrapper.text()).not.toContain(
+      "admin.settings.payment.marketplaceMaintenance.addGroup",
+    );
+    expect(wrapper.text()).not.toContain(
+      "admin.settings.payment.marketplaceMaintenance.addModel",
+    );
+    expect(
+      wrapper
+        .findAll("button")
+        .some((button) =>
+          String(button.attributes("aria-label") || "").includes(
+            "marketplaceMaintenance.delete",
+          ),
+        ),
+    ).toBe(false);
   });
 
   it("links payment guidance to README sections instead of removed payment docs", async () => {
@@ -820,6 +1034,7 @@ describe("admin SettingsView payment visible method controls", () => {
       global: {
         stubs: {
           AppLayout: AppLayoutStub,
+          "router-link": { template: "<a><slot /></a>" },
           Select: SelectStub,
           Toggle: ToggleStub,
           Icon: true,
@@ -894,6 +1109,10 @@ describe("admin SettingsView wechat connect controls", () => {
     updateProvider.mockReset();
     createProvider.mockReset();
     deleteProvider.mockReset();
+    getMarketplaceGroups.mockReset();
+    syncMarketplaceGroups.mockReset();
+    saveMarketplaceGroups.mockReset();
+    updateMarketplaceGroup.mockReset();
     fetchPublicSettings.mockReset();
     adminSettingsFetch.mockReset();
     showError.mockReset();
@@ -952,6 +1171,27 @@ describe("admin SettingsView wechat connect controls", () => {
     });
     getProviders.mockResolvedValue({
       data: [],
+    });
+    getMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: false,
+      },
+    });
+    syncMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: true,
+      },
+    });
+    saveMarketplaceGroups.mockResolvedValue({
+      data: {
+        groups: [],
+        synced: true,
+      },
+    });
+    updateMarketplaceGroup.mockResolvedValue({
+      data: null,
     });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);

@@ -88,6 +88,23 @@ func TestSubAdminAdminPermissionGuard(t *testing.T) {
 			wantStatus:  http.StatusOK,
 		},
 		{
+			name:        "sub_admin_model_marketplace_uses_payment_permission",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_order_dashboard"},
+			method:      http.MethodGet,
+			path:        "/api/v1/admin/payment/model-marketplace",
+			wantStatus:  http.StatusOK,
+		},
+		{
+			name:        "sub_admin_model_marketplace_write_remains_read_only",
+			role:        service.RoleSubAdmin,
+			permissions: []string{"admin_order_dashboard"},
+			method:      http.MethodPut,
+			path:        "/api/v1/admin/payment/model-marketplace/groups/1",
+			wantStatus:  http.StatusForbidden,
+			wantBody:    "READ_ONLY_ADMIN",
+		},
+		{
 			name:        "sub_admin_ttft_analysis_uses_dedicated_permission",
 			role:        service.RoleSubAdmin,
 			permissions: []string{"admin_ttft_analysis"},

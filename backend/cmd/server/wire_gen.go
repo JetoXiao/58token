@@ -123,7 +123,9 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	concurrencyCache := repository.ProvideConcurrencyCache(redisClient, configConfig)
 	concurrencyService := service.ProvideConcurrencyService(concurrencyCache, accountRepository, configConfig)
 	pricingRemoteClient := repository.ProvidePricingRemoteClient(configConfig)
-	pricingService, err := service.ProvidePricingService(configConfig, pricingRemoteClient)
+	modelMarketplaceRepository := repository.NewModelMarketplaceRepository(db)
+	marketplaceOfficialPriceStore := repository.ProvideMarketplaceOfficialPriceStore(modelMarketplaceRepository)
+	pricingService, err := service.ProvidePricingService(configConfig, pricingRemoteClient, marketplaceOfficialPriceStore)
 	if err != nil {
 		return nil, err
 	}
@@ -174,9 +176,6 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	internal500CounterCache := repository.NewInternal500CounterCache(redisClient)
 	antigravityGatewayService := service.NewAntigravityGatewayService(accountRepository, gatewayCache, schedulerSnapshotService, antigravityTokenProvider, rateLimitService, httpUpstream, settingService, internal500CounterCache)
 	accountTestService := service.NewAccountTestService(accountRepository, geminiTokenProvider, claudeTokenProvider, antigravityGatewayService, httpUpstream, configConfig, tlsFingerprintProfileService)
-	runtimeModelProbeService := service.NewRuntimeModelProbeService(accountRepository, accountTestService, rateLimitService, time.Minute)
-	runtimeModelProbeService.Start()
-	openAIGatewayService.SetRuntimeModelProbeService(runtimeModelProbeService)
 	crsSyncService := service.NewCRSSyncService(accountRepository, proxyRepository, oAuthService, openAIOAuthService, geminiOAuthService, configConfig)
 	accountHandler := admin.NewAccountHandler(adminService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, rateLimitService, accountUsageService, accountTestService, concurrencyService, crsSyncService, sessionLimitCache, rpmCache, compositeTokenCacheInvalidator)
 	adminAnnouncementHandler := admin.NewAnnouncementHandler(announcementService)
@@ -197,8 +196,6 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	identityService := service.NewIdentityService(identityCache)
 	digestSessionStore := service.NewDigestSessionStore()
 	gatewayService := service.NewGatewayService(accountRepository, groupRepository, usageLogRepository, usageBillingRepository, userRepository, userSubscriptionRepository, userGroupRateRepository, gatewayCache, configConfig, schedulerSnapshotService, concurrencyService, billingService, rateLimitService, billingCacheService, identityService, httpUpstream, deferredService, claudeTokenProvider, sessionLimitCache, rpmCache, digestSessionStore, settingService, tlsFingerprintProfileService, channelService, modelPricingResolver, balanceNotifyService)
-	runtimeModelProbeService.SetGatewayServices(gatewayService, openAIGatewayService)
-	gatewayService.SetRuntimeModelProbeService(runtimeModelProbeService)
 	geminiMessagesCompatService := service.NewGeminiMessagesCompatService(accountRepository, groupRepository, gatewayCache, schedulerSnapshotService, geminiTokenProvider, rateLimitService, httpUpstream, antigravityGatewayService, configConfig)
 	opsSystemLogSink := service.ProvideOpsSystemLogSink(opsRepository)
 	opsService := service.NewOpsService(opsRepository, settingRepository, configConfig, accountRepository, userRepository, concurrencyService, gatewayService, openAIGatewayService, geminiMessagesCompatService, antigravityGatewayService, opsSystemLogSink)
@@ -243,7 +240,11 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	contentModerationHashCache := repository.NewContentModerationHashCache(redisClient)
 	contentModerationService := service.NewContentModerationService(settingRepository, contentModerationRepository, contentModerationHashCache, groupRepository, userRepository, apiKeyAuthCacheInvalidator, emailService)
 	contentModerationHandler := admin.NewContentModerationHandler(contentModerationService)
-	paymentHandler := admin.NewPaymentHandler(paymentService, paymentConfigService)
+	modelMarketplaceMaintenanceStore := repository.ProvideModelMarketplaceMaintenanceStore(modelMarketplaceRepository)
+	marketplaceGroupSourceReader := service.ProvideMarketplaceGroupSource(groupRepository)
+	marketplaceModelSourceReader := service.ProvideMarketplaceModelSource(gatewayService)
+	modelMarketplaceMaintenanceService := service.NewModelMarketplaceMaintenanceService(modelMarketplaceMaintenanceStore, marketplaceGroupSourceReader, marketplaceModelSourceReader)
+	paymentHandler := admin.NewPaymentHandler(paymentService, paymentConfigService, modelMarketplaceMaintenanceService)
 	affiliateHandler := admin.NewAffiliateHandler(affiliateService, adminService)
 	trialCardHandler := admin.NewTrialCardHandler(freeQuotaService)
 	helpCenterService := service.NewHelpCenterService(settingRepository)
@@ -260,8 +261,9 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	paymentWebhookHandler := handler.NewPaymentWebhookHandler(paymentService, registry)
 	availableChannelHandler := handler.NewAvailableChannelHandler(channelService, apiKeyService, settingService)
 	modelPricingHandler := handler.NewModelPricingHandler()
-	modelMarketplaceRepository := repository.NewModelMarketplaceRepository(db)
-	modelMarketplaceService := service.NewModelMarketplaceService(modelMarketplaceRepository)
+	serviceModelMarketplaceRepository := repository.ProvideModelMarketplaceRepository(modelMarketplaceRepository)
+	modelMarketplaceConfiguredRepository := repository.ProvideModelMarketplaceConfiguredRepository(modelMarketplaceRepository)
+	modelMarketplaceService := service.NewConfiguredModelMarketplaceService(serviceModelMarketplaceRepository, modelMarketplaceConfiguredRepository)
 	modelMarketplaceHandler := handler.NewModelMarketplaceHandler(modelMarketplaceService)
 	handlerHelpCenterHandler := handler.ProvideHelpCenterHandler(helpCenterService, userService, configConfig)
 	visitorAnalyticsService := service.NewVisitorAnalyticsService(db)
@@ -285,6 +287,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
 	accountExpiryService := service.ProvideAccountExpiryService(accountRepository)
 	subscriptionExpiryService := service.ProvideSubscriptionExpiryService(userSubscriptionRepository, settingRepository, notificationEmailService)
+	runtimeModelProbeService := service.ProvideRuntimeModelProbeService(accountRepository, accountTestService, rateLimitService, gatewayService, openAIGatewayService)
 	scheduledTestRunnerService := service.ProvideScheduledTestRunnerService(scheduledTestPlanRepository, scheduledTestService, accountTestService, rateLimitService, configConfig)
 	paymentOrderExpiryService := service.ProvidePaymentOrderExpiryService(paymentService)
 	channelMonitorRunner := service.ProvideChannelMonitorRunner(channelMonitorService, settingService)
@@ -415,6 +418,12 @@ func provideCleanup(
 			}},
 			{"AccountExpiryService", func() error {
 				accountExpiry.Stop()
+				return nil
+			}},
+			{"RuntimeModelProbeService", func() error {
+				if runtimeModelProbe != nil {
+					runtimeModelProbe.Stop()
+				}
 				return nil
 			}},
 			{"SubscriptionExpiryService", func() error {

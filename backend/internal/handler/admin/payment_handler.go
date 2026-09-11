@@ -12,15 +12,21 @@ import (
 
 // PaymentHandler handles admin payment management.
 type PaymentHandler struct {
-	paymentService *service.PaymentService
-	configService  *service.PaymentConfigService
+	paymentService         *service.PaymentService
+	configService          *service.PaymentConfigService
+	marketplaceMaintenance *service.ModelMarketplaceMaintenanceService
 }
 
 // NewPaymentHandler creates a new admin PaymentHandler.
-func NewPaymentHandler(paymentService *service.PaymentService, configService *service.PaymentConfigService) *PaymentHandler {
+func NewPaymentHandler(
+	paymentService *service.PaymentService,
+	configService *service.PaymentConfigService,
+	marketplaceMaintenance *service.ModelMarketplaceMaintenanceService,
+) *PaymentHandler {
 	return &PaymentHandler{
-		paymentService: paymentService,
-		configService:  configService,
+		paymentService:         paymentService,
+		configService:          configService,
+		marketplaceMaintenance: marketplaceMaintenance,
 	}
 }
 
@@ -341,4 +347,98 @@ func (h *PaymentHandler) UpdateConfig(c *gin.Context) {
 		return
 	}
 	response.Success(c, gin.H{"message": "updated"})
+}
+
+// ListMarketplaceGroups returns the model marketplace maintenance configuration.
+// GET /api/v1/admin/payment/model-marketplace
+func (h *PaymentHandler) ListMarketplaceGroups(c *gin.Context) {
+	if h.marketplaceMaintenance == nil {
+		response.InternalError(c, "model marketplace maintenance is not configured")
+		return
+	}
+	groups, err := h.marketplaceMaintenance.ListAdmin(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	synced, err := h.marketplaceMaintenance.HasSynced(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"groups": groups, "synced": synced})
+}
+
+// SyncMarketplaceGroups refreshes source groups and model mappings.
+// POST /api/v1/admin/payment/model-marketplace/sync
+func (h *PaymentHandler) SyncMarketplaceGroups(c *gin.Context) {
+	if h.marketplaceMaintenance == nil {
+		response.InternalError(c, "model marketplace maintenance is not configured")
+		return
+	}
+	var req service.SyncMarketplaceGroupsInput
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.BadRequest(c, "Invalid request: "+err.Error())
+			return
+		}
+	}
+	groups, err := h.marketplaceMaintenance.Sync(
+		c.Request.Context(),
+		req.PreserveDisplayConfig,
+	)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"groups": groups, "synced": true})
+}
+
+// SaveMarketplaceGroups saves the complete marketplace display configuration.
+// PUT /api/v1/admin/payment/model-marketplace
+func (h *PaymentHandler) SaveMarketplaceGroups(c *gin.Context) {
+	if h.marketplaceMaintenance == nil {
+		response.InternalError(c, "model marketplace maintenance is not configured")
+		return
+	}
+	var req service.SaveMarketplaceGroupsInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	groups, err := h.marketplaceMaintenance.SaveGroups(c.Request.Context(), req)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	synced, err := h.marketplaceMaintenance.HasSynced(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"groups": groups, "synced": synced})
+}
+
+// UpdateMarketplaceGroup updates admin-owned display settings for one source group.
+// PUT /api/v1/admin/payment/model-marketplace/groups/:id
+func (h *PaymentHandler) UpdateMarketplaceGroup(c *gin.Context) {
+	if h.marketplaceMaintenance == nil {
+		response.InternalError(c, "model marketplace maintenance is not configured")
+		return
+	}
+	sourceGroupID, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	var req service.UpdateMarketplaceGroupInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	group, err := h.marketplaceMaintenance.UpdateGroup(c.Request.Context(), sourceGroupID, req)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, group)
 }

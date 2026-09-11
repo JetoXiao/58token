@@ -75,14 +75,14 @@
         </div>
       </section>
 
-      <div class="mx-auto mt-6 grid max-w-7xl gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div class="mx-auto mt-6 grid max-w-7xl grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside class="rounded-[1.5rem] border border-sky-100/80 bg-white/78 p-5 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.045] xl:sticky xl:top-6 xl:self-start">
-          <div class="flex items-start justify-between gap-3">
-            <div>
+          <div class="flex min-w-0 items-start justify-between gap-3">
+            <div class="min-w-0">
               <h2 class="text-base font-semibold text-gray-950 dark:text-white">{{ t('availableChannels.filters.title') }}</h2>
               <p class="mt-1 text-xs text-gray-500 dark:text-slate-400">{{ t('availableChannels.filters.description') }}</p>
             </div>
-            <button type="button" class="rounded-xl border border-sky-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-sky-300 hover:text-sky-600 dark:border-white/10 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:text-primary-300" @click="resetFilters">
+            <button type="button" class="shrink-0 whitespace-nowrap rounded-xl border border-sky-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:border-sky-300 hover:text-sky-600 dark:border-white/10 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:text-primary-300" @click="resetFilters">
               {{ t('availableChannels.filters.reset') }}
             </button>
           </div>
@@ -133,30 +133,32 @@
           </div>
 
           <div v-else-if="viewMode === 'cards'" class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            <article v-for="item in filteredModels" :key="`${item.modelName}-${item.group}`" class="group rounded-[1.5rem] border border-sky-100/80 bg-white/84 p-5 shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-100/60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-primary-800 dark:hover:shadow-primary-950/20">
-              <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
-                <div class="flex min-w-0 items-start gap-3">
-                  <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 shadow-sm dark:border-white/10 dark:bg-white/5">
-                    <ModelIcon :model="item.modelName" size="24px" />
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <div class="flex min-w-0 items-start gap-2">
-                      <h3 class="min-w-0 max-w-full break-words text-base font-semibold leading-6 text-gray-950 dark:text-white" :title="item.modelName">{{ item.modelName }}</h3>
-                      <button type="button" class="shrink-0 rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/10 dark:hover:text-primary-300" :title="t('availableChannels.copyModel')" @click="copyModel(item.modelName)">
-                        <Icon name="copy" size="sm" />
-                      </button>
-                    </div>
-                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-slate-400">{{ item.vendorName }} / {{ item.group }} · {{ item.groupMultiplier }}x</p>
+            <article v-for="item in filteredModels" :key="`${item.modelName}-${item.group}`" class="group min-w-0 rounded-[1.5rem] border border-sky-100/80 bg-white/84 p-5 shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-lg hover:shadow-sky-100/60 dark:border-white/10 dark:bg-white/[0.045] dark:hover:border-primary-800 dark:hover:shadow-primary-950/20">
+              <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-100 bg-sky-50 shadow-sm dark:border-white/10 dark:bg-white/5">
+                  <ModelIcon :model="item.modelName" size="24px" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <h3 class="line-clamp-2 min-w-0 flex-1 break-words text-base font-semibold leading-6 text-gray-950 dark:text-white" :title="item.modelName">
+                      {{ item.modelName }}
+                    </h3>
+                    <button type="button" class="shrink-0 rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/10 dark:hover:text-primary-300" :title="t('availableChannels.copyModel')" @click="copyModel(item.requestModelName)">
+                      <Icon name="copy" size="sm" />
+                    </button>
                   </div>
                 </div>
-                <div class="flex shrink-0 flex-col items-end gap-2">
-                  <span class="rounded-full border border-sky-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:border-white/10 dark:text-slate-300">
-                    {{ item.billingLabel }}
-                  </span>
-                  <span class="rounded-full border border-accent-200 bg-accent-50 px-2.5 py-1 text-xs font-semibold text-accent-700 dark:border-accent-900/60 dark:bg-accent-900/20 dark:text-accent-300">
-                    {{ itemDiscountLabel(item) }}
-                  </span>
-                </div>
+              </div>
+              <div class="mt-2 flex w-full min-w-0 flex-nowrap items-center justify-center gap-1.5">
+                <span class="shrink-0 whitespace-nowrap rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                  {{ item.billingLabel }}
+                </span>
+                <span class="shrink-0 whitespace-nowrap rounded-full border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 dark:border-sky-900/60 dark:bg-sky-900/20 dark:text-sky-300">
+                  {{ item.multiplierLabel }}
+                </span>
+                <span class="shrink-0 whitespace-nowrap rounded-full border border-accent-200 bg-accent-50 px-2 py-1 text-[11px] font-semibold text-accent-700 dark:border-accent-900/60 dark:bg-accent-900/20 dark:text-accent-300">
+                  {{ itemDiscountLabel(item) }}
+                </span>
               </div>
 
               <p class="mt-4 line-clamp-2 text-sm leading-6 text-gray-500 dark:text-slate-400">
@@ -192,9 +194,9 @@
                 <tbody>
                   <tr v-for="item in filteredModels" :key="`row-${item.modelName}-${item.group}`" class="border-t border-sky-100 transition hover:bg-sky-50/70 dark:border-white/10 dark:hover:bg-white/[0.04]">
                     <td class="px-5 py-4">
-                      <button type="button" class="flex min-w-0 items-center gap-3 font-semibold text-gray-950 hover:text-primary-600 dark:text-white dark:hover:text-primary-300" @click="copyModel(item.modelName)">
+                      <button type="button" class="flex min-w-0 items-center gap-3 font-semibold text-gray-950 hover:text-primary-600 dark:text-white dark:hover:text-primary-300" @click="copyModel(item.requestModelName)">
                         <ModelIcon :model="item.modelName" size="20px" />
-                        <span class="break-words">{{ item.modelName }}</span>
+                        <span class="max-w-[18rem] truncate whitespace-nowrap" :title="item.modelName">{{ item.modelName }}</span>
                       </button>
                     </td>
                     <td class="px-5 py-4 text-gray-600 dark:text-slate-300">{{ item.vendorName }}</td>
@@ -226,6 +228,9 @@ import ModelIcon from '@/components/common/ModelIcon.vue'
 import { useClipboard } from '@/composables/useClipboard'
 import { BRAND_LOGO_URL } from '@/constants/brand'
 import { normalizeMarketplaceModelName } from '@/utils/marketplaceModel'
+import { parseMarketplaceCapabilities } from '@/utils/marketplaceCapabilities'
+import { formatMarketplaceMultiplier } from '@/utils/marketplaceDisplay'
+import { syncMarketplaceFilterSelections } from '@/utils/marketplaceFilters'
 import type { PaymentConfig } from '@/types/payment'
 
 type CurrencyMode = 'usd' | 'cny'
@@ -263,9 +268,12 @@ interface PricingResponse {
 interface MarketplaceItemResponse {
   id: number
   model_name: string
+  display_name?: string
   pricing_aliases?: string[]
   vendor_name: string
   groups: string[]
+  source_group_id?: number
+  group_multiplier?: number
   tags: string[]
   endpoints: string[]
   description?: string
@@ -280,12 +288,14 @@ interface MarketplaceResponse {
 
 interface MarketplaceModel {
   modelName: string
+  requestModelName: string
   pricingAliases: string[]
   vendorName: string
   group: string
   groupMultiplier: number
   capabilities: string[]
   billingLabel: string
+  multiplierLabel: string
   description: string
   prices: Record<PriceKey, OfficialPrice>
   requestPrice: number | null
@@ -317,10 +327,7 @@ const MARKETPLACE_CAPABILITY_KEYS: Record<string, string> = {
   'Adaptive Thinking': 'adaptiveThinking',
   'Fast Mode': 'fastMode',
   '1M': 'context1m',
-  '128K': 'output128k',
-  'OpenAI API': 'openaiApi',
-  anthropic: 'anthropic',
-  openai: 'openai'
+  '128K': 'output128k'
 }
 const RETIRED_MARKETPLACE_MODELS = new Set(['gpt-5.2', 'gpt-5.3-codex'])
 
@@ -463,28 +470,36 @@ const viewItems = computed(() => [
 ])
 
 const marketplaceModels = computed<MarketplaceModel[]>(() => marketplaceItems.value.filter(isVisibleMarketplaceItem).flatMap((definition) => {
-  const modelName = normalizeMarketplaceModelName(definition.model_name)
-  const pricingAliases = modelPricingAliases(modelName, definition.pricing_aliases)
+  const requestModelName = String(definition.model_name || '').trim()
+  const normalizedModelName = normalizeMarketplaceModelName(requestModelName)
+  const modelName = definition.display_name?.trim() || normalizedModelName
+  const pricingAliases = modelPricingAliases(requestModelName, definition.pricing_aliases)
+  if (!pricingAliases.includes(normalizedModelName.toLowerCase())) pricingAliases.push(normalizedModelName.toLowerCase())
   const pricingModel = rawPricing.value.data?.find((item) => pricingAliases.includes(item.model_name.toLowerCase()))
-  const capabilities = parseCapabilities(definition.tags, pricingModel?.supported_endpoint_types || [...definition.endpoints])
+  const capabilities = parseMarketplaceCapabilities(definition.tags)
   const description = localizedModelDescription(definition, pricingModel)
   const prices = normalizeOfficialPrices(definition.official_prices)
   const localizedCapabilities = capabilities.map(localizedCapability)
 
   return definition.groups.map((group) => {
-    const groupMultiplier = groupMultiplierFor(group)
+    const configuredMultiplier = Number(definition.group_multiplier)
+    const groupMultiplier = Number.isFinite(configuredMultiplier) && configuredMultiplier > 0
+      ? configuredMultiplier
+      : groupMultiplierFor(group)
     return {
       modelName,
+      requestModelName,
       pricingAliases,
       vendorName: definition.vendor_name,
       group,
       groupMultiplier,
       capabilities,
       billingLabel: t('availableChannels.pricing.billingModeToken'),
+      multiplierLabel: formatMarketplaceMultiplier(t('availableChannels.pricing.multiplier'), groupMultiplier),
       description,
       prices,
       requestPrice: null,
-      searchText: [definition.model_name, ...pricingAliases, definition.vendor_name, group, ...capabilities, ...localizedCapabilities, ...definition.endpoints].join(' ').toLowerCase()
+      searchText: [requestModelName, normalizedModelName, modelName, ...pricingAliases, definition.vendor_name, group, ...capabilities, ...localizedCapabilities, ...definition.endpoints].join(' ').toLowerCase()
     }
   })
 }))
@@ -565,8 +580,9 @@ function toOptions(counts: Map<string, number>, order: string[] = [], labelFn: (
 
 function selectProvider(value: string) {
   selectedProvider.value = value
-  const nextGroup = groupOptions.value.find((option) => option.value === selectedGroup.value)?.value || groupOptions.value[0]?.value || ''
-  selectedGroup.value = nextGroup
+  if (!groupOptions.value.some((option) => option.value === selectedGroup.value)) {
+    selectedGroup.value = ''
+  }
 }
 
 function selectGroup(value: string) {
@@ -579,15 +595,9 @@ function selectCapability(value: string) {
 
 function resetFilters() {
   searchQuery.value = ''
-  selectedProvider.value = providerOptions.value[0]?.value || ''
-  selectedGroup.value = groupOptions.value[0]?.value || ''
+  selectedProvider.value = ''
+  selectedGroup.value = ''
   selectedCapability.value = ''
-}
-
-function parseCapabilities(tags: string[], endpoints: string[]): string[] {
-  const tagItems = tags.map((tag) => tag.trim()).filter(Boolean)
-  const endpointItems = endpoints.map((endpoint) => endpoint === 'openai' ? 'OpenAI API' : endpoint)
-  return Array.from(new Set([...tagItems, ...endpointItems]))
 }
 
 function localizedModelDescription(definition: MarketplaceItemResponse, pricingModel?: PricingModel): string {
@@ -646,6 +656,13 @@ function modelDescription(modelName: string): string {
 }
 
 function groupMultiplierFor(group: string): number {
+  const configuredItem = marketplaceItems.value.find((item) =>
+    item.groups.includes(group) &&
+    Number.isFinite(Number(item.group_multiplier)) &&
+    Number(item.group_multiplier) > 0
+  )
+  if (configuredItem) return Number(configuredItem.group_multiplier)
+
   const configured = Number(marketplaceGroupMultipliers.value[group])
   return Number.isFinite(configured) && configured > 0 ? configured : 1
 }
@@ -793,12 +810,13 @@ function isVisibleMarketplaceItem(item: MarketplaceItemResponse): boolean {
 }
 
 function syncDefaultSelections() {
-  if (!providerOptions.value.some((option) => option.value === selectedProvider.value)) {
-    selectedProvider.value = providerOptions.value[0]?.value || ''
-  }
-  if (!groupOptions.value.some((option) => option.value === selectedGroup.value)) {
-    selectedGroup.value = groupOptions.value[0]?.value || ''
-  }
+  const selections = syncMarketplaceFilterSelections(
+    { provider: selectedProvider.value, group: selectedGroup.value },
+    providerOptions.value.map((option) => option.value),
+    groupOptions.value.map((option) => option.value)
+  )
+  selectedProvider.value = selections.provider
+  selectedGroup.value = selections.group
 }
 
 async function loadMarketplacePaymentConfig(): Promise<PaymentConfig | null> {

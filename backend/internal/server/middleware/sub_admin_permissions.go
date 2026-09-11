@@ -137,7 +137,9 @@ func adminMenuKeyForAPIPath(path string) string {
 		return "admin_orders"
 	case strings.HasPrefix(p, "/payment/plans"):
 		return "admin_order_plans"
-	case strings.HasPrefix(p, "/payment/config") || strings.HasPrefix(p, "/payment/providers"):
+	case strings.HasPrefix(p, "/payment/config") ||
+		strings.HasPrefix(p, "/payment/providers") ||
+		strings.HasPrefix(p, "/payment/model-marketplace"):
 		return "admin_order_dashboard"
 	case strings.HasPrefix(p, "/usage"):
 		return "admin_usage"

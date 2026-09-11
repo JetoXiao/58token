@@ -1,13 +1,231 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
+
+type marketplaceOfficialPriceStoreStub struct {
+	prices map[string]MarketplaceOfficialPrice
+	err    error
+}
+
+func (s *marketplaceOfficialPriceStoreStub) SyncOfficialPrices(
+	_ context.Context,
+	prices map[string]MarketplaceOfficialPrice,
+) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.prices = prices
+	return nil
+}
+
+type pricingRemoteClientStub struct {
+	body []byte
+	hash string
+}
+
+func (s pricingRemoteClientStub) FetchPricingJSON(context.Context, string) ([]byte, error) {
+	return append([]byte(nil), s.body...), nil
+}
+
+func (s pricingRemoteClientStub) FetchHashText(context.Context, string) (string, error) {
+	return s.hash, nil
+}
+
+func TestPricingServiceSyncMarketplaceOfficialPricesConvertsToPerMillionTokens(t *testing.T) {
+	store := &marketplaceOfficialPriceStoreStub{}
+	svc := &PricingService{
+		marketplacePriceStore: store,
+	}
+
+	err := svc.syncMarketplaceOfficialPrices(context.Background(), map[string]*LiteLLMModelPricing{
+		"gpt-5.6-sol": {
+			InputCostPerToken:           4e-6,
+			OutputCostPerToken:          20e-6,
+			CacheCreationInputTokenCost: 5e-6,
+			CacheReadInputTokenCost:     0.4e-6,
+		},
+	})
+
+	require.NoError(t, err)
+	assertMarketplaceOfficialPrice(t, MarketplaceOfficialPrice{
+		Input:      pricingFloat64Ptr(4),
+		Output:     pricingFloat64Ptr(20),
+		CacheWrite: pricingFloat64Ptr(5),
+		CacheRead:  pricingFloat64Ptr(0.4),
+	}, store.prices["gpt-5.6-sol"])
+}
+
+func pricingFloat64Ptr(value float64) *float64 {
+	return &value
+}
+
+func TestPricingServiceDownloadPricingDataAlsoSyncsMarketplacePrices(t *testing.T) {
+	store := &marketplaceOfficialPriceStoreStub{}
+	svc := NewPricingService(&config.Config{
+		Pricing: config.PricingConfig{
+			RemoteURL: "https://pricing.test/model-pricing.json",
+			DataDir:   t.TempDir(),
+		},
+	}, pricingRemoteClientStub{
+		body: []byte(`{
+			"gpt-5.6-sol": {
+				"input_cost_per_token": 0.000004,
+				"output_cost_per_token": 0.00002,
+				"cache_creation_input_token_cost": 0.000005,
+				"cache_read_input_token_cost": 0.0000004,
+				"litellm_provider": "openai",
+				"mode": "chat"
+			}
+		}`),
+	}, store)
+
+	err := svc.downloadPricingData()
+
+	require.NoError(t, err)
+	assertMarketplaceOfficialPrice(t, MarketplaceOfficialPrice{
+		Input:      pricingFloat64Ptr(4),
+		Output:     pricingFloat64Ptr(20),
+		CacheWrite: pricingFloat64Ptr(5),
+		CacheRead:  pricingFloat64Ptr(0.4),
+	}, store.prices["gpt-5.6-sol"])
+}
+
+func TestPricingServiceMarketplacePriceSyncFailureDoesNotBlockPricingDownload(t *testing.T) {
+	store := &marketplaceOfficialPriceStoreStub{err: errors.New("marketplace database unavailable")}
+	svc := NewPricingService(&config.Config{
+		Pricing: config.PricingConfig{
+			RemoteURL: "https://pricing.test/model-pricing.json",
+			DataDir:   t.TempDir(),
+		},
+	}, pricingRemoteClientStub{
+		body: []byte(`{
+			"gpt-5.6-sol": {
+				"input_cost_per_token": 0.000004,
+				"output_cost_per_token": 0.00002,
+				"litellm_provider": "openai",
+				"mode": "chat"
+			}
+		}`),
+	}, store)
+
+	err := svc.downloadPricingData()
+
+	require.NoError(t, err)
+	require.NotNil(t, svc.GetModelPricing("gpt-5.6-sol"))
+}
+
+func TestPricingServiceInitializeSyncsLoadedLocalPricesToMarketplace(t *testing.T) {
+	dataDir := t.TempDir()
+	pricingFile := filepath.Join(dataDir, "model_pricing.json")
+	require.NoError(t, os.WriteFile(pricingFile, []byte(`{
+		"gpt-5.6-sol": {
+			"input_cost_per_token": 0.000004,
+			"output_cost_per_token": 0.00002,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`), 0644))
+
+	store := &marketplaceOfficialPriceStoreStub{}
+	svc := NewPricingService(&config.Config{
+		Pricing: config.PricingConfig{
+			RemoteURL: "https://pricing.test/model-pricing.json",
+			HashURL:   "https://pricing.test/model-pricing.sha256",
+			DataDir:   dataDir,
+		},
+	}, pricingRemoteClientStub{}, store)
+
+	require.NoError(t, svc.Initialize())
+	t.Cleanup(svc.Stop)
+
+	assertMarketplaceOfficialPrice(t, MarketplaceOfficialPrice{
+		Input:  pricingFloat64Ptr(4),
+		Output: pricingFloat64Ptr(20),
+	}, store.prices["gpt-5.6-sol"])
+}
+
+func TestPricingServiceFallbackAlsoSyncsMarketplacePrices(t *testing.T) {
+	dataDir := t.TempDir()
+	fallbackFile := filepath.Join(dataDir, "fallback.json")
+	require.NoError(t, os.WriteFile(fallbackFile, []byte(`{
+		"gpt-5.6-sol": {
+			"input_cost_per_token": 0.000004,
+			"output_cost_per_token": 0.00002,
+			"litellm_provider": "openai",
+			"mode": "chat"
+		}
+	}`), 0644))
+
+	store := &marketplaceOfficialPriceStoreStub{}
+	svc := NewPricingService(&config.Config{
+		Pricing: config.PricingConfig{
+			RemoteURL:    "https://pricing.test/model-pricing.json",
+			DataDir:      filepath.Join(dataDir, "runtime"),
+			FallbackFile: fallbackFile,
+		},
+	}, pricingRemoteClientStub{body: []byte(`{}`)}, store)
+
+	require.NoError(t, svc.Initialize())
+	t.Cleanup(svc.Stop)
+
+	assertMarketplaceOfficialPrice(t, MarketplaceOfficialPrice{
+		Input:  pricingFloat64Ptr(4),
+		Output: pricingFloat64Ptr(20),
+	}, store.prices["gpt-5.6-sol"])
+}
+
+func TestPricingServiceSyncWithRemoteSyncsMarketplacePricesWhenHashUnchanged(t *testing.T) {
+	store := &marketplaceOfficialPriceStoreStub{}
+	svc := NewPricingService(&config.Config{
+		Pricing: config.PricingConfig{
+			HashURL: "https://pricing.test/model-pricing.sha256",
+			DataDir: t.TempDir(),
+		},
+	}, pricingRemoteClientStub{hash: "same-hash"}, store)
+	svc.localHash = "same-hash"
+	svc.pricingData = map[string]*LiteLLMModelPricing{
+		"gpt-5.6-sol": {
+			InputCostPerToken:  4e-6,
+			OutputCostPerToken: 20e-6,
+		},
+	}
+
+	err := svc.syncWithRemote()
+
+	require.NoError(t, err)
+	assertMarketplaceOfficialPrice(t, MarketplaceOfficialPrice{
+		Input:  pricingFloat64Ptr(4),
+		Output: pricingFloat64Ptr(20),
+	}, store.prices["gpt-5.6-sol"])
+}
+
+func assertMarketplaceOfficialPrice(t *testing.T, expected, actual MarketplaceOfficialPrice) {
+	t.Helper()
+	assertPricePointer(t, expected.Input, actual.Input)
+	assertPricePointer(t, expected.Output, actual.Output)
+	assertPricePointer(t, expected.CacheWrite, actual.CacheWrite)
+	assertPricePointer(t, expected.CacheRead, actual.CacheRead)
+}
+
+func assertPricePointer(t *testing.T, expected, actual *float64) {
+	t.Helper()
+	if expected == nil {
+		require.Nil(t, actual)
+		return
+	}
+	require.NotNil(t, actual)
+	require.InDelta(t, *expected, *actual, 1e-12)
+}
 
 func TestParsePricingData_ParsesPriorityAndServiceTierFields(t *testing.T) {
 	svc := &PricingService{}

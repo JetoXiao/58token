@@ -57,6 +57,49 @@ export interface UpdatePaymentConfigRequest {
   help_text?: string
 }
 
+export interface MarketplaceModelConfig {
+  id?: number
+  source_model_name: string
+  display_name?: string
+  capability_tags?: string[]
+  capability_tags_text?: string
+  capability_tags_configured?: boolean
+  enabled: boolean
+  sort_order: number
+  is_virtual: boolean
+}
+
+export interface MarketplaceGroupConfig {
+  id: number
+  source_group_id: number
+  source_group_name: string
+  platform: string
+  source_rate_multiplier: number
+  source_sort_order: number
+  source_models: string[]
+  display_name: string
+  display_multiplier: number
+  enabled: boolean
+  source_active: boolean
+  is_virtual: boolean
+  models: MarketplaceModelConfig[]
+}
+
+export interface SyncMarketplaceGroupsRequest {
+  preserve_display_config: boolean
+}
+
+export interface SaveMarketplaceGroupsRequest {
+  groups: MarketplaceGroupConfig[]
+}
+
+export interface UpdateMarketplaceGroupRequest {
+  display_name: string
+  display_multiplier: number
+  enabled: boolean
+  models: MarketplaceModelConfig[]
+}
+
 export const adminPaymentAPI = {
   // ==================== Config ====================
 
@@ -68,6 +111,35 @@ export const adminPaymentAPI = {
   /** Update payment configuration */
   updateConfig(data: UpdatePaymentConfigRequest) {
     return apiClient.put('/admin/payment/config', data)
+  },
+
+  /** List model marketplace group and model display settings */
+  getMarketplaceGroups() {
+    return apiClient.get<{ groups: MarketplaceGroupConfig[]; synced: boolean }>('/admin/payment/model-marketplace')
+  },
+
+  /** Refresh model marketplace data from active gateway groups */
+  syncMarketplaceGroups(data: SyncMarketplaceGroupsRequest) {
+    return apiClient.post<{ groups: MarketplaceGroupConfig[]; synced: boolean }>(
+      '/admin/payment/model-marketplace/sync',
+      data,
+    )
+  },
+
+  /** Save the complete model marketplace display configuration */
+  saveMarketplaceGroups(data: SaveMarketplaceGroupsRequest) {
+    return apiClient.put<{ groups: MarketplaceGroupConfig[]; synced: boolean }>(
+      '/admin/payment/model-marketplace',
+      data,
+    )
+  },
+
+  /** Update one model marketplace group's display settings */
+  updateMarketplaceGroup(sourceGroupId: number, data: UpdateMarketplaceGroupRequest) {
+    return apiClient.put<MarketplaceGroupConfig>(
+      `/admin/payment/model-marketplace/groups/${sourceGroupId}`,
+      data
+    )
   },
 
   // ==================== Dashboard ====================

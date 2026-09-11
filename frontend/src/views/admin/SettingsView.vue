@@ -6433,38 +6433,168 @@
           </div>
 
           <div class="card">
-            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t("admin.settings.payment.marketplaceGroupMultipliers.title") }}
-              </h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {{ t("admin.settings.payment.marketplaceGroupMultipliers.description") }}
-              </p>
-            </div>
-            <div class="grid gap-4 p-6 md:grid-cols-2 xl:grid-cols-3">
-              <div
-                v-for="group in marketplaceGroupMultiplierKeys"
-                :key="group"
-                class="rounded-2xl border border-gray-200 bg-gray-50/80 p-4 dark:border-dark-700 dark:bg-dark-800"
-              >
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ group }}
-                </label>
-                <div class="flex items-center gap-2">
-                  <input
-                    v-model="marketplaceGroupMultiplierInputs[group]"
-                    @blur="commitMarketplaceGroupMultiplierInput(group)"
-                    type="text"
-                    inputmode="decimal"
-                    pattern="[0-9]*[.]?[0-9]*"
-                    autocomplete="off"
-                    class="input"
-                  />
-                  <span class="text-sm text-gray-500 dark:text-gray-400">x</span>
-                </div>
-                <p class="mt-2 text-xs text-gray-400">
-                  {{ t("admin.settings.payment.marketplaceGroupMultipliers.hint") }}
+            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ t("admin.settings.payment.marketplaceGroupMultipliers.title") }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.payment.marketplaceMaintenance.description") }}
                 </p>
+              </div>
+              <div class="flex flex-wrap items-center justify-end gap-3">
+                <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <input
+                    v-model="marketplaceMaintenancePreserveDisplayConfig"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
+                  />
+                  <span>{{ t("admin.settings.payment.marketplaceMaintenance.preserveDisplayConfig") }}</span>
+                </label>
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm"
+                  :disabled="marketplaceMaintenanceLoading || marketplaceMaintenanceSyncing"
+                  @click="syncMarketplaceMaintenance"
+                >
+                  <Icon name="refresh" size="sm" />
+                  {{ marketplaceMaintenanceSyncing
+                    ? t("common.loading")
+                    : t("admin.settings.payment.marketplaceMaintenance.sync") }}
+                </button>
+              </div>
+            </div>
+            <div class="space-y-4 p-6">
+              <div
+                v-if="marketplaceMaintenanceLoading"
+                class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400"
+              >
+                <span class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></span>
+                {{ t("common.loading") }}
+              </div>
+              <div
+                v-else-if="marketplaceMaintenanceGroups.length === 0"
+                class="rounded-lg border border-dashed border-gray-200 p-5 text-sm text-gray-500 dark:border-dark-700 dark:text-gray-400"
+              >
+                {{ t("admin.settings.payment.marketplaceMaintenance.empty") }}
+              </div>
+              <div v-else class="grid gap-4 lg:grid-cols-2">
+                <div
+                  v-for="group in marketplaceMaintenanceGroups"
+                  :key="group.id"
+                  class="rounded-xl border border-gray-200 p-4 dark:border-dark-700"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                          {{ group.display_name || group.source_group_name || t("admin.settings.payment.marketplaceMaintenance.unnamedGroup") }}
+                        </h3>
+                      </div>
+                      <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-600 dark:text-gray-300">
+                        <span class="rounded-full bg-gray-100 px-2 py-1 dark:bg-dark-800">
+                          {{ group.platform || "-" }}
+                        </span>
+                        <span class="rounded-full bg-gray-100 px-2 py-1 dark:bg-dark-800">
+                          {{ group.models.length }} {{ t("admin.settings.payment.marketplaceMaintenance.models") }}
+                        </span>
+                        <span class="rounded-full bg-gray-100 px-2 py-1 dark:bg-dark-800">
+                          {{ group.is_virtual
+                            ? t("admin.settings.payment.marketplaceMaintenance.displayMultiplier")
+                            : t("admin.settings.payment.marketplaceMaintenance.sourceMultiplier") }}
+                          {{ Number(group.is_virtual ? group.display_multiplier : group.source_rate_multiplier).toFixed(2) }}x
+                        </span>
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-icon !p-2"
+                        :aria-label="t('admin.settings.payment.marketplaceMaintenance.toggleModels')"
+                        :title="t('admin.settings.payment.marketplaceMaintenance.toggleModels')"
+                        @click="toggleMarketplaceMaintenanceGroup(group)"
+                      >
+                        <Icon
+                          :name="isMarketplaceMaintenanceGroupExpanded(group) ? 'chevronUp' : 'chevronDown'"
+                          size="sm"
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label class="input-label">
+                        {{ t("admin.settings.payment.marketplaceMaintenance.displayName") }}
+                      </label>
+                      <input
+                        v-model="group.display_name"
+                        class="input"
+                        :placeholder="group.source_group_name"
+                      />
+                    </div>
+                    <div>
+                      <label class="input-label">
+                        {{ t("admin.settings.payment.marketplaceMaintenance.multiplier") }}
+                      </label>
+                      <input
+                        v-model.number="group.display_multiplier"
+                        type="number"
+                        min="0.0001"
+                        step="0.01"
+                        class="input"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t("admin.settings.payment.marketplaceMaintenance.visible") }}
+                    </span>
+                    <Toggle v-model="group.enabled" />
+                  </div>
+
+                  <div
+                    v-if="isMarketplaceMaintenanceGroupExpanded(group)"
+                    class="mt-4 border-t border-gray-100 pt-4 dark:border-dark-700"
+                  >
+                    <div class="flex items-center justify-between gap-3">
+                      <p class="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {{ t("admin.settings.payment.marketplaceMaintenance.modelList") }}
+                        <span class="text-xs font-normal text-gray-400">({{ group.models.length }})</span>
+                      </p>
+                    </div>
+                    <div v-if="group.models.length > 0" class="mt-3 space-y-2">
+                      <div
+                        v-for="model in group.models"
+                        :key="model.id || `${group.id}-${model.sort_order}-${model.source_model_name}`"
+                        class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+                      >
+                        <div class="min-w-0">
+                          <span
+                            class="block truncate text-sm text-gray-600 dark:text-gray-300"
+                            :title="model.source_model_name"
+                          >
+                            {{ model.source_model_name }}
+                          </span>
+                          <span class="mt-1 block text-[11px] text-gray-400">
+                            {{ t("admin.settings.payment.marketplaceMaintenance.capabilities") }}
+                          </span>
+                        </div>
+                        <input
+                          v-model="model.capability_tags_text"
+                          class="input input-sm min-w-0"
+                          :placeholder="t('admin.settings.payment.marketplaceMaintenance.capabilityPlaceholder')"
+                          @input="model.capability_tags_configured = true"
+                        />
+                        <Toggle v-model="model.enabled" />
+                      </div>
+                    </div>
+                    <p v-else class="mt-3 text-xs text-gray-400">
+                      {{ t("admin.settings.payment.marketplaceMaintenance.noModels") }}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -7025,6 +7155,11 @@ import type {
   SupportContactItem,
 } from "@/types";
 import type { ProviderInstance } from "@/types/payment";
+import type {
+  MarketplaceGroupConfig,
+  MarketplaceModelConfig,
+  SaveMarketplaceGroupsRequest,
+} from "@/api/admin/payment";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import Icon from "@/components/icons/Icon.vue";
 import Select from "@/components/common/Select.vue";
@@ -7331,17 +7466,6 @@ function syncMarketplaceGroupMultiplierInputs(
   for (const group of marketplaceGroupMultiplierKeys) {
     marketplaceGroupMultiplierInputs[group] = String(values[group] ?? 1);
   }
-}
-
-function commitMarketplaceGroupMultiplierInput(
-  group: (typeof marketplaceGroupMultiplierKeys)[number],
-): void {
-  const normalized =
-    parseMarketplaceGroupMultiplierInput(
-      marketplaceGroupMultiplierInputs[group],
-    ) ?? 1;
-  form.payment_marketplace_group_multipliers[group] = normalized;
-  marketplaceGroupMultiplierInputs[group] = String(normalized);
 }
 
 function marketplaceGroupMultipliersPayload(): Record<string, number> {
@@ -9264,7 +9388,18 @@ async function saveSettings() {
 
     const requestedMarketplaceGroupMultipliers =
       payload.payment_marketplace_group_multipliers;
+    const shouldSaveMarketplaceMaintenance =
+      activeTab.value === "payment" && marketplaceMaintenanceLoaded.value;
+    if (
+      shouldSaveMarketplaceMaintenance &&
+      !validateMarketplaceMaintenance()
+    ) {
+      return;
+    }
     const updated = await adminAPI.settings.updateSettings(payload);
+    if (shouldSaveMarketplaceMaintenance) {
+      await persistMarketplaceMaintenance();
+    }
     for (const [key, value] of Object.entries(updated)) {
       if (key === "openai_fast_policy_settings") continue;
       if (value !== null && value !== undefined) {
@@ -9895,6 +10030,13 @@ function slog(...args: unknown[]) {
 const providersLoading = ref(false);
 const providerSaving = ref(false);
 const providers = ref<ProviderInstance[]>([]);
+const marketplaceMaintenanceLoading = ref(false);
+const marketplaceMaintenanceSyncing = ref(false);
+const marketplaceMaintenancePreserveDisplayConfig = ref(false);
+const marketplaceMaintenanceGroups = ref<MarketplaceGroupConfig[]>([]);
+const marketplaceMaintenanceLoaded = ref(false);
+const marketplaceMaintenanceSynced = ref(false);
+const marketplaceMaintenanceExpandedGroups = ref<Record<string, boolean>>({});
 const showProviderDialog = ref(false);
 const showDeleteProviderDialog = ref(false);
 const editingProvider = ref<ProviderInstance | null>(null);
@@ -10049,6 +10191,211 @@ async function loadProviders() {
   } finally {
     providersLoading.value = false;
   }
+}
+
+function normalizeMarketplaceMaintenanceGroup(
+  group: MarketplaceGroupConfig,
+): MarketplaceGroupConfig {
+  const sourceGroupID = Number(group.source_group_id || 0);
+  return {
+    ...group,
+    id: Number(group.id || 0),
+    source_group_id: sourceGroupID,
+    source_models: Array.isArray(group.source_models) ? group.source_models : [],
+    source_rate_multiplier:
+      Number.isFinite(Number(group.source_rate_multiplier)) &&
+      Number(group.source_rate_multiplier) > 0
+        ? Number(group.source_rate_multiplier)
+        : 1,
+    source_sort_order: Number(group.source_sort_order || 0),
+    platform: String(group.platform || ""),
+    enabled: group.enabled === true,
+    source_active: group.source_active !== false,
+    is_virtual: group.is_virtual === true || sourceGroupID <= 0,
+    display_name: String(group.display_name || ""),
+    display_multiplier:
+      Number.isFinite(Number(group.display_multiplier)) &&
+      Number(group.display_multiplier) > 0
+        ? Number(group.display_multiplier)
+        : 1,
+    models: (Array.isArray(group.models) ? group.models : []).map(
+      (model: MarketplaceModelConfig, index: number) => ({
+        ...model,
+        id: model.id ? Number(model.id) : undefined,
+        source_model_name: String(model.source_model_name || ""),
+        display_name: String(model.display_name || ""),
+        sort_order: Number(model.sort_order ?? index),
+        enabled: model.enabled !== false,
+        is_virtual: model.is_virtual === true,
+        capability_tags: Array.isArray(model.capability_tags)
+          ? model.capability_tags.map((tag) => String(tag).trim()).filter(Boolean)
+          : [],
+        capability_tags_configured: model.capability_tags_configured === true,
+        capability_tags_text: Array.isArray(model.capability_tags)
+          ? model.capability_tags.map((tag) => String(tag).trim()).filter(Boolean).join(", ")
+          : "",
+      }),
+    ),
+  };
+}
+
+function normalizeMarketplaceMaintenanceGroups(
+  groups: MarketplaceGroupConfig[],
+): MarketplaceGroupConfig[] {
+  return groups
+    .map(normalizeMarketplaceMaintenanceGroup)
+    .filter((group) => !group.is_virtual && group.source_group_id > 0);
+}
+
+async function loadMarketplaceMaintenance(): Promise<void> {
+  marketplaceMaintenanceLoading.value = true;
+  marketplaceMaintenanceLoaded.value = false;
+  try {
+    const response = await adminAPI.payment.getMarketplaceGroups();
+    marketplaceMaintenanceSynced.value = response.data?.synced === true;
+    marketplaceMaintenanceGroups.value = normalizeMarketplaceMaintenanceGroups(
+      response.data?.groups || [],
+    );
+    marketplaceMaintenanceLoaded.value = true;
+  } catch (err: unknown) {
+    appStore.showError(
+      extractI18nErrorMessage(
+        err,
+        t,
+        "payment.errors",
+        t("common.error"),
+      ),
+    );
+  } finally {
+    marketplaceMaintenanceLoading.value = false;
+  }
+}
+
+async function syncMarketplaceMaintenance(): Promise<void> {
+  marketplaceMaintenanceSyncing.value = true;
+  try {
+    const response = await adminAPI.payment.syncMarketplaceGroups({
+      preserve_display_config: marketplaceMaintenancePreserveDisplayConfig.value,
+    });
+    marketplaceMaintenanceSynced.value = response.data?.synced === true;
+    marketplaceMaintenanceGroups.value = normalizeMarketplaceMaintenanceGroups(
+      response.data?.groups || [],
+    );
+    appStore.showSuccess(
+      t("admin.settings.payment.marketplaceMaintenance.syncSuccess"),
+    );
+  } catch (err: unknown) {
+    appStore.showError(
+      extractI18nErrorMessage(
+        err,
+        t,
+        "payment.errors",
+        t("common.error"),
+      ),
+    );
+  } finally {
+    marketplaceMaintenanceSyncing.value = false;
+  }
+}
+
+function marketplaceMaintenanceGroupKey(group: MarketplaceGroupConfig): string {
+  return String(group.id);
+}
+
+function isMarketplaceMaintenanceGroupExpanded(
+  group: MarketplaceGroupConfig,
+): boolean {
+  return marketplaceMaintenanceExpandedGroups.value[
+    marketplaceMaintenanceGroupKey(group)
+  ] === true;
+}
+
+function toggleMarketplaceMaintenanceGroup(group: MarketplaceGroupConfig): void {
+  const key = marketplaceMaintenanceGroupKey(group);
+  marketplaceMaintenanceExpandedGroups.value = {
+    ...marketplaceMaintenanceExpandedGroups.value,
+    [key]: !isMarketplaceMaintenanceGroupExpanded(group),
+  };
+}
+
+function validateMarketplaceMaintenance(): boolean {
+  for (const group of marketplaceMaintenanceGroups.value) {
+    const multiplier = Number(group.display_multiplier);
+    if (!Number.isFinite(multiplier) || multiplier <= 0) {
+      appStore.showError(
+        t("admin.settings.payment.marketplaceMaintenance.invalidMultiplier"),
+      );
+      return false;
+    }
+  }
+  return true;
+}
+
+function marketplaceMaintenanceSavePayload(): SaveMarketplaceGroupsRequest {
+  return {
+    groups: marketplaceMaintenanceGroups.value
+      .filter((group) => !group.is_virtual && group.source_group_id > 0)
+      .map((group, groupIndex) => {
+        const displayMultiplier = Number(group.display_multiplier);
+        return {
+          ...group,
+          id: group.id > 0 ? group.id : 0,
+          source_group_id: group.source_group_id,
+          source_group_name: group.source_group_name,
+          source_rate_multiplier: group.source_rate_multiplier,
+          source_sort_order: group.source_sort_order || groupIndex,
+          display_name: group.display_name.trim(),
+          display_multiplier: displayMultiplier,
+          is_virtual: false,
+        models: group.models
+          .filter(
+            (model) =>
+              !model.is_virtual && model.source_model_name.trim() !== "",
+          )
+          .map((model, modelIndex) => ({
+          ...model,
+          id: model.id && model.id > 0 ? model.id : undefined,
+          source_model_name: model.source_model_name.trim(),
+          display_name: "",
+          capability_tags: model.capability_tags_configured
+            ? parseMarketplaceCapabilityTags(
+                model.capability_tags_text ?? model.capability_tags ?? [],
+              )
+            : undefined,
+          capability_tags_configured: model.capability_tags_configured === true,
+          enabled: model.enabled === true,
+          sort_order: modelIndex,
+          is_virtual: false,
+            })),
+        };
+      }),
+  };
+}
+
+function parseMarketplaceCapabilityTags(raw: string | string[]): string[] {
+  const values = Array.isArray(raw) ? raw : raw.split(/[,，;；|]/);
+  const tags: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const tag = String(value).trim();
+    if (!tag) continue;
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+  }
+  return tags;
+}
+
+async function persistMarketplaceMaintenance(): Promise<void> {
+  const response = await adminAPI.payment.saveMarketplaceGroups(
+    marketplaceMaintenanceSavePayload(),
+  );
+  marketplaceMaintenanceSynced.value = response.data?.synced === true;
+  marketplaceMaintenanceGroups.value = normalizeMarketplaceMaintenanceGroups(
+    response.data?.groups || [],
+  );
+  marketplaceMaintenanceLoaded.value = true;
 }
 
 function openCreateProvider() {
@@ -10206,6 +10553,7 @@ onMounted(() => {
   loadRectifierSettings();
   loadBetaPolicySettings();
   loadProviders();
+  loadMarketplaceMaintenance();
 });
 
 // =========================

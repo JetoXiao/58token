@@ -21,8 +21,12 @@ type BuildInfo struct {
 }
 
 // ProvidePricingService creates and initializes PricingService
-func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient) (*PricingService, error) {
-	svc := NewPricingService(cfg, remoteClient)
+func ProvidePricingService(
+	cfg *config.Config,
+	remoteClient PricingRemoteClient,
+	marketplacePriceStore MarketplaceOfficialPriceStore,
+) (*PricingService, error) {
+	svc := NewPricingService(cfg, remoteClient, marketplacePriceStore)
 	if err := svc.Initialize(); err != nil {
 		// Pricing service initialization failure should not block startup, use fallback prices
 		println("[Service] Warning: Pricing service initialization failed:", err.Error())
@@ -176,6 +180,27 @@ func ProvideDeferredService(accountRepo AccountRepository, timingWheel *TimingWh
 	svc := NewDeferredService(accountRepo, timingWheel, 10*time.Second)
 	svc.Start()
 	return svc
+}
+
+// ProvideRuntimeModelProbeService creates and starts the runtime model probe
+// after both gateway services are available, then wires the probe back into them.
+func ProvideRuntimeModelProbeService(
+	accountRepo AccountRepository,
+	accountTest *AccountTestService,
+	rateLimit *RateLimitService,
+	gateway *GatewayService,
+	openAI *OpenAIGatewayService,
+) *RuntimeModelProbeService {
+	probe := NewRuntimeModelProbeService(accountRepo, accountTest, rateLimit, time.Minute)
+	probe.SetGatewayServices(gateway, openAI)
+	if gateway != nil {
+		gateway.SetRuntimeModelProbeService(probe)
+	}
+	if openAI != nil {
+		openAI.SetRuntimeModelProbeService(probe)
+	}
+	probe.Start()
+	return probe
 }
 
 // ProvideConcurrencyService creates ConcurrencyService and starts slot cleanup worker.
@@ -550,7 +575,11 @@ var ProviderSet = wire.NewSet(
 	NewGroupCapacityService,
 	NewChannelService,
 	NewModelPricingResolver,
-	NewModelMarketplaceService,
+	NewConfiguredModelMarketplaceService,
+	NewModelMarketplaceMaintenanceService,
+	ProvideMarketplaceGroupSource,
+	ProvideMarketplaceModelSource,
+	ProvideRuntimeModelProbeService,
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,

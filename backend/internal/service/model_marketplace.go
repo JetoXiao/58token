@@ -20,20 +20,30 @@ type MarketplaceOfficialPrices struct {
 	CacheRead  json.RawMessage `json:"cacheRead"`
 }
 
+type MarketplaceOfficialPrice struct {
+	Input      *float64
+	Output     *float64
+	CacheWrite *float64
+	CacheRead  *float64
+}
+
 type ModelMarketplaceItem struct {
-	ID             int64                     `json:"id"`
-	ModelName      string                    `json:"model_name"`
-	PricingAliases []string                  `json:"pricing_aliases"`
-	VendorName     string                    `json:"vendor_name"`
-	Groups         []string                  `json:"groups"`
-	Tags           []string                  `json:"tags"`
-	Endpoints      []string                  `json:"endpoints"`
-	Description    string                    `json:"description"`
-	OfficialPrices MarketplaceOfficialPrices `json:"official_prices"`
-	SortOrder      int                       `json:"sort_order"`
-	Enabled        bool                      `json:"enabled"`
-	CreatedAt      time.Time                 `json:"created_at"`
-	UpdatedAt      time.Time                 `json:"updated_at"`
+	ID              int64                     `json:"id"`
+	ModelName       string                    `json:"model_name"`
+	DisplayName     string                    `json:"display_name,omitempty"`
+	PricingAliases  []string                  `json:"pricing_aliases"`
+	VendorName      string                    `json:"vendor_name"`
+	Groups          []string                  `json:"groups"`
+	SourceGroupID   int64                     `json:"source_group_id,omitempty"`
+	GroupMultiplier float64                   `json:"group_multiplier,omitempty"`
+	Tags            []string                  `json:"tags"`
+	Endpoints       []string                  `json:"endpoints"`
+	Description     string                    `json:"description"`
+	OfficialPrices  MarketplaceOfficialPrices `json:"official_prices"`
+	SortOrder       int                       `json:"sort_order"`
+	Enabled         bool                      `json:"enabled"`
+	CreatedAt       time.Time                 `json:"created_at"`
+	UpdatedAt       time.Time                 `json:"updated_at"`
 }
 
 type ModelMarketplaceRepository interface {
@@ -41,7 +51,8 @@ type ModelMarketplaceRepository interface {
 }
 
 type ModelMarketplaceService struct {
-	repo ModelMarketplaceRepository
+	repo           ModelMarketplaceRepository
+	configuredRepo ModelMarketplaceConfiguredRepository
 }
 
 var retiredMarketplaceModels = map[string]struct{}{
@@ -49,15 +60,40 @@ var retiredMarketplaceModels = map[string]struct{}{
 	"gpt-5.3-codex": {},
 }
 
-func NewModelMarketplaceService(repo ModelMarketplaceRepository) *ModelMarketplaceService {
-	return &ModelMarketplaceService{repo: repo}
+func NewModelMarketplaceService(
+	repo ModelMarketplaceRepository,
+	configuredRepo ...ModelMarketplaceConfiguredRepository,
+) *ModelMarketplaceService {
+	var configured ModelMarketplaceConfiguredRepository
+	if len(configuredRepo) > 0 {
+		configured = configuredRepo[0]
+	}
+	return &ModelMarketplaceService{repo: repo, configuredRepo: configured}
+}
+
+func NewConfiguredModelMarketplaceService(
+	repo ModelMarketplaceRepository,
+	configuredRepo ModelMarketplaceConfiguredRepository,
+) *ModelMarketplaceService {
+	return &ModelMarketplaceService{
+		repo:           repo,
+		configuredRepo: configuredRepo,
+	}
 }
 
 func (s *ModelMarketplaceService) ListEnabled(ctx context.Context) ([]ModelMarketplaceItem, error) {
 	if s == nil || s.repo == nil {
 		return nil, fmt.Errorf("model marketplace repository is not configured")
 	}
-	items, err := s.repo.ListEnabled(ctx)
+	var (
+		items []ModelMarketplaceItem
+		err   error
+	)
+	if s.configuredRepo != nil {
+		items, err = s.configuredRepo.ListConfiguredEnabled(ctx)
+	} else {
+		items, err = s.repo.ListEnabled(ctx)
+	}
 	if err != nil {
 		return nil, err
 	}
