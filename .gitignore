@@ -135,6 +135,8 @@ docs/*
 !docs/RESPONSE_CACHE_RELEASE_RUNBOOK_CN.md
 !docs/SUB2API_UPGRADE_PLAN_CN.md
 !docs/SUB2API_UPGRADE_BASELINE_20261020.md
+!docs/upgrade-v0.2.17/
+!docs/upgrade-v0.2.17/**
 .serena/
 .codex/
 frontend/coverage/

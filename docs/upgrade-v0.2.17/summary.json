@@ -1,0 +1,27 @@
+{
+  "base": "63b0631a58272e88af0d83aa168f65787c53a746",
+  "initial": "75b6c3c5910b4bb525f0337bbd36ae29911f7dc8",
+  "local": "f2f785fd6af5233f570841003fb3fb23d830d78b",
+  "target": "060d0160417782cd962a0c7f460f6cd4565d4916",
+  "initial_differences": [
+    "frontend/pnpm-lock.yaml",
+    "frontend/pnpm-workspace.yaml"
+  ],
+  "tracked_files": {
+    "base": 2196,
+    "initial": 2197,
+    "local": 2388,
+    "target": 4338
+  },
+  "file_classifications": {
+    "both-changed-review": 375,
+    "custom-only-change": 237,
+    "upstream-only-change": 2913
+  },
+  "migration_classifications": {
+    "different": 3,
+    "local-only-preserve": 30,
+    "same": 172,
+    "target-only-review": 121
+  }
+}

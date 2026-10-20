@@ -4,7 +4,7 @@
 
 ## 已完成
 
-- 当前生产基线 tag：`58token-pre-upgrade-20261020`，指向 `f2f785fd6af5233f570841003fb3fb23d830d78b`。
+- 当前生产基线 tag：`58token-pre-upgrade`，指向 `f2f785fd6af5233f570841003fb3fb23d830d78b`。
 - 上游 tag：`upstream-v0.2.17`，目标 commit `060d0160417782cd962a0c7f460f6cd4565d4916`。
 - 当前升级分支：`codex/upgrade-sub2api-v0.2.17`。
 - 已确认当前基线和官方目标没有共同祖先，后续不能直接执行普通 `git merge`。

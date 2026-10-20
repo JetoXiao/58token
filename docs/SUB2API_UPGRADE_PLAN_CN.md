@@ -45,7 +45,7 @@
 | `codex/upgrade-sub2api-v0.2.17` | 升级集成，合并检查和验收通过后 PR 至 `dev` |
 | `codex/upgrade-v0.2.17-<domain>` | 短期模块分支，例如 migrations、gateway、payment、frontend |
 | `codex/hotfix-<issue>` | 从生产基线修复；同步至 `dev` 和升级分支 |
-| `58token-pre-upgrade-20261019` | 升级前代码 tag，实际执行日不同则使用实际日期 |
+| `58token-pre-upgrade` | 升级前代码 tag，固定名称并保留原生产提交 |
 | `v0.2.17-58token.1-rc.1` / `v0.2.17-58token.1` | 候选 / 正式 tag；与官方 tag 分开 |
 
 不要 rebase/force-push 已共享的 `dev`。已从 `dev` 创建集成分支时，旧定制已在分支中，不再整批 cherry-pick 相同提交。只有从干净上游重建的备选路线才需要移植定制。
@@ -70,9 +70,9 @@ git fetch origin
 git switch dev
 git pull --ff-only origin dev
 git rev-parse HEAD
-git tag -a 58token-pre-upgrade-20261019 -m "58Token production baseline"
+git tag -a 58token-pre-upgrade -m "58Token production baseline"
 # tag 存在时先核对，不覆盖；审核后单独推送这个 tag
-git push origin 58token-pre-upgrade-20261019
+git push origin 58token-pre-upgrade
 git remote -v
 # upstream 尚不存在时添加；存在时先检查 URL
 git remote add upstream https://github.com/Wei-Shaw/sub2api.git
