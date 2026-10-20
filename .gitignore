@@ -133,6 +133,7 @@ docs/*
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
 !docs/RESPONSE_CACHE_SECOND_REDIS_DEPLOY_CN.md
 !docs/RESPONSE_CACHE_RELEASE_RUNBOOK_CN.md
+!docs/SUB2API_UPGRADE_PLAN_CN.md
 .serena/
 .codex/
 frontend/coverage/
