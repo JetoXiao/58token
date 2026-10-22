@@ -152,6 +152,21 @@
             <Icon name="cloud" size="sm" />
             Antigravity
           </button>
+          <button
+            v-for="provider in cnProviderOptions"
+            :key="provider.id"
+            type="button"
+            @click.stop.prevent="selectDomesticProvider(provider)"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all',
+              domesticProviderId === provider.id
+                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <Icon name="globe" size="sm" />
+            {{ provider.label }}
+          </button>
         </div>
       </div>
 
@@ -3589,11 +3604,27 @@ const form = reactive({
   expires_at: null as number | null
 })
 
+const cnProviderOptions = [
+  { id: 'kimi', label: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1' },
+  { id: 'zhipu', label: 'Zhipu GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+  { id: 'minimax', label: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1' }
+] as const
+const domesticProviderId = ref<string | null>(null)
+
 // Keep platform selection inside the dialog. The explicit event guard prevents
 // clicks on the segmented control from reaching any outside-click handlers
 // attached by the dialog host.
 const selectPlatform = (platform: AccountPlatform) => {
+  domesticProviderId.value = null
   form.platform = platform
+}
+
+const selectDomesticProvider = (provider: (typeof cnProviderOptions)[number]) => {
+  domesticProviderId.value = provider.id
+  form.platform = 'openai'
+  apiKeyBaseUrl.value = provider.baseUrl
+  accountCategory.value = 'apikey'
 }
 
 // Helper to check if current type needs OAuth flow
