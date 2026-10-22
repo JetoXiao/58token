@@ -1902,6 +1902,14 @@ const handleScroll = () => {
 // 点击外部关闭顶部下拉菜单
 const handleClickOutside = (event: MouseEvent) => {
   const target = event.target as HTMLElement
+
+  // Dialogs are teleported to <body>, so their clicks also reach this page-level
+  // listener. Ignore dialog content; controls inside a modal (such as the
+  // Create Account platform selector) must not close the modal or its menus.
+  if (target instanceof Element && target.closest('[role="dialog"]')) {
+    return
+  }
+
   if (accountToolsDropdownRef.value && !accountToolsDropdownRef.value.contains(target)) {
     showAccountToolsDropdown.value = false
   }
