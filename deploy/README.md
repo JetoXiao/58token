@@ -173,9 +173,9 @@ docker compose -f docker-compose.local.yml logs -f sub2api
 # Restart 58Token only
 docker compose -f docker-compose.local.yml restart sub2api
 
-# Update to latest version
-docker compose -f docker-compose.local.yml pull
-docker compose -f docker-compose.local.yml up -d
+# Build and deploy the new local image
+bash build_image.sh
+docker compose -f docker-compose.local.yml up -d --no-deps --force-recreate sub2api
 
 # Remove all data (caution!)
 docker compose -f docker-compose.local.yml down

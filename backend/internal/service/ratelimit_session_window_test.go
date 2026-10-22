@@ -80,7 +80,7 @@ func (m *sessionWindowMockRepo) Update(context.Context, *Account) error { panic(
 func (m *sessionWindowMockRepo) UpdateSortOrders(context.Context, []AccountSortOrderUpdate) error {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) Delete(context.Context, int64) error    { panic("unexpected") }
+func (m *sessionWindowMockRepo) Delete(context.Context, int64) error { panic("unexpected") }
 func (m *sessionWindowMockRepo) List(context.Context, pagination.PaginationParams) ([]Account, *pagination.PaginationResult, error) {
 	panic("unexpected")
 }

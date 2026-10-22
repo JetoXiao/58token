@@ -20,7 +20,11 @@ const (
 	EndpointResponses         = "/v1/responses"
 	EndpointImagesGenerations = "/v1/images/generations"
 	EndpointImagesEdits       = "/v1/images/edits"
-	EndpointGeminiModels      = "/v1beta/models"
+	// EndpointArkTasks is the OpenAI-platform Seedance/Ark task API.
+	// It intentionally remains separate from image generation: Ark creates an
+	// asynchronous task and reports billable completion tokens on polling.
+	EndpointArkTasks     = "/contents/generations/tasks"
+	EndpointGeminiModels = "/v1beta/models"
 )
 
 // gin.Context keys used by the middleware and helpers below.
@@ -42,6 +46,8 @@ const (
 func NormalizeInboundEndpoint(path string) string {
 	path = strings.TrimSpace(path)
 	switch {
+	case strings.Contains(path, EndpointArkTasks):
+		return EndpointArkTasks
 	case strings.Contains(path, EndpointChatCompletions):
 		return EndpointChatCompletions
 	case strings.Contains(path, EndpointMessages):
@@ -75,6 +81,9 @@ func DeriveUpstreamEndpoint(inbound, rawRequestPath, platform string) string {
 
 	switch platform {
 	case service.PlatformOpenAI:
+		if inbound == EndpointArkTasks {
+			return EndpointArkTasks
+		}
 		if inbound == EndpointImagesGenerations || inbound == EndpointImagesEdits {
 			return inbound
 		}

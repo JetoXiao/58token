@@ -24,7 +24,10 @@ services:
   # 58Token Application
   # ===========================================================================
   sub2api:
-    image: weishaw/sub2api:latest
+    # Use the image built locally by deploy/build_image.sh.
+    # Keep deployment deterministic and avoid silently pulling the upstream image.
+    image: sub2api:latest
+    pull_policy: never
     container_name: sub2api
     restart: unless-stopped
     ulimits:

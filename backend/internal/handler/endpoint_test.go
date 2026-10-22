@@ -35,6 +35,8 @@ func TestNormalizeInboundEndpoint(t *testing.T) {
 		{"/openai/v1/responses/compact", EndpointResponses},
 		{"/openai/v1/images/generations", EndpointImagesGenerations},
 		{"/openai/v1/images/edits", EndpointImagesEdits},
+		{"/contents/generations/tasks", EndpointArkTasks},
+		{"/contents/generations/tasks/mock123", EndpointArkTasks},
 		{"/antigravity/v1beta/models/gemini:generateContent", EndpointGeminiModels},
 
 		// Gin route patterns with wildcards.
@@ -79,6 +81,7 @@ func TestDeriveUpstreamEndpoint(t *testing.T) {
 		{"openai from completions", EndpointChatCompletions, "/v1/chat/completions", service.PlatformOpenAI, EndpointResponses},
 		{"openai image generations", EndpointImagesGenerations, "/v1/images/generations", service.PlatformOpenAI, EndpointImagesGenerations},
 		{"openai image edits", EndpointImagesEdits, "/openai/v1/images/edits", service.PlatformOpenAI, EndpointImagesEdits},
+		{"openai ark tasks", EndpointArkTasks, "/contents/generations/tasks", service.PlatformOpenAI, EndpointArkTasks},
 
 		// Antigravity — uses inbound to pick Claude vs Gemini upstream.
 		{"antigravity claude", EndpointMessages, "/antigravity/v1/messages", service.PlatformAntigravity, EndpointMessages},

@@ -357,9 +357,11 @@ docker compose -f docker-compose.local.yml logs sub2api | grep "admin password"
 #### 升级
 
 ```bash
-# 拉取最新镜像并重建容器
-docker compose -f docker-compose.local.yml pull
-docker compose -f docker-compose.local.yml up -d
+# 在项目根目录构建新镜像（标签：sub2api:latest）
+bash deploy/build_image.sh
+
+# 使用本地新镜像重建应用容器
+docker compose -f docker-compose.local.yml up -d --no-deps --force-recreate sub2api
 ```
 
 #### 轻松迁移（本地目录版）

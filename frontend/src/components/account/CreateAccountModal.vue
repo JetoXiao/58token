@@ -70,10 +70,15 @@
       <!-- Platform Selection - Segmented Control Style -->
       <div>
         <label class="input-label">{{ t('admin.accounts.platform') }}</label>
-        <div class="mt-2 flex rounded-lg bg-gray-100 p-1 dark:bg-dark-700" data-tour="account-form-platform">
+        <div
+          class="mt-2 flex rounded-lg bg-gray-100 p-1 dark:bg-dark-700"
+          data-tour="account-form-platform"
+          @click.stop
+          @mousedown.stop
+        >
           <button
             type="button"
-            @click="form.platform = 'anthropic'"
+            @click.stop.prevent="selectPlatform('anthropic')"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'anthropic'
@@ -86,7 +91,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'openai'"
+            @click.stop.prevent="selectPlatform('openai')"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'openai'
@@ -111,7 +116,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'gemini'"
+            @click.stop.prevent="selectPlatform('gemini')"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'gemini'
@@ -136,7 +141,7 @@
           </button>
           <button
             type="button"
-            @click="form.platform = 'antigravity'"
+            @click.stop.prevent="selectPlatform('antigravity')"
             :class="[
               'flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all',
               form.platform === 'antigravity'
@@ -3583,6 +3588,13 @@ const form = reactive({
   group_ids: [] as number[],
   expires_at: null as number | null
 })
+
+// Keep platform selection inside the dialog. The explicit event guard prevents
+// clicks on the segmented control from reaching any outside-click handlers
+// attached by the dialog host.
+const selectPlatform = (platform: AccountPlatform) => {
+  form.platform = platform
+}
 
 // Helper to check if current type needs OAuth flow
 const isOAuthFlow = computed(() => {

@@ -112,6 +112,23 @@ func RegisterGatewayRoutes(
 			}
 			h.OpenAIGateway.Images(c)
 		})
+		// Seedance/Ark asynchronous task API. The handler is deliberately
+		// separate from Images because task polling and video billing use
+		// completion tokens/duration rather than image units.
+		gateway.POST("/contents/generations/tasks", func(c *gin.Context) {
+			if getGroupPlatform(c) != service.PlatformOpenAI {
+				c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Ark tasks are supported for OpenAI groups only"}})
+				return
+			}
+			h.OpenAIGateway.ArkTasks(c)
+		})
+		gateway.GET("/contents/generations/tasks/:task_id", func(c *gin.Context) {
+			if getGroupPlatform(c) != service.PlatformOpenAI {
+				c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Ark tasks are supported for OpenAI groups only"}})
+				return
+			}
+			h.OpenAIGateway.ArkTasks(c)
+		})
 	}
 
 	// Gemini 原生 API 兼容层（Gemini SDK/CLI 直连）
@@ -178,6 +195,20 @@ func RegisterGatewayRoutes(
 			return
 		}
 		h.OpenAIGateway.Images(c)
+	})
+	r.POST("/contents/generations/tasks", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, func(c *gin.Context) {
+		if getGroupPlatform(c) != service.PlatformOpenAI {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Ark tasks are supported for OpenAI groups only"}})
+			return
+		}
+		h.OpenAIGateway.ArkTasks(c)
+	})
+	r.GET("/contents/generations/tasks/:task_id", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, func(c *gin.Context) {
+		if getGroupPlatform(c) != service.PlatformOpenAI {
+			c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"type": "not_found_error", "message": "Ark tasks are supported for OpenAI groups only"}})
+			return
+		}
+		h.OpenAIGateway.ArkTasks(c)
 	})
 
 	// Antigravity 模型列表
