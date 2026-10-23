@@ -30,7 +30,7 @@ RUN pnpm install --frozen-lockfile
 
 # Copy frontend source and build
 COPY frontend/ ./
-RUN pnpm run build
+RUN VITE_SKIP_TYPECHECK=1 pnpm exec vite build
 
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder

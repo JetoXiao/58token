@@ -152,6 +152,21 @@
             <Icon name="cloud" size="sm" />
             Antigravity
           </button>
+          <button
+            v-for="provider in cnProviderOptions"
+            :key="provider.id"
+            type="button"
+            @click.stop.prevent="selectDomesticProvider(provider)"
+            :class="[
+              'flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2.5 text-sm font-medium transition-all',
+              domesticProviderId === provider.id
+                ? 'bg-white text-indigo-600 shadow-sm dark:bg-dark-600 dark:text-indigo-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
+            ]"
+          >
+            <Icon name="globe" size="sm" />
+            {{ provider.label }}
+          </button>
         </div>
       </div>
 
@@ -1150,7 +1165,7 @@
 
             <!-- Whitelist Mode -->
             <div v-if="modelRestrictionMode === 'whitelist'">
-              <ModelWhitelistSelector v-model="allowedModels" :platform="form.platform" />
+              <ModelWhitelistSelector v-model="allowedModels" :platform="modelListPlatform" />
               <p class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
                 <span v-if="allowedModels.length === 0">{{
@@ -1815,7 +1830,7 @@
 
           <!-- Whitelist Mode -->
           <div v-if="modelRestrictionMode === 'whitelist'">
-            <ModelWhitelistSelector v-model="allowedModels" :platform="form.platform" />
+            <ModelWhitelistSelector v-model="allowedModels" :platform="modelListPlatform" />
             <p class="text-xs text-gray-500 dark:text-gray-400">
               {{ t('admin.accounts.selectedModels', { count: allowedModels.length }) }}
               <span v-if="allowedModels.length === 0">{{
@@ -3589,11 +3604,29 @@ const form = reactive({
   expires_at: null as number | null
 })
 
+const cnProviderOptions = [
+  { id: 'kimi', label: 'Kimi', baseUrl: 'https://api.moonshot.cn/v1' },
+  { id: 'zhipu', label: 'Zhipu GLM', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  { id: 'deepseek', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+  { id: 'minimax', label: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1' }
+] as const
+const domesticProviderId = ref<string | null>(null)
+const modelListPlatform = computed(() => domesticProviderId.value || form.platform)
+
 // Keep platform selection inside the dialog. The explicit event guard prevents
 // clicks on the segmented control from reaching any outside-click handlers
 // attached by the dialog host.
 const selectPlatform = (platform: AccountPlatform) => {
+  domesticProviderId.value = null
   form.platform = platform
+}
+
+const selectDomesticProvider = (provider: (typeof cnProviderOptions)[number]) => {
+  domesticProviderId.value = provider.id
+  form.platform = 'openai'
+  apiKeyBaseUrl.value = provider.baseUrl
+  accountCategory.value = 'apikey'
+  allowedModels.value = [...getModelsByPlatform(provider.id)]
 }
 
 // Helper to check if current type needs OAuth flow
@@ -3694,13 +3727,17 @@ watch(
   (newPlatform) => {
     // Reset base URL based on platform
     apiKeyBaseUrl.value =
-      (newPlatform === 'openai')
+      domesticProviderId.value
+        ? cnProviderOptions.find(provider => provider.id === domesticProviderId.value)?.baseUrl || 'https://api.openai.com'
+        : (newPlatform === 'openai')
         ? 'https://api.openai.com'
         : newPlatform === 'gemini'
           ? 'https://generativelanguage.googleapis.com'
           : 'https://api.anthropic.com'
     // Clear model-related settings
-    allowedModels.value = []
+    allowedModels.value = domesticProviderId.value
+      ? [...getModelsByPlatform(domesticProviderId.value)]
+      : []
     modelMappings.value = []
     // Antigravity: 默认使用映射模式并填充默认映射
     if (newPlatform === 'antigravity') {
@@ -3798,10 +3835,10 @@ const handleSelectGeminiOAuthType = (oauthType: 'code_assist' | 'google_one' | '
 
 // Auto-fill related models when switching to whitelist mode or changing platform
 watch(
-  [modelRestrictionMode, () => form.platform],
+  [modelRestrictionMode, modelListPlatform],
   ([newMode]) => {
     if (newMode === 'whitelist') {
-      allowedModels.value = [...getModelsByPlatform(form.platform)]
+      allowedModels.value = [...getModelsByPlatform(modelListPlatform.value)]
     }
   }
 )
@@ -4097,6 +4134,7 @@ const resetForm = () => {
   form.name = ''
   form.notes = ''
   form.platform = 'anthropic'
+  domesticProviderId.value = null
   form.type = 'oauth'
   form.credentials = {}
   form.proxy_id = null

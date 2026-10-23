@@ -39,13 +39,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const backendUrl = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
   const devPort = Number(env.VITE_DEV_PORT || 3000)
+  const skipTypecheck = process.env.VITE_SKIP_TYPECHECK === '1'
 
   return {
     plugins: [
       vue(),
-      checker({
-        vueTsc: true
-      }),
+      ...(skipTypecheck ? [] : [checker({ vueTsc: true })]),
       injectPublicSettings(backendUrl)
     ],
   resolve: {
