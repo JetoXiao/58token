@@ -3611,7 +3611,10 @@ const cnProviderOptions = [
   { id: 'minimax', label: 'MiniMax', baseUrl: 'https://api.minimax.chat/v1' }
 ] as const
 const domesticProviderId = ref<string | null>(null)
+<<<<<<< HEAD
 const modelListPlatform = computed(() => domesticProviderId.value || form.platform)
+=======
+>>>>>>> origin/dev
 
 // Keep platform selection inside the dialog. The explicit event guard prevents
 // clicks on the segmented control from reaching any outside-click handlers
@@ -3626,7 +3629,10 @@ const selectDomesticProvider = (provider: (typeof cnProviderOptions)[number]) =>
   form.platform = 'openai'
   apiKeyBaseUrl.value = provider.baseUrl
   accountCategory.value = 'apikey'
+<<<<<<< HEAD
   allowedModels.value = [...getModelsByPlatform(provider.id)]
+=======
+>>>>>>> origin/dev
 }
 
 // Helper to check if current type needs OAuth flow
